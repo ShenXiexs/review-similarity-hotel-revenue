@@ -36,8 +36,29 @@ library(purrr)
 7. `FE` 是主结果，`OLS` 与后续 `sys-GMM` 只作为同一样本定义下的稳健性。
 
 ```{r path}
-project_dir <- "/Users/samxie/Research/ReviewSimi_Sales/Code"
-base_dir <- "/Users/samxie/Research/ReviewSimi_Sales"
+detect_project_dir <- function() {
+  candidates <- unique(c(
+    normalizePath(getwd(), winslash = "/", mustWork = FALSE),
+    normalizePath(file.path(getwd(), ".."), winslash = "/", mustWork = FALSE),
+    normalizePath(file.path(getwd(), "..", ".."), winslash = "/", mustWork = FALSE),
+    "/Users/samxie/Research/ReviewSimi_Sales/Code"
+  ))
+
+  for (candidate in candidates) {
+    if (
+      file.exists(file.path(candidate, "Paper_Results_260407.md")) &&
+      dir.exists(file.path(candidate, "scripts")) &&
+      dir.exists(file.path(candidate, "outputs"))
+    ) {
+      return(normalizePath(candidate, winslash = "/", mustWork = TRUE))
+    }
+  }
+
+  stop("Cannot locate project root.")
+}
+
+project_dir <- detect_project_dir()
+base_dir <- normalizePath(file.path(project_dir, ".."), winslash = "/", mustWork = TRUE)
 path_panel_in <- file.path(base_dir, "Data/revenue_1205/valid_match_review_acc_10_zip.dta")
 path_revenue_bind <- file.path(base_dir, "1209new/revenue_tp_all_bind0123Zip.csv")
 output_root <- file.path(project_dir, "outputs")

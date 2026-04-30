@@ -13,16 +13,24 @@ set linesize 255
 capture log close
 
 local project "/Users/samxie/Research/ReviewSimi_Sales/Code"
-local data_main "`project'/outputs/valid_match_review_acc_260407_main.dta"
+local output_root "`project'/outputs"
+local data_dir "`output_root'/data"
+local table_dir "`output_root'/tables"
+local log_dir "`output_root'/logs"
+cap mkdir "`output_root'"
+cap mkdir "`data_dir'"
+cap mkdir "`table_dir'"
+cap mkdir "`log_dir'"
+local data_main "`data_dir'/valid_match_review_acc_260407_main.dta"
 
 capture confirm file "`data_main'"
 if _rc {
-    di as error "Cannot find valid_match_review_acc_260407_main.dta. Run Review_Simi_260325.Rmd first."
+    di as error "Cannot find valid_match_review_acc_260407_main.dta. Run scripts/r/Review_Simi_260325.Rmd first."
     exit 601
 }
 
 use "`data_main'", clear
-log using "`project'/outputs/results_focus_interaction_260407.log", text replace
+log using "`log_dir'/results_focus_interaction_260407.log", text replace
 
 capture confirm numeric variable HotelID
 if _rc {
@@ -97,7 +105,7 @@ reghdfe ln_RevPAR_clean c.sim_mean##i.star_ge3 `ctrl_base' if main_sample_keep =
 estimates store b5_star
 
 esttab b1_rating_last b2_rating_acc b3_volume_last b4_volume_acc b5_star ///
-    using "`project'/outputs/results_focus260407_interaction_binary.txt", replace ///
+    using "`table_dir'/results_focus260407_interaction_binary.txt", replace ///
     se star(+ 0.10 * 0.05 ** 0.01 *** 0.001) b(%9.4f) se(%9.4f) ///
     label compress nomtitles nonumber ///
     stats(N r2, fmt(%9.0f %9.4f) labels("N" "R2"))
@@ -115,7 +123,7 @@ reghdfe ln_RevPAR_clean c.sim_mean##c.center_volume_acc `ctrl_base' if main_samp
 estimates store c4_volume_acc
 
 esttab c1_rating_last c2_rating_acc c3_volume_last c4_volume_acc ///
-    using "`project'/outputs/results_focus260407_interaction_continuous.txt", replace ///
+    using "`table_dir'/results_focus260407_interaction_continuous.txt", replace ///
     se star(+ 0.10 * 0.05 ** 0.01 *** 0.001) b(%9.4f) se(%9.4f) ///
     label compress nomtitles nonumber ///
     stats(N r2, fmt(%9.0f %9.4f) labels("N" "R2"))

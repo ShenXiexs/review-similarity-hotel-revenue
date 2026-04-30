@@ -13,7 +13,15 @@ set linesize 255
 capture log close
 
 local project "/Users/samxie/Research/ReviewSimi_Sales/Code"
-local data_pre "`project'/outputs/valid_match_review_acc_260407_main.dta"
+local output_root "`project'/outputs"
+local data_dir "`output_root'/data"
+local table_dir "`output_root'/tables"
+local log_dir "`output_root'/logs"
+cap mkdir "`output_root'"
+cap mkdir "`data_dir'"
+cap mkdir "`table_dir'"
+cap mkdir "`log_dir'"
+local data_pre "`data_dir'/valid_match_review_acc_260407_main.dta"
 
 capture confirm file "`data_pre'"
 if _rc {
@@ -23,7 +31,7 @@ if _rc {
 
 use "`data_pre'", clear
 keep if main_sample_keep == 1 & Year <= 2019
-log using "`project'/outputs/results_pre2019_heterogeneity_260407.log", text replace
+log using "`log_dir'/results_pre2019_heterogeneity_260407.log", text replace
 
 capture confirm numeric variable HotelID
 if _rc {
@@ -155,7 +163,7 @@ reghdfe ln_RevPAR_clean sim_mean `ctrl_base' if high_star_pre == 1, absorb(hotel
 estimates store g10_star_high
 
 esttab g1_rating_last_low g2_rating_last_high g3_rating_acc_low g4_rating_acc_high g5_volume_last_low g6_volume_last_high g7_volume_acc_low g8_volume_acc_high g9_star_low g10_star_high ///
-    using "`project'/outputs/results_pre2019_heterogeneity_group_260407.txt", replace ///
+    using "`table_dir'/results_pre2019_heterogeneity_group_260407.txt", replace ///
     se star(+ 0.10 * 0.05 ** 0.01 *** 0.001) b(%9.4f) se(%9.4f) ///
     label compress nomtitles nonumber ///
     stats(N r2, fmt(%9.0f %9.4f) labels("N" "R2"))
@@ -175,7 +183,7 @@ reghdfe ln_RevPAR_clean c.sim_mean##i.high_star_pre `ctrl_base' if !missing(high
 estimates store b5_star
 
 esttab b1_rating_last b2_rating_acc b3_volume_last b4_volume_acc b5_star ///
-    using "`project'/outputs/results_pre2019_heterogeneity_interaction_binary_260407.txt", replace ///
+    using "`table_dir'/results_pre2019_heterogeneity_interaction_binary_260407.txt", replace ///
     se star(+ 0.10 * 0.05 ** 0.01 *** 0.001) b(%9.4f) se(%9.4f) ///
     label compress nomtitles nonumber ///
     stats(N r2, fmt(%9.0f %9.4f) labels("N" "R2"))
@@ -193,7 +201,7 @@ reghdfe ln_RevPAR_clean c.sim_mean##c.center_volume_acc_pre `ctrl_base' if !miss
 estimates store c4_volume_acc
 
 esttab c1_rating_last c2_rating_acc c3_volume_last c4_volume_acc ///
-    using "`project'/outputs/results_pre2019_heterogeneity_interaction_continuous_260407.txt", replace ///
+    using "`table_dir'/results_pre2019_heterogeneity_interaction_continuous_260407.txt", replace ///
     se star(+ 0.10 * 0.05 ** 0.01 *** 0.001) b(%9.4f) se(%9.4f) ///
     label compress nomtitles nonumber ///
     stats(N r2, fmt(%9.0f %9.4f) labels("N" "R2"))

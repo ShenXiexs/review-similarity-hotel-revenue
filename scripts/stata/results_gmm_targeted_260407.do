@@ -13,7 +13,19 @@ capture log close
 mata: mata set matafavor speed
 
 local project "/Users/samxie/Research/ReviewSimi_Sales/Code"
-local data_main "`project'/outputs/valid_match_review_acc_260407_main.dta"
+local output_root "`project'/outputs"
+local data_dir "`output_root'/data"
+local log_dir "`output_root'/logs"
+cap mkdir "`output_root'"
+cap mkdir "`data_dir'"
+cap mkdir "`log_dir'"
+local data_main "`data_dir'/valid_match_review_acc_260407_main.dta"
+
+capture confirm file "`data_main'"
+if _rc {
+    di as error "Cannot find valid_match_review_acc_260407_main.dta. Run scripts/r/Review_Simi_260325.Rmd first."
+    exit 601
+}
 
 use "`data_main'", clear
 
@@ -38,7 +50,7 @@ gen byte post2021 = (Year >= 2021)
 gen double sim_post2020 = sim_mean_std_hotel * post2020
 gen double sim_post2021 = sim_mean_std_hotel * post2021
 
-log using "`project'/outputs/results_gmm_targeted_260407.log", text replace
+log using "`log_dir'/results_gmm_targeted_260407.log", text replace
 
 di as text "============================================================"
 di as text "1) PRE2019 TARGETED SAME-SAMPLE GMM"

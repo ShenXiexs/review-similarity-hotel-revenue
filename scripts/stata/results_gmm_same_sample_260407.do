@@ -14,11 +14,21 @@ capture log close
 mata: mata set matafavor speed
 
 local project "/Users/samxie/Research/ReviewSimi_Sales/Code"
-local data_main "`project'/outputs/valid_match_review_acc_260407_main.dta"
+local output_root "`project'/outputs"
+local data_dir "`output_root'/data"
+local scan_dir "`output_root'/scans"
+local table_dir "`output_root'/tables"
+local log_dir "`output_root'/logs"
+cap mkdir "`output_root'"
+cap mkdir "`data_dir'"
+cap mkdir "`scan_dir'"
+cap mkdir "`table_dir'"
+cap mkdir "`log_dir'"
+local data_main "`data_dir'/valid_match_review_acc_260407_main.dta"
 
 capture confirm file "`data_main'"
 if _rc {
-    di as error "Cannot find valid_match_review_acc_260407_main.dta. Run Review_Simi_260325.Rmd first."
+    di as error "Cannot find valid_match_review_acc_260407_main.dta. Run scripts/r/Review_Simi_260325.Rmd first."
     exit 601
 }
 
@@ -146,7 +156,7 @@ end
 
 use "`data_main'", clear
 keep if main_sample_keep == 1
-log using "`project'/outputs/results_gmm_full_same_sample_260407.log", text replace
+log using "`log_dir'/results_gmm_full_same_sample_260407.log", text replace
 build_panel_state
 
 capture which xtabond2
@@ -217,13 +227,13 @@ replace tf_rank = 3 if timefe == "yearfe"
 replace tf_rank = 4 if timefe == "monthfe"
 gsort -pass -nearpass +han_gap +ar1_gap +tf_rank p -beta
 
-export delimited using "`project'/outputs/gmm_full_same_sample_scan_260407.csv", replace
-export delimited using "`project'/outputs/gmm_full_control_scan_260407.csv", replace
+export delimited using "`scan_dir'/gmm_full_same_sample_scan_260407.csv", replace
+export delimited using "`scan_dir'/gmm_full_control_scan_260407.csv", replace
 list ctrl timefe dyn siminst transform breakspec ylag xlag beta p ar1 ar2 han inst N pass nearpass in 1/20, clean noobs
 
 preserve
 keep in 1/20
-export delimited using "`project'/outputs/results_gmm_full_same_sample.txt", replace
+export delimited using "`table_dir'/results_gmm_full_same_sample.txt", replace
 restore
 
 quietly levelsof ctrl in 1, local(best_ctrl) clean

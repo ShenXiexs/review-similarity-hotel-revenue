@@ -13,10 +13,24 @@ set linesize 255
 capture log close
 
 local project "/Users/samxie/Research/ReviewSimi_Sales/Code"
-local data_main "`project'/outputs/valid_match_review_acc_260407_main.dta"
+local output_root "`project'/outputs"
+local data_dir "`output_root'/data"
+local table_dir "`output_root'/tables"
+local log_dir "`output_root'/logs"
+cap mkdir "`output_root'"
+cap mkdir "`data_dir'"
+cap mkdir "`table_dir'"
+cap mkdir "`log_dir'"
+local data_main "`data_dir'/valid_match_review_acc_260407_main.dta"
+
+capture confirm file "`data_main'"
+if _rc {
+    di as error "Cannot find valid_match_review_acc_260407_main.dta. Run scripts/r/Review_Simi_260325.Rmd first."
+    exit 601
+}
 
 use "`data_main'", clear
-log using "`project'/outputs/results_focus_boundary_260410.log", text replace
+log using "`log_dir'/results_focus_boundary_260410.log", text replace
 
 capture confirm numeric variable HotelID
 if _rc {
@@ -83,7 +97,7 @@ reghdfe ln_RevPAR_clean sim_mean `ctrl_base' if main_sample_keep == 1 & high_sta
 estimates store g4_star_high
 
 esttab g1_rating_last_low g2_rating_last_high g3_star_low g4_star_high ///
-    using "`project'/outputs/results_focus_boundary_260410_group.txt", replace ///
+    using "`table_dir'/results_focus_boundary_260410_group.txt", replace ///
     se star(+ 0.10 * 0.05 ** 0.01 *** 0.001) b(%9.4f) se(%9.4f) ///
     label compress nomtitles nonumber ///
     stats(N r2, fmt(%9.0f %9.4f) labels("N" "R2"))
@@ -99,7 +113,7 @@ reghdfe ln_RevPAR_clean c.sim_mean##i.high_star_boundary `ctrl_base' if main_sam
 estimates store i2_star
 
 esttab i1_rating_last i2_star ///
-    using "`project'/outputs/results_focus_boundary_260410_interaction.txt", replace ///
+    using "`table_dir'/results_focus_boundary_260410_interaction.txt", replace ///
     se star(+ 0.10 * 0.05 ** 0.01 *** 0.001) b(%9.4f) se(%9.4f) ///
     label compress nomtitles nonumber ///
     stats(N r2, fmt(%9.0f %9.4f) labels("N" "R2"))

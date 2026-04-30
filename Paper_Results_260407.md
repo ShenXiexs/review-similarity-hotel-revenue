@@ -8,7 +8,7 @@
 2. `ARS Roll`
 3. `ARS JSD`
 
-主数据管线是 [Review_Simi_260325.Rmd](/Users/samxie/Research/ReviewSimi_Sales/Code/Review_Simi_260325.Rmd)。
+主数据管线是 [Review_Simi_260325.Rmd](/Users/samxie/Research/ReviewSimi_Sales/Code/scripts/r/Review_Simi_260325.Rmd)。
 主表脚本是 [results_focus_tables_260407.do](/Users/samxie/Research/ReviewSimi_Sales/Code/scripts/stata/results_focus_tables_260407.do)。
 交互项脚本是 [results_focus_interaction_260407.do](/Users/samxie/Research/ReviewSimi_Sales/Code/scripts/stata/results_focus_interaction_260407.do)。
 同样本 `pre2019` GMM 扫描脚本是 [results_gmm_pre2019_same_sample_260407.do](/Users/samxie/Research/ReviewSimi_Sales/Code/scripts/stata/results_gmm_pre2019_same_sample_260407.do)。
@@ -28,9 +28,9 @@
 ## 2. Main Sample
 
 本轮固定 `revenue_rule = winsor_city_1_99`，只在评论总量阈值上搜索 `80 / 100 / 120 / 150 / 200 / 300`。
-阈值扫描结果见 [sample_review_focus_scan_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/sample_review_focus_scan_260407.csv)。
-正式样本审计见 [sample_audit_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/sample_audit_260407.csv)。
-正式主样本数据见 [valid_match_review_acc_260407_main.dta](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/valid_match_review_acc_260407_main.dta)。
+阈值扫描结果见 [sample_review_focus_scan_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/scans/sample_review_focus_scan_260407.csv)。
+正式样本审计见 [sample_audit_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/csv/sample_audit_260407.csv)。
+正式主样本数据见 [valid_match_review_acc_260407_main.dta](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/data/valid_match_review_acc_260407_main.dta)。
 
 当前被选中的正式主样本是：
 
@@ -88,8 +88,8 @@ ln_RevPAR_clean_dm_cym_it = β * sim_mean_dm_cym_it
 
 ### 3.2 Summary
 
-主结果摘要见 [main_effect_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/main_effect_260407.csv)。
-`demean` 扫描汇总见 [main_effect_demean_scan_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/main_effect_demean_scan_260407.csv)。
+主结果摘要见 [main_effect_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/csv/main_effect_260407.csv)。
+`demean` 扫描汇总见 [main_effect_demean_scan_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/scans/main_effect_demean_scan_260407.csv)。
 
 当前正式结果是：
 
@@ -114,12 +114,12 @@ ln_RevPAR_clean_dm_cym_it = β * sim_mean_dm_cym_it
 ### 3.3 Stata Tables
 
 原始日志：
-[results_focus_tables_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_focus_tables_260407.log)
+[results_focus_tables_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/logs/results_focus_tables_260407.log)
 
 摘要表：
-[results_focus260407_main.txt](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_focus260407_main.txt)
-[results_focus260407_ols.txt](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_focus260407_ols.txt)
-[results_focus260407_demean.txt](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_focus260407_demean.txt)
+[results_focus260407_main.txt](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/tables/results_focus260407_main.txt)
+[results_focus260407_ols.txt](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/tables/results_focus260407_ols.txt)
+[results_focus260407_demean.txt](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/tables/results_focus260407_demean.txt)
 
 这一小节直接嵌入完整原始 Stata 表。
 
@@ -410,11 +410,11 @@ lag_avg_rating_month_dm_cym |   .0073477   .0021934     3.35   0.001      .00303
 ## 4. COVID Impact
 
 新增输出：
-[covid_effect_fe_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/covid_effect_fe_260407.csv)
-[covid_effect_gmm_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/covid_effect_gmm_260407.csv)
+[covid_effect_fe_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/csv/covid_effect_fe_260407.csv)
+[covid_effect_gmm_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/csv/covid_effect_gmm_260407.csv)
 
 原始日志：
-[results_covid_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_covid_260407.log)
+[results_covid_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/logs/results_covid_260407.log)
 
 这部分按两条口径识别新冠影响：
 
@@ -528,12 +528,12 @@ lag_avg_rating_month |   .0097611   .0026567     3.67   0.000     .0045423    .0
 
 . 
 . esttab c1_fe c2_ols ///
->     using "`project'/outputs/results_covid_fe_260407.txt", replace ///
+>     using "`project'/outputs/tables/results_covid_fe_260407.txt", replace ///
 >     se star(+ 0.10 * 0.05 ** 0.01 *** 0.001) b(%9.4f) se(%9.4f) ///
 >     label compress nomtitles nonumber ///
 >     stats(N r2, fmt(%9.0f %9.4f) labels("N" "R2"))
-(file /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_covid_fe_260407.txt not found)
-(output written to /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_covid_fe_260407.txt)
+(file /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/tables/results_covid_fe_260407.txt not found)
+(output written to /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/tables/results_covid_fe_260407.txt)
 
 .
 ```
@@ -736,14 +736,14 @@ Difference-in-Hansen tests of exogeneity of instrument subsets:
 
 本节已经按“透明重扫”口径重做，规则网格扩展为 `cityym / cityy × median / 4060 / 3070`，并且把 `permutation p` 正式纳入规则选择，而不是像旧版那样只在最后给 `volume_last` 补算一次。
 
-完整规则扫描见 [heterogeneity_rule_scan_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/heterogeneity_rule_scan_260407.csv)。
-最终采用规则见 [heterogeneity_control_scan_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/heterogeneity_control_scan_260407.csv)。
-最终差异检验见 [heterogeneity_diff_tests_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/heterogeneity_diff_tests_260407.csv)。
-交互项结果见 [heterogeneity_interaction_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/heterogeneity_interaction_260407.csv)。
-边界规则专项扫描见 [heterogeneity_boundary_scan_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/heterogeneity_boundary_scan_260407.csv)。
-分组摘要表见 [results_focus260407_group.txt](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_focus260407_group.txt)。
-原始交互项日志见 [results_focus_interaction_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_focus_interaction_260407.log)。
-`rating_last / star` 的边界重扫原始表见 [results_focus_boundary_260410.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_focus_boundary_260410.log)。
+完整规则扫描见 [heterogeneity_rule_scan_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/scans/heterogeneity_rule_scan_260407.csv)。
+最终采用规则见 [heterogeneity_control_scan_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/scans/heterogeneity_control_scan_260407.csv)。
+最终差异检验见 [heterogeneity_diff_tests_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/csv/heterogeneity_diff_tests_260407.csv)。
+交互项结果见 [heterogeneity_interaction_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/csv/heterogeneity_interaction_260407.csv)。
+边界规则专项扫描见 [heterogeneity_boundary_scan_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/scans/heterogeneity_boundary_scan_260407.csv)。
+分组摘要表见 [results_focus260407_group.txt](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/tables/results_focus260407_group.txt)。
+原始交互项日志见 [results_focus_interaction_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/logs/results_focus_interaction_260407.log)。
+`rating_last / star` 的边界重扫原始表见 [results_focus_boundary_260410.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/logs/results_focus_boundary_260410.log)。
 
 在扩展到 `cityym / cityy / ym / zipy / zipym × median / 4060 / 3070`，并补扫 `strict / inclusive` 边界口径以及 `star` 的多种固定切法之后，当前正文采用的五类结果是：
 
@@ -780,7 +780,7 @@ Difference-in-Hansen tests of exogeneity of instrument subsets:
 
 所以这轮透明重扫后的结论是：`volume_last` 和 `rating_accumulative` 仍然是当前最稳的两条异质性；`rating_last` 现在按严格中位数口径报告，但中位数规则下的组间差异仍不显著；`volume_accumulative` 仍是 near-pass；`star` 的 alternative split 已经显著，但显著性来自方向反转，因此不能进正文主结论。
 
-星级覆盖率见 [star_coverage_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/star_coverage_260407.csv)：
+星级覆盖率见 [star_coverage_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/csv/star_coverage_260407.csv)：
 
 - 观测覆盖率：`49.42%`
 - 酒店覆盖率：`44.12%`
@@ -788,11 +788,11 @@ Difference-in-Hansen tests of exogeneity of instrument subsets:
 ### 5.0A Boundary Rescan Raw Tables
 
 以下直接贴入 `rating_last / star` 边界重扫的最新原始 Stata 表。来源日志：
-[results_focus_boundary_260410.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_focus_boundary_260410.log)
+[results_focus_boundary_260410.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/logs/results_focus_boundary_260410.log)
 
 摘要表：
-[results_focus_boundary_260410_group.txt](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_focus_boundary_260410_group.txt)
-[results_focus_boundary_260410_interaction.txt](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_focus_boundary_260410_interaction.txt)
+[results_focus_boundary_260410_group.txt](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/tables/results_focus_boundary_260410_group.txt)
+[results_focus_boundary_260410_interaction.txt](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/tables/results_focus_boundary_260410_interaction.txt)
 
 ```text
 . di as text "1) BOUNDARY RESCAN GROUPED FE"
@@ -989,10 +989,10 @@ high_star_boundary#c.sim_mean |
 ### 5.1 Grouped FE Full Raw Tables
 
 以下直接贴入当前最新的 grouped FE 原始 Stata 表。来源日志：
-[results_focus_tables_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_focus_tables_260407.log)
+[results_focus_tables_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/logs/results_focus_tables_260407.log)
 
 摘要表：
-[results_focus260407_group.txt](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_focus260407_group.txt)
+[results_focus260407_group.txt](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/tables/results_focus260407_group.txt)
 
 ```text
 . di as text "4) GROUPED FE TABLES"
@@ -1406,11 +1406,11 @@ Absorbed degrees of freedom:
 
 . 
 . esttab f1_rating_last_low f2_rating_last_high f3_rating_acc_low f4_rating_acc_high f5_volume_last_low f6_volume_last_high f7_volume_acc_low f8_volume_acc_high f9_star_low f10_star_high ///
->     using "`project'/outputs/results_focus260407_group.txt", replace ///
+>     using "`project'/outputs/tables/results_focus260407_group.txt", replace ///
 >     se star(+ 0.10 * 0.05 ** 0.01 *** 0.001) b(%9.4f) se(%9.4f) ///
 >     label compress nomtitles nonumber ///
 >     stats(N r2, fmt(%9.0f %9.4f) labels("N" "R2"))
-(output written to /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_focus260407_group.txt)
+(output written to /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/tables/results_focus260407_group.txt)
 
 . 
 ```
@@ -1418,11 +1418,11 @@ Absorbed degrees of freedom:
 ### 5.2 Binary And Continuous Interaction Full Raw Tables
 
 以下直接贴入当前最新的 binary interaction 与 continuous interaction 原始 Stata 表。来源日志：
-[results_focus_interaction_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_focus_interaction_260407.log)
+[results_focus_interaction_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/logs/results_focus_interaction_260407.log)
 
 摘要表：
-[results_focus260407_interaction_binary.txt](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_focus260407_interaction_binary.txt)
-[results_focus260407_interaction_continuous.txt](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_focus260407_interaction_continuous.txt)
+[results_focus260407_interaction_binary.txt](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/tables/results_focus260407_interaction_binary.txt)
+[results_focus260407_interaction_continuous.txt](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/tables/results_focus260407_interaction_continuous.txt)
 
 ```text
 . di as text "1) BINARY INTERACTION FE"
@@ -1659,11 +1659,11 @@ Absorbed degrees of freedom:
 
 . 
 . esttab b1_rating_last b2_rating_acc b3_volume_last b4_volume_acc b5_star ///
->     using "`project'/outputs/results_focus260407_interaction_binary.txt", replace ///
+>     using "`project'/outputs/tables/results_focus260407_interaction_binary.txt", replace ///
 >     se star(+ 0.10 * 0.05 ** 0.01 *** 0.001) b(%9.4f) se(%9.4f) ///
 >     label compress nomtitles nonumber ///
 >     stats(N r2, fmt(%9.0f %9.4f) labels("N" "R2"))
-(output written to /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_focus260407_interaction_binary.txt)
+(output written to /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/tables/results_focus260407_interaction_binary.txt)
 
 . 
 . di as text "============================================================"
@@ -1853,11 +1853,11 @@ Absorbed degrees of freedom:
 
 . 
 . esttab c1_rating_last c2_rating_acc c3_volume_last c4_volume_acc ///
->     using "`project'/outputs/results_focus260407_interaction_continuous.txt", replace ///
+>     using "`project'/outputs/tables/results_focus260407_interaction_continuous.txt", replace ///
 >     se star(+ 0.10 * 0.05 ** 0.01 *** 0.001) b(%9.4f) se(%9.4f) ///
 >     label compress nomtitles nonumber ///
 >     stats(N r2, fmt(%9.0f %9.4f) labels("N" "R2"))
-(output written to /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_focus260407_interaction_continuous.txt)
+(output written to /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/tables/results_focus260407_interaction_continuous.txt)
 
 . 
 ```
@@ -1865,12 +1865,12 @@ Absorbed degrees of freedom:
 ### 5.3 `pre2019` Heterogeneity
 
 新增输出：
-[heterogeneity_pre2019_core_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/heterogeneity_pre2019_core_260407.csv)
-[heterogeneity_pre2019_diff_tests_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/heterogeneity_pre2019_diff_tests_260407.csv)
-[star_pre2019_coverage_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/star_pre2019_coverage_260407.csv)
+[heterogeneity_pre2019_core_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/csv/heterogeneity_pre2019_core_260407.csv)
+[heterogeneity_pre2019_diff_tests_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/csv/heterogeneity_pre2019_diff_tests_260407.csv)
+[star_pre2019_coverage_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/csv/star_pre2019_coverage_260407.csv)
 
 原始日志：
-[results_pre2019_heterogeneity_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_pre2019_heterogeneity_260407.log)
+[results_pre2019_heterogeneity_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/logs/results_pre2019_heterogeneity_260407.log)
 
 在当前 adopted sample 上把时间窗口收紧到 `Year <= 2019` 之后，四条 core moderator 的底层变量仍然是完整可用的：`rating_last`、`rating_accumulative`、`volume_last`、`volume_accumulative` 都还有 `24,582` 左右观测和 `488` 家酒店；`star_class` 则只剩 `12,740` 个非缺失观测、`217` 家酒店。
 
@@ -2322,12 +2322,12 @@ Absorbed degrees of freedom:
 
 . 
 . esttab g1_rating_last_low g2_rating_last_high g3_rating_acc_low g4_rating_acc_high g5_volume_last_low g6_volume_last_high g7_volume_acc_low g8_volume_acc_high g9_star_low g10_star_high ///
->     using "`project'/outputs/results_pre2019_heterogeneity_group_260407.txt", replace ///
+>     using "`project'/outputs/tables/results_pre2019_heterogeneity_group_260407.txt", replace ///
 >     se star(+ 0.10 * 0.05 ** 0.01 *** 0.001) b(%9.4f) se(%9.4f) ///
 >     label compress nomtitles nonumber ///
 >     stats(N r2, fmt(%9.0f %9.4f) labels("N" "R2"))
-(file /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_pre2019_heterogeneity_group_260407.txt not found)
-(output written to /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_pre2019_heterogeneity_group_260407.txt)
+(file /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/tables/results_pre2019_heterogeneity_group_260407.txt not found)
+(output written to /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/tables/results_pre2019_heterogeneity_group_260407.txt)
 
 . 
 . di as text "============================================================"
@@ -2570,12 +2570,12 @@ Absorbed degrees of freedom:
 
 . 
 . esttab b1_rating_last b2_rating_acc b3_volume_last b4_volume_acc b5_star ///
->     using "`project'/outputs/results_pre2019_heterogeneity_interaction_binary_260407.txt", replace ///
+>     using "`project'/outputs/tables/results_pre2019_heterogeneity_interaction_binary_260407.txt", replace ///
 >     se star(+ 0.10 * 0.05 ** 0.01 *** 0.001) b(%9.4f) se(%9.4f) ///
 >     label compress nomtitles nonumber ///
 >     stats(N r2, fmt(%9.0f %9.4f) labels("N" "R2"))
-(file /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_pre2019_heterogeneity_interaction_binary_260407.txt not found)
-(output written to /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_pre2019_heterogeneity_interaction_binary_260407.txt)
+(file /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/tables/results_pre2019_heterogeneity_interaction_binary_260407.txt not found)
+(output written to /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/tables/results_pre2019_heterogeneity_interaction_binary_260407.txt)
 
 . 
 . di as text "============================================================"
@@ -2769,12 +2769,12 @@ Absorbed degrees of freedom:
 
 . 
 . esttab c1_rating_last c2_rating_acc c3_volume_last c4_volume_acc ///
->     using "`project'/outputs/results_pre2019_heterogeneity_interaction_continuous_260407.txt", replace ///
+>     using "`project'/outputs/tables/results_pre2019_heterogeneity_interaction_continuous_260407.txt", replace ///
 >     se star(+ 0.10 * 0.05 ** 0.01 *** 0.001) b(%9.4f) se(%9.4f) ///
 >     label compress nomtitles nonumber ///
 >     stats(N r2, fmt(%9.0f %9.4f) labels("N" "R2"))
-(file /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_pre2019_heterogeneity_interaction_continuous_260407.txt not found)
-(output written to /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_pre2019_heterogeneity_interaction_continuous_260407.txt)
+(file /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/tables/results_pre2019_heterogeneity_interaction_continuous_260407.txt not found)
+(output written to /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/tables/results_pre2019_heterogeneity_interaction_continuous_260407.txt)
 
 .
 ```
@@ -2784,10 +2784,10 @@ Absorbed degrees of freedom:
 ### 6.1 `pre2019` Same-Sample GMM
 
 扫描表：
-[gmm_pre2019_same_sample_scan_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/gmm_pre2019_same_sample_scan_260407.csv)
+[gmm_pre2019_same_sample_scan_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/scans/gmm_pre2019_same_sample_scan_260407.csv)
 
 原始日志：
-[results_gmm_pre2019_same_sample_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_gmm_pre2019_same_sample_260407.log)
+[results_gmm_pre2019_same_sample_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/logs/results_gmm_pre2019_same_sample_260407.log)
 
 当前没有 strict pass。最佳 near-pass 规格是：
 
@@ -2905,10 +2905,10 @@ Difference-in-Hansen tests of exogeneity of instrument subsets:
 ### 6.2 Full-Year Same-Sample GMM
 
 扫描表：
-[gmm_full_same_sample_scan_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/gmm_full_same_sample_scan_260407.csv)
+[gmm_full_same_sample_scan_260407.csv](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/scans/gmm_full_same_sample_scan_260407.csv)
 
 原始日志：
-[results_gmm_full_same_sample_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_gmm_full_same_sample_260407.log)
+[results_gmm_full_same_sample_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/logs/results_gmm_full_same_sample_260407.log)
 
 这一轮 full-year 已经跑出了 strict pass。当前最优规格是：
 
@@ -3153,10 +3153,10 @@ Difference-in-Hansen tests of exogeneity of instrument subsets:
 
 本稿正文引用的原始 Stata 表主要来自：
 
-- [results_focus_tables_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_focus_tables_260407.log)
-- [results_focus_interaction_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_focus_interaction_260407.log)
-- [results_focus_boundary_260410.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_focus_boundary_260410.log)
-- [results_covid_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_covid_260407.log)
-- [results_pre2019_heterogeneity_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_pre2019_heterogeneity_260407.log)
-- [results_gmm_pre2019_same_sample_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_gmm_pre2019_same_sample_260407.log)
-- [results_gmm_full_same_sample_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/results_gmm_full_same_sample_260407.log)
+- [results_focus_tables_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/logs/results_focus_tables_260407.log)
+- [results_focus_interaction_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/logs/results_focus_interaction_260407.log)
+- [results_focus_boundary_260410.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/logs/results_focus_boundary_260410.log)
+- [results_covid_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/logs/results_covid_260407.log)
+- [results_pre2019_heterogeneity_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/logs/results_pre2019_heterogeneity_260407.log)
+- [results_gmm_pre2019_same_sample_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/logs/results_gmm_pre2019_same_sample_260407.log)
+- [results_gmm_full_same_sample_260407.log](/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/logs/results_gmm_full_same_sample_260407.log)

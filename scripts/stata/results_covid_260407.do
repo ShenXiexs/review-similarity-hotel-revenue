@@ -14,7 +14,17 @@ capture log close
 mata: mata set matafavor speed
 
 local project "/Users/samxie/Research/ReviewSimi_Sales/Code"
-local data_main "`project'/outputs/valid_match_review_acc_260407_main.dta"
+local output_root "`project'/outputs"
+local data_dir "`output_root'/data"
+local csv_dir "`output_root'/csv"
+local table_dir "`output_root'/tables"
+local log_dir "`output_root'/logs"
+cap mkdir "`output_root'"
+cap mkdir "`data_dir'"
+cap mkdir "`csv_dir'"
+cap mkdir "`table_dir'"
+cap mkdir "`log_dir'"
+local data_main "`data_dir'/valid_match_review_acc_260407_main.dta"
 
 capture confirm file "`data_main'"
 if _rc {
@@ -145,7 +155,7 @@ program define run_gmm_spec
 end
 
 use "`data_main'", clear
-log using "`project'/outputs/results_covid_260407.log", text replace
+log using "`log_dir'/results_covid_260407.log", text replace
 build_panel_state
 
 capture which reghdfe
@@ -201,7 +211,7 @@ reg ln_RevPAR_clean sim_mean `ctrl_base' covid_2020 covid_2021 covid_2022 i.Mon 
 estimates store c2_ols
 
 esttab c1_fe c2_ols ///
-    using "`project'/outputs/results_covid_fe_260407.txt", replace ///
+    using "`table_dir'/results_covid_fe_260407.txt", replace ///
     se star(+ 0.10 * 0.05 ** 0.01 *** 0.001) b(%9.4f) se(%9.4f) ///
     label compress nomtitles nonumber ///
     stats(N r2, fmt(%9.0f %9.4f) labels("N" "R2"))
@@ -223,7 +233,7 @@ foreach model in c1_fe c2_ols {
 }
 postclose hh
 use `fecov', clear
-export delimited using "`project'/outputs/covid_effect_fe_260407.csv", replace
+export delimited using "`csv_dir'/covid_effect_fe_260407.csv", replace
 
 use "`data_main'", clear
 keep if main_sample_keep == 1
@@ -265,6 +275,6 @@ post gg ("gmm_post2021") ("rich8_gmm") ("monthfe") ("L1") ("gmm") ("orth") ("pos
 
 postclose gg
 use `outgmm', clear
-export delimited using "`project'/outputs/covid_effect_gmm_260407.csv", replace
+export delimited using "`csv_dir'/covid_effect_gmm_260407.csv", replace
 
 log close

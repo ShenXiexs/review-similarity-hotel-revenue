@@ -8,7 +8,28 @@ if ("setFixest_notes" %in% getNamespaceExports("fixest")) {
   setFixest_notes(FALSE)
 }
 
-project_dir <- "/Users/samxie/Research/ReviewSimi_Sales/Code"
+detect_project_dir <- function() {
+  candidates <- unique(c(
+    normalizePath(getwd(), winslash = "/", mustWork = FALSE),
+    normalizePath(file.path(getwd(), ".."), winslash = "/", mustWork = FALSE),
+    normalizePath(file.path(getwd(), "..", ".."), winslash = "/", mustWork = FALSE),
+    "/Users/samxie/Research/ReviewSimi_Sales/Code"
+  ))
+
+  for (candidate in candidates) {
+    if (
+      file.exists(file.path(candidate, "Paper_Results_260407.md")) &&
+      dir.exists(file.path(candidate, "scripts")) &&
+      dir.exists(file.path(candidate, "outputs"))
+    ) {
+      return(normalizePath(candidate, winslash = "/", mustWork = TRUE))
+    }
+  }
+
+  stop("Cannot locate project root.")
+}
+
+project_dir <- detect_project_dir()
 output_root <- file.path(project_dir, "outputs")
 data_dir <- file.path(output_root, "data")
 scan_dir <- file.path(output_root, "scans")
