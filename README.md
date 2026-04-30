@@ -74,3 +74,29 @@
 - 结果文稿：`Paper_Results_260407.md`
 - 主数据处理：`scripts/r/Review_Simi_260325.Rmd`
 - 主回归输入数据：`outputs/data/valid_match_review_acc_260407_main.dta`
+
+## Hypothesis 结果链 260430
+
+新增的 `Paper_Hypothesis_Results_260430.md` 是围绕 `outputs/paper/ref-results.pdf` 重建 H1-H4 的独立结果链，不覆盖原 `260407` 输出。
+
+运行顺序：
+
+1. `Rscript scripts/r/build_hypothesis_panel_260430.R`
+   生成 `outputs/hypothesis/data/hypothesis_panel_260430.dta`、样本审计、H1 OLS/FE scan 和 H2-H4 分组 scan。
+
+2. `/Applications/Stata/StataMP.app/Contents/MacOS/stata-mp -b do scripts/stata/run_hypothesis_tables_260430.do`
+   读取 R 端输出，导出 H1 OLS/FE/Sys-GMM、H2-H4 grouped FE 表和完整 Stata log。
+
+新增输出统一放在：
+
+- `outputs/hypothesis/data/`
+- `outputs/hypothesis/csv/`
+- `outputs/hypothesis/scans/`
+- `outputs/hypothesis/tables/`
+- `outputs/hypothesis/logs/`
+
+当前状态：
+
+- H1 已由 OLS、双向固定效应和 Sys-GMM 同时支持。
+- H2/H3 在主要分组口径下有支持性结果。
+- H4 方向正确但当前结果链未达到显著复现标准，详见 `Paper_Hypothesis_Results_260430.md`。
