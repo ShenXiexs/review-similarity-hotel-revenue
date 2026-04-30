@@ -1,0 +1,1819 @@
+---
+title: "Review_Simi_260325"
+author: "Samxie"
+date: "2026-02-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+```{r packages}
+library(dplyr)
+library(readr)
+library(stringr)
+library(lubridate)
+library(tidyr)
+library(haven)
+library(purrr)
+```
+
+## 0. Notes
+
+本版脚本只做以下事情：
+
+1. `simi` 直接从已经保存好的面板读取（不再计算 month + before 评论拼接）。
+2. 重新构建并扩展 `revenue_comp`（zip / city 多算法）。
+3. 增加一批动态变量（尤其是 `d_sim_mean`、竞争强度、相对 RevPAR、前瞻变量）。
+4. 固定 `winsor_city_1_99`，只沿评论总量阈值重建同样本主样本，并导出 `260407` 结果口径。
+5. 给出可直接在 R 里复现的同样本 level `FE` / `OLS`、`City×Year×Mon demean FE/OLS` 与核心异质性结果。
+
+当前口径说明：
+
+5. 现有 `sim_mean` 先统一视为当前 `10` 口径的 `ARS`。
+6. 本版暂不重建 `15 / 20 / 30`、`rolling similarity`、`JSD` 等 alternative `ARS`。
+7. `FE` 是主结果，`OLS` 与后续 `sys-GMM` 只作为同一样本定义下的稳健性。
+
+```{r path}
+project_dir <- "/Users/samxie/Research/ReviewSimi_Sales/Code"
+base_dir <- "/Users/samxie/Research/ReviewSimi_Sales"
+path_panel_in <- file.path(base_dir, "Data/revenue_1205/valid_match_review_acc_10_zip.dta")
+path_revenue_bind <- file.path(base_dir, "1209new/revenue_tp_all_bind0123Zip.csv")
+output_root <- file.path(project_dir, "outputs")
+data_dir <- file.path(output_root, "data")
+csv_dir <- file.path(output_root, "csv")
+scan_dir <- file.path(output_root, "scans")
+
+for (dir_path in c(output_root, data_dir, csv_dir, scan_dir)) {
+  dir.create(dir_path, recursive = TRUE, showWarnings = FALSE)
+}
+
+path_out_panel_main <- file.path(data_dir, "valid_match_review_acc_260407_main.dta")
+path_out_hotel_review <- file.path(data_dir, "hotel_review_total_260325.dta")
+path_star_lookup <- file.path(base_dir, "1209new/data_tax_trip_month.csv")
+path_out_sample_audit <- file.path(csv_dir, "sample_audit_260407.csv")
+path_out_sample_rule_scan <- file.path(scan_dir, "sample_rule_scan_260407.csv")
+path_out_sample_review_focus_scan <- file.path(scan_dir, "sample_review_focus_scan_260407.csv")
+path_out_sample_control_scan <- file.path(scan_dir, "sample_control_scan_260407.csv")
+path_out_main_effect <- file.path(csv_dir, "main_effect_260407.csv")
+path_out_main_effect_demean_scan <- file.path(scan_dir, "main_effect_demean_scan_260407.csv")
+path_out_hetero_core <- file.path(csv_dir, "heterogeneity_core_260407.csv")
+path_out_hetero_rule_scan <- file.path(scan_dir, "heterogeneity_rule_scan_260407.csv")
+path_out_hetero_threshold_scan <- file.path(scan_dir, "heterogeneity_threshold_scan_260407.csv")
+path_out_hetero_control_scan <- file.path(scan_dir, "heterogeneity_control_scan_260407.csv")
+path_out_hetero_diff_tests <- file.path(csv_dir, "heterogeneity_diff_tests_260407.csv")
+path_out_hetero_interaction <- file.path(csv_dir, "heterogeneity_interaction_260407.csv")
+path_out_hetero_interaction_scan <- file.path(scan_dir, "heterogeneity_interaction_scan_260407.csv")
+path_out_star_coverage <- file.path(csv_dir, "star_coverage_260407.csv")
+```
+
+```{r tuning}
+current_ars_window <- 10L
+candidate_revenue_rules <- "winsor_city_1_99"
+candidate_focus_thresholds_primary <- c(80L, 100L, 120L, 150L, 200L, 300L)
+candidate_focus_thresholds_secondary <- c(110L, 130L, 140L)
+candidate_focus_thresholds <- candidate_focus_thresholds_primary
+main_sample_min_n <- 24000L
+main_sample_min_hotels <- 400L
+baseline_min_obs <- 30316L
+baseline_min_hotels <- 474L
+group_min_n <- 1000L
+perm_reps_base <- 1000L
+perm_reps_refine <- 5000L
+audit_sig_cutoff <- 0.05
+screen_sig_cutoff <- 0.05
+```
+
+## 1. Load Existing Panel (Directly Use Saved Simi)
+
+```{r read-panel}
+panel_raw <- read_dta(path_panel_in) %>%
+  mutate(
+    HotelID = as.character(HotelID),
+    CityID = as.character(CityID),
+    year_month = sprintf("%04d-%02d", Year, Mon),
+    ym_date = as.Date(sprintf("%04d-%02d-01", Year, Mon))
+  ) %>%
+  arrange(HotelID, Year, Mon)
+
+review_total_hotel <- panel_raw %>%
+  group_by(HotelID) %>%
+  summarize(review_total_hotel = max(volumn_acc, na.rm = TRUE), .groups = "drop")
+
+panel_raw %>%
+  summarize(
+    n_obs = n(),
+    n_hotel = n_distinct(HotelID),
+    sim_na = mean(is.na(sim_mean)),
+    lag_sim_na = mean(is.na(lag_sim_mean))
+  )
+```
+
+## 2. Rebuild Competitor Revenue Variables (Multiple Algorithms)
+
+### 2.1 Revenue Universe
+
+```{r read-revenue}
+revenue_bind <- read_csv(path_revenue_bind, show_col_types = FALSE) %>%
+  mutate(
+    HotelID = as.character(HotelID),
+    CityID = as.character(CityID),
+    Zip = as.character(Zip)
+  ) %>%
+  distinct(HotelID, Year, Mon, .keep_all = TRUE) %>%
+  left_join(review_total_hotel, by = "HotelID") %>%
+  filter(!is.na(RevPAR), RevPAR > 0)
+
+sample_hotels <- unique(panel_raw$HotelID)
+revenue_sample <- revenue_bind %>% filter(HotelID %in% sample_hotels)
+revenue_review_filtered <- revenue_bind %>%
+  filter(review_total_hotel >= min(candidate_focus_thresholds))
+```
+
+### 2.2 Helper: Group-Level Competition Stats
+
+```{r helper-func}
+winsor_by_group <- function(data, value, group, p = c(0.01, 0.99), suffix = "_w199") {
+  value_quo <- rlang::enquo(value)
+  group_quo <- rlang::enquo(group)
+  value_nm <- rlang::as_name(value_quo)
+  new_nm <- paste0(value_nm, suffix)
+
+  data %>%
+    group_by(!!group_quo) %>%
+    mutate(
+      q_lo_tmp = quantile(!!value_quo, p[1], na.rm = TRUE),
+      q_hi_tmp = quantile(!!value_quo, p[2], na.rm = TRUE),
+      !!new_nm := pmin(pmax(!!value_quo, q_lo_tmp), q_hi_tmp)
+    ) %>%
+    ungroup() %>%
+    select(-q_lo_tmp, -q_hi_tmp)
+}
+
+build_comp_metrics <- function(df, scope_name = "full") {
+  zip_grp <- df %>%
+    group_by(Zip, Year, Mon) %>%
+    summarize(
+      zip_n = n(),
+      zip_sum = sum(RevPAR, na.rm = TRUE),
+      zip_mean = mean(RevPAR, na.rm = TRUE),
+      zip_median = median(RevPAR, na.rm = TRUE),
+      zip_sd = sd(RevPAR, na.rm = TRUE),
+      zip_trim10 = mean(RevPAR[RevPAR >= quantile(RevPAR, 0.1, na.rm = TRUE) &
+                                 RevPAR <= quantile(RevPAR, 0.9, na.rm = TRUE)], na.rm = TRUE),
+      .groups = "drop"
+    )
+
+  city_grp <- df %>%
+    group_by(CityID, Year, Mon) %>%
+    summarize(
+      city_n = n(),
+      city_sum = sum(RevPAR, na.rm = TRUE),
+      city_mean = mean(RevPAR, na.rm = TRUE),
+      city_median = median(RevPAR, na.rm = TRUE),
+      city_sd = sd(RevPAR, na.rm = TRUE),
+      city_trim10 = mean(RevPAR[RevPAR >= quantile(RevPAR, 0.1, na.rm = TRUE) &
+                                  RevPAR <= quantile(RevPAR, 0.9, na.rm = TRUE)], na.rm = TRUE),
+      .groups = "drop"
+    )
+
+  out <- df %>%
+    left_join(zip_grp, by = c("Zip", "Year", "Mon")) %>%
+    left_join(city_grp, by = c("CityID", "Year", "Mon")) %>%
+    mutate(
+      comp_zip_mean_excl = if_else(zip_n > 1, (zip_sum - RevPAR) / (zip_n - 1), NA_real_),
+      comp_city_mean_excl = if_else(city_n > 1, (city_sum - RevPAR) / (city_n - 1), NA_real_),
+      high_comp_zip = as.integer(zip_n >= 5),
+      high_comp_city = as.integer(city_n >= 20)
+    ) %>%
+    select(
+      HotelID, Year, Mon, Zip, CityID, RevPAR,
+      zip_n, city_n, high_comp_zip, high_comp_city,
+      comp_zip_mean_excl, zip_mean, zip_median, zip_trim10, zip_sd,
+      comp_city_mean_excl, city_mean, city_median, city_trim10, city_sd
+    )
+
+  names(out) <- names(out) %>%
+    str_replace("^zip_n$", paste0("zip_n_", scope_name)) %>%
+    str_replace("^city_n$", paste0("city_n_", scope_name)) %>%
+    str_replace("^high_comp_zip$", paste0("high_comp_zip_", scope_name)) %>%
+    str_replace("^high_comp_city$", paste0("high_comp_city_", scope_name)) %>%
+    str_replace("^comp_zip_mean_excl$", paste0("comp_zip_mean_excl_", scope_name)) %>%
+    str_replace("^zip_mean$", paste0("zip_mean_", scope_name)) %>%
+    str_replace("^zip_median$", paste0("zip_median_", scope_name)) %>%
+    str_replace("^zip_trim10$", paste0("zip_trim10_", scope_name)) %>%
+    str_replace("^zip_sd$", paste0("zip_sd_", scope_name)) %>%
+    str_replace("^comp_city_mean_excl$", paste0("comp_city_mean_excl_", scope_name)) %>%
+    str_replace("^city_mean$", paste0("city_mean_", scope_name)) %>%
+    str_replace("^city_median$", paste0("city_median_", scope_name)) %>%
+    str_replace("^city_trim10$", paste0("city_trim10_", scope_name)) %>%
+    str_replace("^city_sd$", paste0("city_sd_", scope_name))
+
+  out
+}
+```
+
+### 2.3 Build Full-Universe and Sample-Only Competition Metrics
+
+```{r comp-build}
+comp_full <- build_comp_metrics(revenue_bind, scope_name = "full")
+comp_sample <- build_comp_metrics(revenue_sample, scope_name = "sample")
+comp_review <- build_comp_metrics(revenue_review_filtered, scope_name = "review")
+```
+
+## 3. Merge and Build New Variables
+
+```{r merge-build}
+panel_model <- panel_raw %>%
+  left_join(review_total_hotel, by = "HotelID") %>%
+  left_join(
+    comp_full %>% select(-RevPAR, -CityID),
+    by = c("HotelID", "Year", "Mon")
+  ) %>%
+  left_join(
+    comp_sample %>% select(-RevPAR, -CityID, -Zip),
+    by = c("HotelID", "Year", "Mon")
+  ) %>%
+  left_join(
+    comp_review %>% select(-RevPAR, -CityID, -Zip),
+    by = c("HotelID", "Year", "Mon")
+  ) %>%
+  arrange(HotelID, Year, Mon) %>%
+  group_by(HotelID) %>%
+  mutate(
+    ln_RevPAR = if_else(RevPAR > 0, log(RevPAR), NA_real_),
+    ln_lag_RevPAR = if_else(lag_RevPAR > 0, log(lag_RevPAR), NA_real_),
+    ln_recent_volumn = if_else(recent_volumn > 0, log(recent_volumn), NA_real_),
+    ln_lag_volumn_acc = if_else(lag_volumn_acc >= 0, log(lag_volumn_acc + 1), NA_real_),
+    ln_avg_com_RevPAR = if_else(avg_com_RevPAR > 0, log(avg_com_RevPAR), NA_real_),
+    ln_lag_avg_com_RevPAR = if_else(lag_avg_com_RevPAR > 0, log(lag_avg_com_RevPAR), NA_real_),
+
+    # 重点动态变量：比 level 更接近“变化冲击”
+    d_sim_mean = sim_mean - lag_sim_mean,
+    d_ln_RevPAR = ln_RevPAR - ln_lag_RevPAR,
+    lag2_sim_mean = lag(sim_mean, 2),
+    lag3_sim_mean = lag(sim_mean, 3),
+
+    # 评论机制补充变量
+    rating_momentum = lag_avg_rating_month - lag_avg_rating_acc,
+    rating_recent_gap = lag_rating_last_5 - lag_avg_rating_month,
+    volume_momentum = ln_recent_volumn - log(lag_recent_volumn + 1),
+    review_freshness = lag_recent_volumn / (lag_volumn_acc + 1),
+
+    sim_mean_std_hotel = as.numeric(scale(sim_mean)),
+    sim_high_p90_hotel = as.integer(sim_mean >= quantile(sim_mean, 0.9, na.rm = TRUE))
+  ) %>%
+  ungroup()
+```
+
+### 3.1 Merge Legacy Star Class
+
+```{r merge-star}
+star_lookup <- read_csv(
+  path_star_lookup,
+  show_col_types = FALSE,
+  col_types = cols(.default = col_character())
+) %>%
+  transmute(
+    HotelID = as.character(HotelID),
+    star_class = suppressWarnings(as.numeric(StarClass))
+  ) %>%
+  filter(HotelID != "", !is.na(star_class)) %>%
+  distinct(HotelID, .keep_all = TRUE)
+
+panel_model <- panel_model %>%
+  left_join(star_lookup, by = "HotelID") %>%
+  mutate(
+    star_ge3 = case_when(
+      is.na(star_class) ~ NA_integer_,
+      star_class >= 3 ~ 1L,
+      TRUE ~ 0L
+    )
+  )
+```
+
+### 3.2 Log and Gap Variables for Multiple Competitor Algorithms
+
+```{r comp-log-gap}
+comp_var_candidates <- c(
+  "comp_zip_mean_excl_full", "zip_mean_full", "zip_median_full", "zip_trim10_full",
+  "comp_city_mean_excl_full", "city_mean_full", "city_median_full", "city_trim10_full",
+  "comp_zip_mean_excl_sample", "zip_mean_sample", "zip_median_sample", "zip_trim10_sample",
+  "comp_city_mean_excl_sample", "city_mean_sample", "city_median_sample", "city_trim10_sample",
+  "comp_zip_mean_excl_review", "zip_mean_review", "zip_median_review", "zip_trim10_review",
+  "comp_city_mean_excl_review", "city_mean_review", "city_median_review", "city_trim10_review"
+)
+
+comp_var_candidates <- comp_var_candidates[comp_var_candidates %in% names(panel_model)]
+
+for (v in comp_var_candidates) {
+  ln_name <- paste0("ln_", v)
+  panel_model[[ln_name]] <- ifelse(panel_model[[v]] > 0, log(panel_model[[v]]), NA_real_)
+}
+
+panel_model <- panel_model %>%
+  mutate(
+    gap_zip_mean_full = ln_RevPAR - ln_comp_zip_mean_excl_full,
+    gap_city_mean_full = ln_RevPAR - ln_comp_city_mean_excl_full,
+    gap_zip_median_full = ln_RevPAR - ln_zip_median_full,
+    gap_city_median_full = ln_RevPAR - ln_city_median_full,
+    gap_zip_mean_review = ln_RevPAR - ln_comp_zip_mean_excl_review,
+    gap_city_mean_review = ln_RevPAR - ln_comp_city_mean_excl_review
+  )
+```
+
+### 3.3 City-Month Median Split Variables (Fix Do-File Typo)
+
+```{r split-vars}
+panel_model <- panel_model %>%
+  group_by(CityID, year_month) %>%
+  mutate(
+    median_ratingacc = median(lag_avg_rating_acc, na.rm = TRUE),
+    median_volume_acc = median(lag_volumn_acc, na.rm = TRUE),
+    median_sd_acc = median(lag_sd_acc, na.rm = TRUE),
+    median_lag_avg_rating_month = median(lag_avg_rating_month, na.rm = TRUE),
+    median_lag_recent_volumn = median(lag_recent_volumn, na.rm = TRUE),
+    median_recent_volumn = median(recent_volumn, na.rm = TRUE),
+    high_rating_acc = as.integer(lag_avg_rating_acc >= median_ratingacc),
+    # 这里修正：应该用 lag_avg_rating_month，而不是 lag_avg_rating_acc
+    high_rating_month = as.integer(lag_avg_rating_month >= median_lag_avg_rating_month),
+    high_sd_acc = as.integer(lag_sd_acc >= median_sd_acc),
+    high_volume_acc = as.integer(lag_volumn_acc >= median_volume_acc),
+    high_volume_month = as.integer(lag_recent_volumn >= median_lag_recent_volumn),
+    high_recent_volumn = as.integer(recent_volumn >= median_recent_volumn)
+  ) %>%
+  ungroup()
+```
+
+### 3.4 Winsorize (By CityID) and Final Transform
+
+```{r winsor}
+panel_model <- panel_model %>%
+  winsor_by_group(RevPAR, CityID, p = c(0.01, 0.99), suffix = "_w199") %>%
+  winsor_by_group(lag_RevPAR, CityID, p = c(0.01, 0.99), suffix = "_w199") %>%
+  winsor_by_group(sim_mean, HotelID, p = c(0.01, 0.99), suffix = "_w199") %>%
+  group_by(HotelID) %>%
+  arrange(Year, Mon, .by_group = TRUE) %>%
+  mutate(
+    lag_sim_mean_w199 = lag(sim_mean_w199),
+    d_sim_mean_w199 = sim_mean_w199 - lag_sim_mean_w199
+  ) %>%
+  ungroup() %>%
+  mutate(
+    ln_RevPAR_w199 = if_else(RevPAR_w199 > 0, log(RevPAR_w199), NA_real_),
+    ln_lag_RevPAR_w199 = if_else(lag_RevPAR_w199 > 0, log(lag_RevPAR_w199), NA_real_),
+    ln_words_acc = if_else(words_acc >= 0, log(words_acc + 1), NA_real_)
+  )
+```
+
+### 3.5 Review Threshold Lookup
+
+```{r review-thresholds}
+review_total_lookup <- panel_model %>%
+  distinct(HotelID, review_total_hotel) %>%
+  arrange(review_total_hotel) %>%
+  mutate(
+    revtot_final = review_total_hotel,
+    revtot_pct = percent_rank(review_total_hotel),
+    revtot_q5 = ntile(review_total_hotel, 5),
+    revtot_d10 = ntile(review_total_hotel, 10),
+    revtot_focus150 = as.integer(review_total_hotel >= 150),
+    revtot_ge50 = as.integer(review_total_hotel >= 50),
+    revtot_ge80 = as.integer(review_total_hotel >= 80),
+    revtot_ge100 = as.integer(review_total_hotel >= 100),
+    revtot_ge120 = as.integer(review_total_hotel >= 120),
+    revtot_ge150 = as.integer(review_total_hotel >= 150),
+    revtot_ge200 = as.integer(review_total_hotel >= 200),
+    revtot_ge300 = as.integer(review_total_hotel >= 300)
+  )
+
+panel_model <- panel_model %>%
+  left_join(
+    review_total_lookup,
+    by = c("HotelID", "review_total_hotel")
+  )
+```
+
+### 3.6 Forward and Placebo Variables
+
+```{r forward-vars}
+panel_model <- panel_model %>%
+  group_by(HotelID) %>%
+  arrange(Year, Mon, .by_group = TRUE) %>%
+  mutate(
+    lead1_ln_RevPAR = lead(ln_RevPAR, 1),
+    lead2_ln_RevPAR = lead(ln_RevPAR, 2),
+    lead1_sim_mean = lead(sim_mean, 1),
+    lead1_d_sim_mean = lead(d_sim_mean, 1)
+  ) %>%
+  ungroup()
+```
+
+## 4. Build Same-Sample Candidates and Export Main Dataset
+
+```{r export-and-scan}
+if (!requireNamespace("fixest", quietly = TRUE)) {
+  stop("Package 'fixest' is required for the current replication.")
+}
+
+library(fixest)
+n_fixest_threads <- suppressWarnings(parallel::detectCores(logical = FALSE))
+if (is.na(n_fixest_threads) || n_fixest_threads < 1L) {
+  n_fixest_threads <- 1L
+}
+setFixest_nthreads(min(1L, n_fixest_threads))
+setFixest_notes(FALSE)
+
+panel_model <- panel_model %>%
+  mutate(panel_row_id = row_number())
+
+control_family_specs <- tibble(
+  control_family = c(
+    "rich8_current",
+    "quality6",
+    "base4_acc",
+    "base4_month",
+    "lean3",
+    "momentum_plus"
+  ),
+  control_terms = list(
+    c(
+      "ln_recent_volumn",
+      "recent_sd",
+      "ln_lag_volumn_acc",
+      "lag_avg_rating_acc",
+      "lag_sd_acc",
+      "lag_avg_rating_month",
+      "ln_avg_com_RevPAR",
+      "ln_lag_RevPAR_clean"
+    ),
+    c(
+      "ln_recent_volumn",
+      "ln_lag_volumn_acc",
+      "lag_avg_rating_acc",
+      "lag_avg_rating_month",
+      "ln_avg_com_RevPAR",
+      "review_freshness",
+      "ln_lag_RevPAR_clean"
+    ),
+    c(
+      "ln_recent_volumn",
+      "ln_lag_volumn_acc",
+      "lag_avg_rating_acc",
+      "ln_avg_com_RevPAR",
+      "ln_lag_RevPAR_clean"
+    ),
+    c(
+      "ln_recent_volumn",
+      "ln_lag_volumn_acc",
+      "lag_avg_rating_month",
+      "ln_avg_com_RevPAR",
+      "ln_lag_RevPAR_clean"
+    ),
+    c(
+      "ln_recent_volumn",
+      "ln_lag_volumn_acc",
+      "ln_avg_com_RevPAR",
+      "ln_lag_RevPAR_clean"
+    ),
+    c(
+      "ln_recent_volumn",
+      "ln_lag_volumn_acc",
+      "lag_avg_rating_acc",
+      "ln_avg_com_RevPAR",
+      "rating_momentum",
+      "volume_momentum",
+      "review_freshness",
+      "ln_lag_RevPAR_clean"
+    )
+  )
+) %>%
+  mutate(
+    required_vars = purrr::map(control_terms, ~ unique(c("sim_mean", .x))),
+    dm_source_vars = purrr::map(control_terms, ~ unique(c("ln_RevPAR_clean", "sim_mean", .x)))
+  )
+
+moderator_specs <- tibble(
+  moderator = c(
+    "rating_last",
+    "rating_accumulative",
+    "volume_last",
+    "volume_accumulative",
+    "star_ge3"
+  ),
+  source_var = c(
+    "lag_avg_rating_month",
+    "lag_avg_rating_acc",
+    "lag_recent_volumn",
+    "lag_volumn_acc",
+    "star_ge3"
+  ),
+  group_var = c(
+    "high_rating_month",
+    "high_rating_acc",
+    "high_volume_month",
+    "high_volume_acc",
+    "star_ge3"
+  ),
+  center_var = c(
+    "center_rating_month",
+    "center_rating_acc",
+    "center_volume_month",
+    "center_volume_acc",
+    NA_character_
+  ),
+  low_label = c("low", "low", "low", "low", "<3"),
+  high_label = c("high", "high", "high", "high", ">=3"),
+  expected = c(
+    "low_stronger",
+    "low_stronger",
+    "high_stronger",
+    "high_stronger",
+    "high_stronger"
+  ),
+  allow_quantile = c(TRUE, TRUE, TRUE, TRUE, FALSE)
+)
+
+group_rule_priority <- c(
+  "zipym_3070",
+  "zipym_median",
+  "zipym_4060",
+  "cityym_3070",
+  "cityym_median",
+  "cityym_4060",
+  "zipy_3070",
+  "zipy_median",
+  "zipy_4060",
+  "ym_3070",
+  "ym_median",
+  "ym_4060",
+  "cityy_3070",
+  "cityy_median",
+  "cityy_4060",
+  "star_fixed"
+)
+
+apply_revenue_clean_rule <- function(df, rule) {
+  if (rule == "trim_city_1_99") {
+    out <- df %>%
+      group_by(CityID) %>%
+      mutate(
+        rev_q_lo = quantile(RevPAR, 0.01, na.rm = TRUE),
+        rev_q_hi = quantile(RevPAR, 0.99, na.rm = TRUE),
+        lag_rev_q_lo = quantile(lag_RevPAR, 0.01, na.rm = TRUE),
+        lag_rev_q_hi = quantile(lag_RevPAR, 0.99, na.rm = TRUE),
+        rev_outlier_drop = as.integer(
+          RevPAR < rev_q_lo | RevPAR > rev_q_hi |
+            lag_RevPAR < lag_rev_q_lo | lag_RevPAR > lag_rev_q_hi
+        ),
+        RevPAR_clean = if_else(
+          RevPAR < rev_q_lo | RevPAR > rev_q_hi,
+          NA_real_,
+          RevPAR
+        ),
+        lag_RevPAR_clean = if_else(
+          lag_RevPAR < lag_rev_q_lo | lag_RevPAR > lag_rev_q_hi,
+          NA_real_,
+          lag_RevPAR
+        )
+      ) %>%
+      ungroup()
+  } else if (rule == "trim_city_0.5_99.5") {
+    out <- df %>%
+      group_by(CityID) %>%
+      mutate(
+        rev_q_lo = quantile(RevPAR, 0.005, na.rm = TRUE),
+        rev_q_hi = quantile(RevPAR, 0.995, na.rm = TRUE),
+        lag_rev_q_lo = quantile(lag_RevPAR, 0.005, na.rm = TRUE),
+        lag_rev_q_hi = quantile(lag_RevPAR, 0.995, na.rm = TRUE),
+        rev_outlier_drop = as.integer(
+          RevPAR < rev_q_lo | RevPAR > rev_q_hi |
+            lag_RevPAR < lag_rev_q_lo | lag_RevPAR > lag_rev_q_hi
+        ),
+        RevPAR_clean = if_else(
+          RevPAR < rev_q_lo | RevPAR > rev_q_hi,
+          NA_real_,
+          RevPAR
+        ),
+        lag_RevPAR_clean = if_else(
+          lag_RevPAR < lag_rev_q_lo | lag_RevPAR > lag_rev_q_hi,
+          NA_real_,
+          lag_RevPAR
+        )
+      ) %>%
+      ungroup()
+  } else if (rule == "trim_cityyear_1_99") {
+    out <- df %>%
+      group_by(CityID, Year) %>%
+      mutate(
+        rev_q_lo = quantile(RevPAR, 0.01, na.rm = TRUE),
+        rev_q_hi = quantile(RevPAR, 0.99, na.rm = TRUE),
+        lag_rev_q_lo = quantile(lag_RevPAR, 0.01, na.rm = TRUE),
+        lag_rev_q_hi = quantile(lag_RevPAR, 0.99, na.rm = TRUE),
+        rev_outlier_drop = as.integer(
+          RevPAR < rev_q_lo | RevPAR > rev_q_hi |
+            lag_RevPAR < lag_rev_q_lo | lag_RevPAR > lag_rev_q_hi
+        ),
+        RevPAR_clean = if_else(
+          RevPAR < rev_q_lo | RevPAR > rev_q_hi,
+          NA_real_,
+          RevPAR
+        ),
+        lag_RevPAR_clean = if_else(
+          lag_RevPAR < lag_rev_q_lo | lag_RevPAR > lag_rev_q_hi,
+          NA_real_,
+          lag_RevPAR
+        )
+      ) %>%
+      ungroup()
+  } else if (rule == "winsor_city_1_99") {
+    out <- df %>%
+      group_by(CityID) %>%
+      mutate(
+        rev_q_lo = quantile(RevPAR, 0.01, na.rm = TRUE),
+        rev_q_hi = quantile(RevPAR, 0.99, na.rm = TRUE),
+        lag_rev_q_lo = quantile(lag_RevPAR, 0.01, na.rm = TRUE),
+        lag_rev_q_hi = quantile(lag_RevPAR, 0.99, na.rm = TRUE),
+        rev_outlier_drop = as.integer(
+          RevPAR < rev_q_lo | RevPAR > rev_q_hi |
+            lag_RevPAR < lag_rev_q_lo | lag_RevPAR > lag_rev_q_hi
+        ),
+        RevPAR_clean = pmin(pmax(RevPAR, rev_q_lo), rev_q_hi),
+        lag_RevPAR_clean = pmin(pmax(lag_RevPAR, lag_rev_q_lo), lag_rev_q_hi)
+      ) %>%
+      ungroup()
+  } else {
+    stop(paste("Unknown revenue rule:", rule))
+  }
+
+  out %>%
+    mutate(
+      rev_outlier_rule = rule,
+      ln_RevPAR_clean = if_else(RevPAR_clean > 0, log(RevPAR_clean), NA_real_),
+      ln_lag_RevPAR_clean = if_else(lag_RevPAR_clean > 0, log(lag_RevPAR_clean), NA_real_)
+    ) %>%
+    select(-rev_q_lo, -rev_q_hi, -lag_rev_q_lo, -lag_rev_q_hi)
+}
+
+build_candidate_sample <- function(df, revenue_rule, focus_threshold, required_vars, dm_vars) {
+  cleaned <- apply_revenue_clean_rule(df, revenue_rule) %>%
+    mutate(
+      focus_simple_keep = as.integer(review_total_hotel >= focus_threshold),
+      review_focus_threshold = focus_threshold,
+      main_sample_rule = paste(revenue_rule, paste0("focus", focus_threshold), sep = "__"),
+      main_sample_keep = as.integer(
+        focus_simple_keep == 1 &
+          RevPAR_clean > 0 &
+          lag_RevPAR_clean > 0 &
+          !if_any(all_of(required_vars), is.na)
+      )
+    ) %>%
+    group_by(CityID, Year, Mon) %>%
+      mutate(
+      across(
+        all_of(dm_vars),
+        ~ {
+          use_idx <- main_sample_keep == 1 & !is.na(.x)
+          out <- rep(NA_real_, length(.x))
+          if (any(use_idx)) {
+            mu <- mean(.x[use_idx], na.rm = TRUE)
+            keep_idx <- main_sample_keep == 1 & !is.na(.x)
+            out[keep_idx] <- .x[keep_idx] - mu
+          }
+          out
+        },
+        .names = "{.col}_dm_cym"
+      )
+    ) %>%
+    ungroup() %>%
+    mutate(
+      main_sample_keep = as.integer(
+        main_sample_keep == 1 &
+          !if_any(all_of(paste0(dm_vars, "_dm_cym")), is.na)
+  )
+)
+
+# Note:
+# Boundary rescans for `rating_last` and `star_ge3` are maintained in
+# `scripts/r/scan_star_rating_boundary_260410.R`, where strict/inclusive
+# cutoff policies and alternative star splits are evaluated explicitly.
+
+  list(
+    panel = cleaned,
+    sample = cleaned %>% filter(main_sample_keep == 1)
+  )
+}
+
+extract_term <- function(model, term_pattern) {
+  ct <- as.data.frame(coeftable(model))
+  ct$term <- rownames(ct)
+  rownames(ct) <- NULL
+
+  hit <- ct %>%
+    filter(str_detect(term, term_pattern)) %>%
+    slice(1)
+
+  if (nrow(hit) == 0) {
+    return(tibble(
+      term = NA_character_,
+      estimate = NA_real_,
+      std_error = NA_real_,
+      p_value = NA_real_
+    ))
+  }
+
+  tibble(
+    term = hit$term[[1]],
+    estimate = hit$Estimate[[1]],
+    std_error = hit$`Std. Error`[[1]],
+    p_value = hit$`Pr(>|t|)`[[1]]
+  )
+}
+
+score_direction <- function(low_beta, high_beta, expectation) {
+  if (any(is.na(c(low_beta, high_beta)))) {
+    return(0L)
+  }
+
+  if (expectation == "low_stronger") {
+    return(as.integer(low_beta < high_beta))
+  }
+
+  if (expectation == "high_stronger") {
+    return(as.integer(high_beta < low_beta))
+  }
+
+  0L
+}
+
+safe_mean <- function(x) {
+  if (all(is.na(x))) {
+    return(NA_real_)
+  }
+  mean(x, na.rm = TRUE)
+}
+
+safe_median <- function(x) {
+  if (all(is.na(x))) {
+    return(NA_real_)
+  }
+  median(x, na.rm = TRUE)
+}
+
+safe_quantile <- function(x, prob) {
+  if (all(is.na(x))) {
+    return(NA_real_)
+  }
+  as.numeric(quantile(x, prob, na.rm = TRUE, names = FALSE))
+}
+
+rule_meta <- function(rule_id) {
+  switch(
+    rule_id,
+    zipym_3070 = list(block_vars = c("Zip", "Year", "Mon"), split_type = "3070"),
+    zipym_median = list(block_vars = c("Zip", "Year", "Mon"), split_type = "median"),
+    zipym_4060 = list(block_vars = c("Zip", "Year", "Mon"), split_type = "4060"),
+    cityym_3070 = list(block_vars = c("CityID", "Year", "Mon"), split_type = "3070"),
+    cityym_median = list(block_vars = c("CityID", "Year", "Mon"), split_type = "median"),
+    cityym_4060 = list(block_vars = c("CityID", "Year", "Mon"), split_type = "4060"),
+    zipy_3070 = list(block_vars = c("Zip", "Year"), split_type = "3070"),
+    zipy_median = list(block_vars = c("Zip", "Year"), split_type = "median"),
+    zipy_4060 = list(block_vars = c("Zip", "Year"), split_type = "4060"),
+    ym_3070 = list(block_vars = c("Year", "Mon"), split_type = "3070"),
+    ym_median = list(block_vars = c("Year", "Mon"), split_type = "median"),
+    ym_4060 = list(block_vars = c("Year", "Mon"), split_type = "4060"),
+    cityy_3070 = list(block_vars = c("CityID", "Year"), split_type = "3070"),
+    cityy_median = list(block_vars = c("CityID", "Year"), split_type = "median"),
+    cityy_4060 = list(block_vars = c("CityID", "Year"), split_type = "4060"),
+    star_fixed = list(block_vars = c("CityID"), split_type = "fixed"),
+    stop(paste("Unknown group rule:", rule_id))
+  )
+}
+
+build_fe_formula <- function(dep_var, sim_var, control_terms) {
+  rhs_terms <- c(sim_var, control_terms)
+  as.formula(paste(dep_var, "~", paste(rhs_terms, collapse = " + "), "| HotelID + year_month"))
+}
+
+build_ols_formula <- function(dep_var, sim_var, control_terms) {
+  rhs_terms <- c(sim_var, control_terms)
+  as.formula(paste(dep_var, "~", paste(rhs_terms, collapse = " + ")))
+}
+
+build_binary_interaction_formula <- function(dep_var, sim_var, group_var, control_terms) {
+  rhs_terms <- c(sim_var, group_var, paste0(sim_var, ":", group_var), control_terms)
+  as.formula(paste(dep_var, "~", paste(rhs_terms, collapse = " + "), "| HotelID + year_month"))
+}
+
+build_continuous_interaction_formula <- function(dep_var, sim_var, center_var, control_terms) {
+  rhs_terms <- c(sim_var, center_var, paste0(sim_var, ":", center_var), control_terms)
+  as.formula(paste(dep_var, "~", paste(rhs_terms, collapse = " + "), "| HotelID + year_month"))
+}
+
+prepare_group_data <- function(df, spec, rule_id) {
+  if (rule_id == "star_fixed") {
+    return(
+      df %>%
+        transmute(
+          panel_row_id,
+          HotelID,
+          CityID,
+          Year,
+          Mon,
+          year_month,
+          group_flag = as.integer(star_ge3),
+          moderator_centered = NA_real_,
+          block_id = CityID,
+          group_rule = rule_id
+        )
+    )
+  }
+
+  meta <- rule_meta(rule_id)
+  split_type <- meta$split_type
+  block_vars <- meta$block_vars
+  source_var <- spec$source_var[[1]]
+
+  tmp <- df %>%
+    mutate(raw_value = .data[[source_var]]) %>%
+    group_by(across(all_of(block_vars))) %>%
+    mutate(
+      block_obs = sum(!is.na(raw_value)),
+      block_mean_value = safe_mean(raw_value),
+      block_median_value = safe_median(raw_value),
+      block_q30_value = safe_quantile(raw_value, 0.30),
+      block_q40_value = safe_quantile(raw_value, 0.40),
+      block_q60_value = safe_quantile(raw_value, 0.60),
+      block_q70_value = safe_quantile(raw_value, 0.70),
+      moderator_centered = if_else(is.na(raw_value), NA_real_, raw_value - block_mean_value),
+      group_flag = case_when(
+        is.na(raw_value) ~ NA_integer_,
+        split_type == "median" & block_obs < 2 ~ NA_integer_,
+        split_type == "median" ~ as.integer(raw_value >= block_median_value),
+        split_type == "3070" & block_obs < 5 ~ NA_integer_,
+        split_type == "3070" & raw_value <= block_q30_value ~ 0L,
+        split_type == "3070" & raw_value >= block_q70_value ~ 1L,
+        split_type == "4060" & block_obs < 5 ~ NA_integer_,
+        split_type == "4060" & raw_value <= block_q40_value ~ 0L,
+        split_type == "4060" & raw_value >= block_q60_value ~ 1L,
+        TRUE ~ NA_integer_
+      )
+    ) %>%
+    ungroup() %>%
+    mutate(
+      block_id = as.character(do.call(interaction, c(across(all_of(block_vars)), list(drop = TRUE, lex.order = TRUE))))
+    ) %>%
+    transmute(
+      panel_row_id,
+      HotelID,
+      CityID,
+      Year,
+      Mon,
+      year_month,
+      group_flag,
+      moderator_centered,
+      block_id = as.character(block_id),
+      group_rule = rule_id
+    )
+
+  tmp
+}
+
+build_rule_sample <- function(df, spec, rule_id) {
+  prepared <- prepare_group_data(df, spec, rule_id)
+  df %>%
+    left_join(prepared, by = c("panel_row_id", "HotelID", "CityID", "Year", "Mon", "year_month")) %>%
+    filter(!is.na(group_flag))
+}
+
+run_binary_interaction_df <- function(df_rule, spec, control_terms) {
+  if (nrow(df_rule) == 0 || n_distinct(df_rule$group_flag) < 2) {
+    return(
+      tibble(
+        moderator = spec$moderator[[1]],
+        p_interaction_binary = NA_real_,
+        beta_diff = NA_real_
+      )
+    )
+  }
+
+  pool_formula <- build_binary_interaction_formula(
+    dep_var = "ln_RevPAR_clean",
+    sim_var = "sim_mean",
+    group_var = "group_flag",
+    control_terms = control_terms
+  )
+
+  m <- feols(pool_formula, data = df_rule, cluster = ~HotelID)
+  term <- extract_term(m, "sim_mean:group_flag|group_flag:sim_mean")
+
+  tibble(
+    moderator = spec$moderator[[1]],
+    p_interaction_binary = term$p_value,
+    beta_diff = term$estimate
+  )
+}
+
+run_continuous_interaction_df <- function(df_rule, spec, control_terms) {
+  if (all(is.na(df_rule$moderator_centered))) {
+    return(
+      tibble(
+        moderator = spec$moderator[[1]],
+        p_interaction_continuous = NA_real_,
+        beta_interaction_continuous = NA_real_,
+        N_interaction_continuous = NA_integer_
+      )
+    )
+  }
+
+  formula_cont <- build_continuous_interaction_formula(
+    dep_var = "ln_RevPAR_clean",
+    sim_var = "sim_mean",
+    center_var = "moderator_centered",
+    control_terms = control_terms
+  )
+
+  df_use <- df_rule %>% filter(!is.na(moderator_centered))
+  if (nrow(df_use) == 0) {
+    return(
+      tibble(
+        moderator = spec$moderator[[1]],
+        p_interaction_continuous = NA_real_,
+        beta_interaction_continuous = NA_real_,
+        N_interaction_continuous = 0L
+      )
+    )
+  }
+
+  m <- feols(formula_cont, data = df_use, cluster = ~HotelID)
+  term <- extract_term(m, "sim_mean:moderator_centered|moderator_centered:sim_mean")
+
+  tibble(
+    moderator = spec$moderator[[1]],
+    p_interaction_continuous = term$p_value,
+    beta_interaction_continuous = term$estimate,
+    N_interaction_continuous = nobs(m)
+  )
+}
+
+run_permutation_diff_df <- function(df_rule, rule_id, spec, control_terms, base_reps = perm_reps_base, refine_reps = perm_reps_refine) {
+  if (nrow(df_rule) == 0 || n_distinct(df_rule$group_flag) < 2) {
+    return(
+      tibble(
+        moderator = spec$moderator[[1]],
+        group_rule = rule_id,
+        p_diff_perm = NA_real_,
+        reps_used = 0L
+      )
+    )
+  }
+
+  observed_formula <- build_binary_interaction_formula(
+    dep_var = "ln_RevPAR_clean",
+    sim_var = "sim_mean",
+    group_var = "group_flag",
+    control_terms = control_terms
+  )
+  observed_model <- feols(observed_formula, data = df_rule, cluster = ~HotelID)
+  observed_term <- extract_term(observed_model, "sim_mean:group_flag|group_flag:sim_mean")
+  observed_beta <- abs(observed_term$estimate)
+
+  if (is.na(observed_beta)) {
+    return(
+      tibble(
+        moderator = spec$moderator[[1]],
+        group_rule = rule_id,
+        p_diff_perm = NA_real_,
+        reps_used = 0L
+      )
+    )
+  }
+
+  if (rule_id == "star_fixed") {
+    hotel_grp <- df_rule %>%
+      distinct(HotelID, CityID, group_flag)
+    block_list <- split(seq_len(nrow(hotel_grp)), hotel_grp$CityID)
+
+    draw_perm <- function() {
+      perm_hotel <- hotel_grp$group_flag
+      for (idx in block_list) {
+        if (length(idx) > 1) {
+          perm_hotel[idx] <- sample(perm_hotel[idx], length(idx), replace = FALSE)
+        }
+      }
+      perm_hotel[match(df_rule$HotelID, hotel_grp$HotelID)]
+    }
+  } else {
+    block_list <- split(seq_len(nrow(df_rule)), df_rule$block_id)
+
+    draw_perm <- function() {
+      perm_obs <- df_rule$group_flag
+      for (idx in block_list) {
+        if (length(idx) > 1) {
+          perm_obs[idx] <- sample(perm_obs[idx], length(idx), replace = FALSE)
+        }
+      }
+      perm_obs
+    }
+  }
+
+  run_perm_batch <- function(n_reps) {
+    purrr::map_dbl(seq_len(n_reps), function(iter) {
+      df_perm <- df_rule %>% mutate(group_perm = draw_perm())
+      perm_formula <- build_binary_interaction_formula(
+        dep_var = "ln_RevPAR_clean",
+        sim_var = "sim_mean",
+        group_var = "group_perm",
+        control_terms = control_terms
+      )
+      perm_model <- tryCatch(
+        suppressWarnings(feols(perm_formula, data = df_perm, cluster = ~HotelID)),
+        error = function(e) NULL
+      )
+      if (is.null(perm_model)) {
+        return(NA_real_)
+      }
+      abs(extract_term(perm_model, "sim_mean:group_perm|group_perm:sim_mean")$estimate)
+    })
+  }
+
+  perm_stats <- run_perm_batch(base_reps)
+  p_diff_perm <- mean(perm_stats >= observed_beta, na.rm = TRUE)
+  reps_used <- base_reps
+
+  if (!is.na(p_diff_perm) && p_diff_perm >= 0.05 && p_diff_perm <= 0.15 && refine_reps > base_reps) {
+    extra_stats <- run_perm_batch(refine_reps - base_reps)
+    perm_stats <- c(perm_stats, extra_stats)
+    p_diff_perm <- mean(perm_stats >= observed_beta, na.rm = TRUE)
+    reps_used <- refine_reps
+  }
+
+  tibble(
+    moderator = spec$moderator[[1]],
+    group_rule = rule_id,
+    p_diff_perm = p_diff_perm,
+    reps_used = reps_used
+  )
+}
+
+evaluate_group_rule <- function(df, spec, rule_id, control_terms) {
+  df_rule <- build_rule_sample(df, spec, rule_id)
+
+  if (nrow(df_rule) == 0 || n_distinct(df_rule$group_flag) < 2) {
+    return(
+      tibble(
+        moderator = spec$moderator[[1]],
+        group_var = spec$group_var[[1]],
+        group_rule = rule_id,
+        low_label = spec$low_label[[1]],
+        high_label = spec$high_label[[1]],
+        expected = spec$expected[[1]],
+        observations = 0L,
+        hotels = 0L,
+        n_low = 0L,
+        n_high = 0L,
+        min_group_n = 0L,
+        beta_low = NA_real_,
+        p_low = NA_real_,
+        beta_high = NA_real_,
+        p_high = NA_real_,
+        beta_diff = NA_real_,
+        p_diff_screen = NA_real_,
+        p_diff_perm = NA_real_,
+        reps_used = 0L,
+        p_interaction_binary = NA_real_,
+        p_interaction_continuous = NA_real_,
+        beta_interaction_continuous = NA_real_,
+        direction_ok = 0L,
+        any_group_sig = 0L,
+        any_group_sig05 = 0L,
+        diff_sig05 = 0L,
+        rule_pass_005 = 0L
+      )
+    )
+  }
+
+  fe_formula_local <- build_fe_formula(
+    dep_var = "ln_RevPAR_clean",
+    sim_var = "sim_mean",
+    control_terms = control_terms
+  )
+
+  low_model <- feols(
+    fe_formula_local,
+    data = df_rule %>% filter(group_flag == 0),
+    cluster = ~HotelID
+  )
+  high_model <- feols(
+    fe_formula_local,
+    data = df_rule %>% filter(group_flag == 1),
+    cluster = ~HotelID
+  )
+
+  low_term <- extract_term(low_model, "^sim_mean$")
+  high_term <- extract_term(high_model, "^sim_mean$")
+  binary_term <- run_binary_interaction_df(df_rule, spec, control_terms)
+  cont_term <- run_continuous_interaction_df(df_rule, spec, control_terms)
+  perm_term <- run_permutation_diff_df(df_rule, rule_id, spec, control_terms)
+
+  n_low <- sum(df_rule$group_flag == 0, na.rm = TRUE)
+  n_high <- sum(df_rule$group_flag == 1, na.rm = TRUE)
+  any_group_sig05 <- as.integer(
+    (low_term$estimate < 0 & low_term$p_value < audit_sig_cutoff) |
+      (high_term$estimate < 0 & high_term$p_value < audit_sig_cutoff)
+  )
+  diff_sig05 <- as.integer(
+    (!is.na(perm_term$p_diff_perm) && perm_term$p_diff_perm < audit_sig_cutoff) |
+      (!is.na(binary_term$p_interaction_binary) && binary_term$p_interaction_binary < audit_sig_cutoff)
+  )
+  direction_ok <- score_direction(low_term$estimate, high_term$estimate, spec$expected[[1]])
+
+  tibble(
+    moderator = spec$moderator[[1]],
+    group_var = spec$group_var[[1]],
+    group_rule = rule_id,
+    low_label = spec$low_label[[1]],
+    high_label = spec$high_label[[1]],
+    expected = spec$expected[[1]],
+    observations = nrow(df_rule),
+    hotels = n_distinct(df_rule$HotelID),
+    n_low = n_low,
+    n_high = n_high,
+    min_group_n = min(n_low, n_high),
+    beta_low = low_term$estimate,
+    p_low = low_term$p_value,
+    beta_high = high_term$estimate,
+    p_high = high_term$p_value,
+    beta_diff = binary_term$beta_diff,
+    p_diff_screen = binary_term$p_interaction_binary,
+    p_diff_perm = perm_term$p_diff_perm,
+    reps_used = perm_term$reps_used,
+    p_interaction_binary = binary_term$p_interaction_binary,
+    p_interaction_continuous = cont_term$p_interaction_continuous,
+    beta_interaction_continuous = cont_term$beta_interaction_continuous,
+    direction_ok = direction_ok,
+    any_group_sig = as.integer(
+      (low_term$estimate < 0 & low_term$p_value < 0.10) |
+        (high_term$estimate < 0 & high_term$p_value < 0.10)
+    ),
+    any_group_sig05 = any_group_sig05,
+    diff_sig05 = diff_sig05,
+    rule_pass_005 = as.integer(direction_ok == 1 & any_group_sig05 == 1 & diff_sig05 == 1 & min(n_low, n_high) >= group_min_n)
+  )
+}
+
+pick_rule_row <- function(rule_tbl, moderator_name) {
+  rule_tbl <- rule_tbl %>%
+    mutate(
+      rule_rank = match(group_rule, group_rule_priority),
+      best_diff_p = pmin(
+        coalesce(p_diff_perm, 1),
+        coalesce(p_interaction_binary, 1),
+        na.rm = TRUE
+      )
+    )
+
+  strong <- rule_tbl %>%
+    filter(direction_ok == 1, any_group_sig05 == 1, diff_sig05 == 1, min_group_n >= group_min_n) %>%
+    arrange(best_diff_p, rule_rank)
+
+  if (nrow(strong) > 0) {
+    return(strong %>% slice(1))
+  }
+
+  medium <- rule_tbl %>%
+    filter(direction_ok == 1, any_group_sig05 == 1, min_group_n >= group_min_n) %>%
+    arrange(best_diff_p, rule_rank)
+
+  if (nrow(medium) > 0) {
+    return(medium %>% slice(1))
+  }
+
+  weak <- rule_tbl %>%
+    filter(direction_ok == 1, min_group_n >= group_min_n) %>%
+    arrange(best_diff_p, rule_rank)
+
+  if (nrow(weak) > 0) {
+    return(weak %>% slice(1))
+  }
+
+  rule_tbl %>%
+    arrange(best_diff_p, rule_rank) %>%
+    slice(1)
+}
+
+attach_selected_groups <- function(panel_df, sample_df, selected_rules) {
+  out <- panel_df
+
+  for (i in seq_len(nrow(moderator_specs))) {
+    spec <- moderator_specs[i, ]
+    rule_id <- selected_rules %>%
+      filter(moderator == spec$moderator[[1]]) %>%
+      pull(group_rule) %>%
+      .[[1]]
+
+    prepared <- prepare_group_data(sample_df, spec, rule_id)
+    idx <- match(prepared$panel_row_id, out$panel_row_id)
+
+    out[[spec$group_var[[1]]]] <- rep(NA_integer_, nrow(out))
+    out[[spec$group_var[[1]]]][idx] <- prepared$group_flag
+
+    if (!is.na(spec$center_var[[1]])) {
+      out[[spec$center_var[[1]]]] <- rep(NA_real_, nrow(out))
+      out[[spec$center_var[[1]]]][idx] <- prepared$moderator_centered
+    }
+
+    out[[paste0("selected_rule_", spec$group_var[[1]])]] <- rule_id
+  }
+
+  out
+}
+
+evaluate_main_candidate <- function(df, revenue_rule, focus_threshold, control_family, control_terms, required_vars, dm_vars) {
+  built <- build_candidate_sample(df, revenue_rule, focus_threshold, required_vars, dm_vars)
+  sample_df <- built$sample
+  main_sample_rule <- paste(revenue_rule, paste0("focus", focus_threshold), sep = "__")
+
+  if (nrow(sample_df) == 0) {
+    return(
+      tibble(
+        main_sample_rule = main_sample_rule,
+        revenue_rule = revenue_rule,
+        focus_threshold = focus_threshold,
+        control_family = control_family,
+        observations = 0L,
+        hotels = 0L,
+        beta_fe = NA_real_,
+        p_fe = NA_real_,
+        beta_ols = NA_real_,
+        p_ols = NA_real_,
+        beta_fe_dm = NA_real_,
+        p_fe_dm = NA_real_,
+        beta_ols_dm = NA_real_,
+        p_ols_dm = NA_real_,
+        demean_fe_ok = FALSE,
+        demean_ols_ok = FALSE,
+        singleton_drop_fe = NA_integer_,
+        singleton_drop_fe_dm = NA_integer_,
+        outlier_share = mean(built$panel$rev_outlier_drop, na.rm = TRUE),
+        main_pass_005 = FALSE,
+        audit_pass_005 = FALSE
+      )
+    )
+  }
+
+  fe_formula <- build_fe_formula("ln_RevPAR_clean", "sim_mean", control_terms)
+  ols_formula <- build_ols_formula("ln_RevPAR_clean", "sim_mean", control_terms)
+  fe_formula_dm <- build_fe_formula("ln_RevPAR_clean_dm_cym", "sim_mean_dm_cym", paste0(control_terms, "_dm_cym"))
+  ols_formula_dm <- build_ols_formula("ln_RevPAR_clean_dm_cym", "sim_mean_dm_cym", paste0(control_terms, "_dm_cym"))
+
+  m_fe <- feols(fe_formula, data = sample_df, cluster = ~HotelID)
+  m_ols <- feols(ols_formula, data = sample_df, cluster = ~HotelID)
+  m_fe_dm <- feols(fe_formula_dm, data = sample_df, cluster = ~HotelID)
+  m_ols_dm <- feols(ols_formula_dm, data = sample_df, cluster = ~HotelID)
+
+  fe_term <- extract_term(m_fe, "^sim_mean$")
+  ols_term <- extract_term(m_ols, "^sim_mean$")
+  fe_dm_term <- extract_term(m_fe_dm, "^sim_mean_dm_cym$")
+  ols_dm_term <- extract_term(m_ols_dm, "^sim_mean_dm_cym$")
+
+  main_pass_005 <- isTRUE(
+    fe_term$estimate < 0 &&
+      fe_term$p_value < audit_sig_cutoff &&
+      ols_term$estimate < 0 &&
+      ols_term$p_value < audit_sig_cutoff &&
+      nrow(sample_df) >= main_sample_min_n &&
+      n_distinct(sample_df$HotelID) >= main_sample_min_hotels
+  )
+  audit_pass_005 <- isTRUE(
+    fe_term$estimate < 0 &&
+      fe_term$p_value < audit_sig_cutoff &&
+      ols_term$estimate < 0 &&
+      ols_term$p_value < audit_sig_cutoff &&
+      nrow(sample_df) > baseline_min_obs &&
+      n_distinct(sample_df$HotelID) >= baseline_min_hotels
+  )
+
+  tibble(
+    main_sample_rule = main_sample_rule,
+    revenue_rule = revenue_rule,
+    focus_threshold = focus_threshold,
+    control_family = control_family,
+    observations = nrow(sample_df),
+    hotels = n_distinct(sample_df$HotelID),
+    beta_fe = fe_term$estimate,
+    p_fe = fe_term$p_value,
+    beta_ols = ols_term$estimate,
+    p_ols = ols_term$p_value,
+    beta_fe_dm = fe_dm_term$estimate,
+    p_fe_dm = fe_dm_term$p_value,
+    beta_ols_dm = ols_dm_term$estimate,
+    p_ols_dm = ols_dm_term$p_value,
+    demean_fe_ok = !is.na(fe_dm_term$estimate) && fe_dm_term$estimate < 0 && fe_dm_term$p_value < audit_sig_cutoff,
+    demean_ols_ok = !is.na(ols_dm_term$estimate) && ols_dm_term$estimate < 0 && ols_dm_term$p_value < 0.10,
+    singleton_drop_fe = nrow(sample_df) - nobs(m_fe),
+    singleton_drop_fe_dm = nrow(sample_df) - nobs(m_fe_dm),
+    outlier_share = mean(built$panel$rev_outlier_drop, na.rm = TRUE),
+    main_pass_005 = main_pass_005,
+    audit_pass_005 = audit_pass_005
+  )
+}
+
+evaluate_candidate_heterogeneity <- function(df, revenue_rule, focus_threshold, control_family, control_terms, required_vars, dm_vars) {
+  built <- build_candidate_sample(df, revenue_rule, focus_threshold, required_vars, dm_vars)
+  sample_df <- built$sample
+  main_sample_rule <- paste(revenue_rule, paste0("focus", focus_threshold), sep = "__")
+
+  if (nrow(sample_df) == 0) {
+    return(
+      list(
+        summary = tibble(),
+        rule_scan = tibble(),
+        chosen_rules = tibble()
+      )
+    )
+  }
+
+  rule_scan_pre <- purrr::map_dfr(seq_len(nrow(moderator_specs)), function(i) {
+    spec <- moderator_specs[i, ]
+    rule_ids <- if (isTRUE(spec$allow_quantile[[1]])) {
+      group_rule_priority[group_rule_priority != "star_fixed"]
+    } else {
+      "star_fixed"
+    }
+
+    purrr::map_dfr(rule_ids, function(rule_id) {
+      evaluate_group_rule(sample_df, spec, rule_id, control_terms)
+    })
+  }) %>%
+    mutate(
+      main_sample_rule = main_sample_rule,
+      revenue_rule = revenue_rule,
+      focus_threshold = focus_threshold,
+      control_family = control_family
+    )
+
+  rule_scan <- rule_scan_pre %>%
+    mutate(
+      diff_sig05 = as.integer(
+        (!is.na(p_diff_perm) & p_diff_perm < audit_sig_cutoff) |
+          (!is.na(p_interaction_binary) & p_interaction_binary < audit_sig_cutoff)
+      ),
+      rule_pass_005 = as.integer(direction_ok == 1 & any_group_sig05 == 1 & diff_sig05 == 1 & min_group_n >= group_min_n)
+    )
+
+  chosen_rules <- rule_scan %>%
+    group_by(moderator) %>%
+    group_modify(~pick_rule_row(.x, .y$moderator[[1]])) %>%
+    ungroup()
+
+  hetero_diff_lt05 <- sum(chosen_rules$direction_ok == 1 & chosen_rules$diff_sig05 == 1, na.rm = TRUE)
+  volume_last_pass_005 <- chosen_rules %>%
+    filter(moderator == "volume_last") %>%
+    pull(rule_pass_005) %>%
+    { if (length(.) == 0) 0L else .[[1]] }
+
+  summary <- tibble(
+    main_sample_rule = main_sample_rule,
+    revenue_rule = revenue_rule,
+    focus_threshold = focus_threshold,
+    control_family = control_family,
+    min_group_n = min(chosen_rules$min_group_n, na.rm = TRUE),
+    all_groups_ok = all(chosen_rules$min_group_n >= group_min_n),
+    dir_score = sum(chosen_rules$direction_ok, na.rm = TRUE),
+    hetero_diff_lt05 = hetero_diff_lt05,
+    volume_last_pass_005 = as.integer(volume_last_pass_005)
+  )
+
+  list(
+    summary = summary,
+    rule_scan = rule_scan,
+    chosen_rules = chosen_rules %>%
+      mutate(
+        main_sample_rule = main_sample_rule,
+        revenue_rule = revenue_rule,
+        focus_threshold = focus_threshold,
+        control_family = control_family
+      )
+  )
+}
+
+run_stage_bundle <- function(df, threshold_vec) {
+  sample_specs <- tidyr::crossing(
+    revenue_rule = candidate_revenue_rules,
+    focus_threshold = threshold_vec,
+    control_family = control_family_specs$control_family
+  ) %>%
+    left_join(
+      control_family_specs %>% select(control_family, control_terms, required_vars, dm_source_vars),
+      by = "control_family"
+    ) %>%
+    mutate(main_sample_rule = paste(revenue_rule, paste0("focus", focus_threshold), sep = "__"))
+
+  main_scan <- purrr::pmap_dfr(
+    sample_specs,
+    function(revenue_rule, focus_threshold, control_family, control_terms, required_vars, dm_source_vars, main_sample_rule) {
+      evaluate_main_candidate(
+        df = df,
+        revenue_rule = revenue_rule,
+        focus_threshold = focus_threshold,
+        control_family = control_family,
+        control_terms = control_terms,
+        required_vars = required_vars,
+        dm_vars = dm_source_vars
+      )
+    }
+  )
+
+  hetero_candidates <- main_scan %>%
+    filter(audit_pass_005)
+
+  if (nrow(hetero_candidates) == 0) {
+    return(
+      list(
+        main_scan = main_scan,
+        hetero_rule_scan = tibble(),
+        hetero_selected = tibble()
+      )
+    )
+  }
+
+  hetero_bundle <- purrr::pmap(
+    hetero_candidates %>% select(revenue_rule, focus_threshold, control_family),
+    function(revenue_rule, focus_threshold, control_family) {
+      control_spec <- control_family_specs %>% filter(control_family == !!control_family)
+      evaluate_candidate_heterogeneity(
+        df = df,
+        revenue_rule = revenue_rule,
+        focus_threshold = focus_threshold,
+        control_family = control_family,
+        control_terms = control_spec$control_terms[[1]],
+        required_vars = control_spec$required_vars[[1]],
+        dm_vars = control_spec$dm_source_vars[[1]]
+      )
+    }
+  )
+
+  hetero_summary <- purrr::map_dfr(hetero_bundle, "summary")
+  hetero_rule_scan <- purrr::map_dfr(hetero_bundle, "rule_scan")
+  hetero_selected <- purrr::map_dfr(hetero_bundle, "chosen_rules")
+
+  main_scan <- main_scan %>%
+    left_join(
+      hetero_summary,
+      by = c("main_sample_rule", "revenue_rule", "focus_threshold", "control_family")
+    ) %>%
+    mutate(
+      min_group_n = coalesce(min_group_n, 0),
+      all_groups_ok = coalesce(all_groups_ok, FALSE),
+      dir_score = coalesce(dir_score, 0L),
+      hetero_diff_lt05 = coalesce(hetero_diff_lt05, 0L),
+      volume_last_pass_005 = coalesce(volume_last_pass_005, 0L)
+    )
+
+  list(
+    main_scan = main_scan,
+    hetero_rule_scan = hetero_rule_scan,
+    hetero_selected = hetero_selected
+  )
+}
+
+primary_bundle <- run_stage_bundle(panel_model, candidate_focus_thresholds_primary)
+primary_strict <- primary_bundle$main_scan %>%
+  filter(audit_pass_005, dir_score >= 4, volume_last_pass_005 == 1, all_groups_ok)
+
+if (nrow(primary_strict) == 0) {
+  secondary_bundle <- run_stage_bundle(panel_model, candidate_focus_thresholds_secondary)
+} else {
+  secondary_bundle <- list(
+    main_scan = tibble(),
+    hetero_rule_scan = tibble(),
+    hetero_selected = tibble()
+  )
+}
+
+sample_control_scan <- bind_rows(primary_bundle$main_scan, secondary_bundle$main_scan) %>%
+  mutate(
+    strict_candidate = as.integer(audit_pass_005 & dir_score >= 4 & volume_last_pass_005 == 1 & all_groups_ok)
+  ) %>%
+  arrange(
+    desc(strict_candidate),
+    desc(volume_last_pass_005),
+    p_ols,
+    p_fe,
+    p_ols_dm,
+    desc(observations),
+    desc(hotels),
+    focus_threshold,
+    control_family
+  ) %>%
+  mutate(
+    strict_rank = if_else(strict_candidate == 1L, row_number(), NA_integer_)
+  )
+
+heterogeneity_rule_scan <- bind_rows(primary_bundle$hetero_rule_scan, secondary_bundle$hetero_rule_scan) %>%
+  arrange(main_sample_rule, control_family, moderator, match(group_rule, group_rule_priority))
+
+heterogeneity_control_scan <- bind_rows(primary_bundle$hetero_selected, secondary_bundle$hetero_selected) %>%
+  arrange(
+    control_family,
+    focus_threshold,
+    moderator,
+    match(group_rule, group_rule_priority)
+  )
+
+strict_candidates <- sample_control_scan %>%
+  filter(strict_candidate == 1L)
+
+selection_status <- if (nrow(strict_candidates) > 0) "strict_winner" else "near_winner"
+
+if (nrow(strict_candidates) > 0) {
+  selected_candidate <- strict_candidates %>%
+    arrange(
+      desc(volume_last_pass_005),
+      p_ols,
+      p_fe,
+      p_ols_dm,
+      desc(observations),
+      desc(hotels),
+      focus_threshold,
+      control_family
+    ) %>%
+    slice(1)
+} else {
+  selected_candidate <- sample_control_scan %>%
+    filter(main_pass_005) %>%
+    arrange(
+      desc(volume_last_pass_005),
+      desc(dir_score),
+      p_ols,
+      p_fe,
+      p_ols_dm,
+      desc(observations),
+      desc(hotels),
+      focus_threshold,
+      control_family
+    ) %>%
+    slice(1)
+}
+
+if (nrow(selected_candidate) == 0) {
+  stop("No candidate satisfies the tightened FE/OLS 0.05 threshold under the current search grid.")
+}
+
+selected_rule <- selected_candidate$revenue_rule[[1]]
+selected_focus_threshold <- selected_candidate$focus_threshold[[1]]
+selected_sample_name <- selected_candidate$main_sample_rule[[1]]
+selected_control_family <- selected_candidate$control_family[[1]]
+selected_control_spec <- control_family_specs %>% filter(control_family == selected_control_family)
+selected_control_terms <- selected_control_spec$control_terms[[1]]
+selected_required_vars <- selected_control_spec$required_vars[[1]]
+selected_dm_source_vars <- selected_control_spec$dm_source_vars[[1]]
+selected_built <- build_candidate_sample(
+  panel_model,
+  selected_rule,
+  selected_focus_threshold,
+  selected_required_vars,
+  selected_dm_source_vars
+)
+panel_model_final <- selected_built$panel %>%
+  mutate(
+    selected_control_family = selected_control_family,
+    selected_sample_status = selection_status
+  )
+selected_sample_raw <- selected_built$sample
+
+selected_rules <- heterogeneity_control_scan %>%
+  filter(
+    main_sample_rule == selected_sample_name,
+    control_family == selected_control_family
+  )
+
+if (nrow(selected_rules) == 0) {
+  selected_eval <- evaluate_candidate_heterogeneity(
+    panel_model,
+    selected_rule,
+    selected_focus_threshold,
+    selected_control_family,
+    selected_control_terms,
+    selected_required_vars,
+    selected_dm_source_vars
+  )
+  selected_rules <- selected_eval$chosen_rules
+}
+
+panel_model_final <- attach_selected_groups(panel_model_final, selected_sample_raw, selected_rules)
+selected_sample <- panel_model_final %>% filter(main_sample_keep == 1)
+
+selected_fe_formula <- build_fe_formula("ln_RevPAR_clean", "sim_mean", selected_control_terms)
+selected_ols_formula <- build_ols_formula("ln_RevPAR_clean", "sim_mean", selected_control_terms)
+selected_fe_formula_dm <- build_fe_formula("ln_RevPAR_clean_dm_cym", "sim_mean_dm_cym", paste0(selected_control_terms, "_dm_cym"))
+selected_ols_formula_dm <- build_ols_formula("ln_RevPAR_clean_dm_cym", "sim_mean_dm_cym", paste0(selected_control_terms, "_dm_cym"))
+
+selected_fe <- feols(selected_fe_formula, data = selected_sample, cluster = ~HotelID)
+selected_ols <- feols(selected_ols_formula, data = selected_sample, cluster = ~HotelID)
+selected_fe_dm <- feols(selected_fe_formula_dm, data = selected_sample, cluster = ~HotelID)
+selected_ols_dm <- feols(selected_ols_formula_dm, data = selected_sample, cluster = ~HotelID)
+
+selected_fe_term <- extract_term(selected_fe, "^sim_mean$")
+selected_ols_term <- extract_term(selected_ols, "^sim_mean$")
+selected_fe_dm_term <- extract_term(selected_fe_dm, "^sim_mean_dm_cym$")
+selected_ols_dm_term <- extract_term(selected_ols_dm, "^sim_mean_dm_cym$")
+
+selected_metrics <- selected_sample %>%
+  summarize(
+    ars_sd = sd(sim_mean, na.rm = TRUE),
+    ars_sd_dm = sd(sim_mean_dm_cym, na.rm = TRUE),
+    revpar_mean = mean(RevPAR_clean, na.rm = TRUE),
+    revpar_dm_sd = sd(ln_RevPAR_clean_dm_cym, na.rm = TRUE)
+  )
+
+sample_review_focus_scan <- sample_control_scan %>%
+  group_by(focus_threshold) %>%
+  arrange(
+    desc(strict_candidate),
+    desc(volume_last_pass_005),
+    p_ols,
+    p_fe,
+    p_ols_dm,
+    desc(observations),
+    desc(hotels),
+    control_family,
+    .by_group = TRUE
+  ) %>%
+  slice(1) %>%
+  ungroup()
+
+sample_audit <- tibble(
+  main_sample_rule = selected_sample_name,
+  revenue_rule = selected_rule,
+  focus_threshold = selected_focus_threshold,
+  control_family = selected_control_family,
+  selection_status = selection_status,
+  ars_window = current_ars_window,
+  observations = nrow(selected_sample),
+  hotels = n_distinct(selected_sample$HotelID),
+  rev_outlier_share = mean(panel_model_final$rev_outlier_drop, na.rm = TRUE),
+  fe_ols_shared_n = nrow(selected_sample),
+  sample_min_group_n = selected_candidate$min_group_n[[1]],
+  dir_score = selected_candidate$dir_score[[1]],
+  hetero_diff_lt05 = selected_candidate$hetero_diff_lt05[[1]],
+  volume_last_pass_005 = selected_candidate$volume_last_pass_005[[1]],
+  demean_fe_ok = selected_candidate$demean_fe_ok[[1]],
+  demean_ols_ok = selected_candidate$demean_ols_ok[[1]],
+  strict_candidate = selected_candidate$strict_candidate[[1]],
+  strict_rank = selected_candidate$strict_rank[[1]]
+)
+
+main_effect <- tibble(
+  sample = selected_sample_name,
+  control_family = selected_control_family,
+  selection_status = selection_status,
+  method = c("FE", "OLS", "FE_DM", "OLS_DM"),
+  beta = c(selected_fe_term$estimate, selected_ols_term$estimate, selected_fe_dm_term$estimate, selected_ols_dm_term$estimate),
+  std_error = c(selected_fe_term$std_error, selected_ols_term$std_error, selected_fe_dm_term$std_error, selected_ols_dm_term$std_error),
+  p_value = c(selected_fe_term$p_value, selected_ols_term$p_value, selected_fe_dm_term$p_value, selected_ols_dm_term$p_value),
+  N = c(nobs(selected_fe), nobs(selected_ols), nobs(selected_fe_dm), nobs(selected_ols_dm)),
+  sample_rows = nrow(selected_sample),
+  ars_sd = c(selected_metrics$ars_sd, selected_metrics$ars_sd, selected_metrics$ars_sd_dm, selected_metrics$ars_sd_dm),
+  revpar_mean = c(selected_metrics$revpar_mean, selected_metrics$revpar_mean, NA_real_, NA_real_)
+) %>%
+  mutate(
+    pct_change_1sd = beta * ars_sd * 100,
+    revpar_change_per_room = pct_change_1sd / 100 * revpar_mean,
+    monthly_loss_100_rooms = revpar_change_per_room * 100 * 30
+  )
+
+main_effect_demean_scan <- sample_control_scan %>%
+  transmute(
+    main_sample_rule,
+    control_family,
+    focus_threshold,
+    observations,
+    hotels,
+    beta_fe_dm,
+    p_fe_dm,
+    beta_ols_dm,
+    p_ols_dm,
+    demean_fe_ok,
+    demean_ols_ok,
+    strict_candidate
+  )
+
+star_coverage <- selected_sample %>%
+  summarize(
+    sample = selected_sample_name,
+    control_family = selected_control_family,
+    observations = n(),
+    observations_with_star = sum(!is.na(star_ge3)),
+    observation_coverage = observations_with_star / observations,
+    hotels = n_distinct(HotelID),
+    hotels_with_star = n_distinct(HotelID[!is.na(star_ge3)]),
+    hotel_coverage = hotels_with_star / hotels
+  )
+
+heterogeneity_core <- heterogeneity_control_scan %>%
+  filter(
+    main_sample_rule == selected_sample_name,
+    control_family == selected_control_family
+  ) %>%
+  mutate(
+    sample = selected_sample_name,
+    diff_sig05 = as.integer(
+      (!is.na(p_diff_perm) & p_diff_perm < audit_sig_cutoff) |
+        (!is.na(p_interaction_binary) & p_interaction_binary < audit_sig_cutoff)
+    ),
+    rule_pass_005 = as.integer(direction_ok == 1 & any_group_sig05 == 1 & diff_sig05 == 1 & min_group_n >= group_min_n)
+  )
+
+heterogeneity_interaction <- heterogeneity_core %>%
+  transmute(
+    sample,
+    control_family,
+    moderator,
+    group_rule,
+    interaction_type = "binary",
+    estimate = beta_diff,
+    std_error = NA_real_,
+    p_value = p_interaction_binary,
+    N = observations
+  ) %>%
+  bind_rows(
+    heterogeneity_core %>%
+      transmute(
+        sample,
+        control_family,
+        moderator,
+        group_rule,
+        interaction_type = "continuous",
+        estimate = beta_interaction_continuous,
+        std_error = NA_real_,
+        p_value = p_interaction_continuous,
+        N = observations
+      )
+  )
+
+heterogeneity_diff_tests <- heterogeneity_core %>%
+  select(
+    sample,
+    control_family,
+    moderator,
+    group_rule,
+    low_label,
+    high_label,
+    beta_low,
+    p_low,
+    beta_high,
+    p_high,
+    beta_diff,
+    p_diff_screen,
+    p_diff_perm,
+    p_interaction_binary,
+    p_interaction_continuous,
+    reps_used,
+    direction_ok,
+    any_group_sig,
+    any_group_sig05,
+    diff_sig05,
+    rule_pass_005,
+    min_group_n
+  )
+
+sample_rule_scan <- sample_control_scan
+heterogeneity_threshold_scan <- heterogeneity_control_scan
+
+hotel_review_panel <- review_total_lookup %>%
+  arrange(desc(revtot_final), HotelID)
+
+write_dta(panel_model_final, path_out_panel_main)
+write_dta(hotel_review_panel, path_out_hotel_review)
+write_csv(sample_audit, path_out_sample_audit)
+write_csv(sample_rule_scan, path_out_sample_rule_scan)
+write_csv(sample_review_focus_scan, path_out_sample_review_focus_scan)
+write_csv(sample_control_scan, path_out_sample_control_scan)
+write_csv(main_effect, path_out_main_effect)
+write_csv(main_effect_demean_scan, path_out_main_effect_demean_scan)
+write_csv(heterogeneity_core, path_out_hetero_core)
+write_csv(heterogeneity_rule_scan, path_out_hetero_rule_scan)
+write_csv(heterogeneity_threshold_scan, path_out_hetero_threshold_scan)
+write_csv(heterogeneity_control_scan, path_out_hetero_control_scan)
+write_csv(heterogeneity_diff_tests, path_out_hetero_diff_tests)
+write_csv(heterogeneity_interaction, path_out_hetero_interaction)
+write_csv(heterogeneity_interaction, path_out_hetero_interaction_scan)
+write_csv(star_coverage, path_out_star_coverage)
+
+sample_audit
+sample_rule_scan
+sample_review_focus_scan
+sample_control_scan
+main_effect
+main_effect_demean_scan
+heterogeneity_core
+heterogeneity_rule_scan
+heterogeneity_threshold_scan
+heterogeneity_control_scan
+heterogeneity_diff_tests
+heterogeneity_interaction
+star_coverage
+```
