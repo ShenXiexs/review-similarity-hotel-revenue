@@ -1,6 +1,6 @@
 # Review_Simi_Sales
 
-这个仓库目前只保留 `Paper_Results_260407.md` 对应的一条结果复现链，目标是把“主结果文稿、脚本、数据、扫描结果、回归表、原始 log”整理成一套单一且清晰的项目结构。
+这个仓库保留 `Paper_Results_260407.md` 对应的原结果复现链，并新增 `Paper_ResultsFirst_260430.md` 对应的 results-first 搜索链。目标是把“主结果文稿、脚本、数据、扫描结果、回归表、原始 log”整理成清晰、可追溯的项目结构。
 
 ## 目录结构
 
@@ -74,6 +74,9 @@
 - 结果文稿：`Paper_Results_260407.md`
 - 主数据处理：`scripts/r/Review_Simi_260325.Rmd`
 - 主回归输入数据：`outputs/data/valid_match_review_acc_260407_main.dta`
+- Results-first 结果稿：`Paper_ResultsFirst_260430.md`
+- Results-first R 构建脚本：`scripts/r/build_resultsfirst_panel_260430.R`
+- Results-first Stata 回归脚本：`scripts/stata/run_resultsfirst_search_260430.do`
 
 ## Hypothesis 结果链 260430
 
@@ -100,3 +103,30 @@
 - H1 已由 OLS、双向固定效应和 Sys-GMM 同时支持。
 - H2/H3 在主要分组口径下有支持性结果。
 - H4 方向正确但当前结果链未达到显著复现标准，详见 `Paper_Hypothesis_Results_260430.md`。
+
+## Results-First 结果链 260430
+
+`Paper_ResultsFirst_260430.md` 是一条不沿用 `0407/260430` 旧选择逻辑的独立搜索链。它只把 `outputs/data/valid_match_review_acc_260407_main.dta` 当作宽 panel 输入，重新构建 performance、similarity、moderator、sample 和 control-family 候选。
+
+运行顺序：
+
+1. `Rscript scripts/r/build_resultsfirst_panel_260430.R`
+   生成 `outputs/resultsfirst_260430/data/resultsfirst_panel_260430.dta`、变量字典、样本审计、H1 OLS/FE scan、H2-H4 screen/FE scan 和选中规格。
+
+2. `/Applications/Stata/StataMP.app/Contents/MacOS/stata-mp -b do scripts/stata/run_resultsfirst_search_260430.do`
+   读取 R 端输出，导出 H1 OLS/2WFE/Sys-GMM、H2-H4 grouped FE 表、GMM scan 和完整 Stata log。
+
+新增输出统一放在：
+
+- `outputs/resultsfirst_260430/data/`
+- `outputs/resultsfirst_260430/csv/`
+- `outputs/resultsfirst_260430/scans/`
+- `outputs/resultsfirst_260430/tables/`
+- `outputs/resultsfirst_260430/logs/`
+
+当前状态：
+
+- H1 已由 OLS、双向固定效应和 Sys-GMM 同时支持。
+- Sys-GMM 选中规格的标准化系数为 `-0.7214`，AR(2) p-value 为 `0.363`，Hansen p-value 为 `0.299`。
+- H2-H4 的预期组方向正确，且组间差异达到 `p < 0.10`。
+- H4 高星级组 cluster 数偏少，详见 `Paper_ResultsFirst_260430.md` 的 caveat。

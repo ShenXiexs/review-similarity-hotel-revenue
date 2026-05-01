@@ -267,22 +267,22 @@ evaluate_hetero_fe <- function(df, row) {
   low <- extract_term(low_m, paste0("^", row$sim_var, "$"))
   high <- extract_term(high_m, paste0("^", row$sim_var, "$"))
   diff <- extract_term(int_m, paste0(row$sim_var, ":group_flag|group_flag:", row$sim_var))
-  direction_ok <- if (row$expected == "low_stronger") low$estimate < high$estimate else high$estimate < low$estimate
-  expected_sig <- if (row$expected == "low_stronger") {
+  direction_val <- if (row$expected == "low_stronger") low$estimate < high$estimate else high$estimate < low$estimate
+  expected_sig_val <- if (row$expected == "low_stronger") {
     low$estimate < 0 && low$p_value < 0.10
   } else {
     high$estimate < 0 && high$p_value < 0.10
   }
-  diff_sig <- !is.na(diff$p_value) && diff$p_value < 0.10
+  diff_sig_val <- !is.na(diff$p_value) && diff$p_value < 0.10
   empty %>%
     mutate(
       beta_low = low$estimate, p_low = low$p_value,
       beta_high = high$estimate, p_high = high$p_value,
       beta_diff = diff$estimate, p_interaction = diff$p_value,
-      direction_ok = as.integer(direction_ok),
-      expected_group_sig = as.integer(expected_sig),
-      diff_sig = as.integer(diff_sig),
-      pass = as.integer(direction_ok && expected_sig && diff_sig)
+      direction_ok = as.integer(direction_val),
+      expected_group_sig = as.integer(expected_sig_val),
+      diff_sig = as.integer(diff_sig_val),
+      pass = as.integer(direction_val && expected_sig_val && diff_sig_val)
     )
 }
 

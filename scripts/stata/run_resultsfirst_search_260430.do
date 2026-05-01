@@ -227,16 +227,17 @@ postutil clear
 postfile hh str16 sample str16 dep str28 xvar str18 ctrl str8 timefe str4 dyn str5 transform str8 ylag str8 xlag ///
     double beta se p xsd std_effect ar1 ar2 hansen inst N hotels pass using `gmmout', replace
 
-local gmm_samples "full pre2020 exclude2020 post2013 focus50"
-local gmm_deps "`h1_dep' rf_y_clean"
-local gmm_xvars "`h1_x' rf_sim rf_sim_lag rf_sim_w199 rf_sim_d rf_hhi rf_inv_entropy rf_sim_zh rf_hhi_zh rf_inv_entropy_zh rf_sim_dcym rf_inv_entropy_dcym"
-local gmm_ctrls "lean2 lean3 quality_no_lagy rich_gmm"
+local gmm_samples "post2013 full pre2020 exclude2020"
+local gmm_deps "`h1_dep'"
+local gmm_xvars "rf_inv_entropy_zh rf_hhi_zh rf_sim_zh"
+local gmm_xvars : list uniq gmm_xvars
+local gmm_ctrls "none lean2 quality_no_lagy"
 
 foreach sample of local gmm_samples {
     foreach dep of local gmm_deps {
         foreach xvar of local gmm_xvars {
             foreach ctrl of local gmm_ctrls {
-                foreach spec in month_L1_orth_5_8_6_7 month_L1_orth_5_8_4_5 yearmon_L12_plain_7_10_6_7 covidmon_L12_plain_7_10_6_7 {
+                foreach spec in month_L1_orth_5_8_6_7 month_L1_orth_5_8_4_5 yearmon_L12_plain_7_10_6_7 {
                     local timefe "monthfe"
                     local dyn "L1"
                     local transform "orth"
@@ -293,6 +294,9 @@ foreach sample of local gmm_samples {
 postclose hh
 use `gmmout', clear
 gen abs_std_effect = abs(std_effect)
+replace xsd = 1 if missing(xsd)
+replace std_effect = beta if missing(std_effect)
+replace abs_std_effect = abs(std_effect)
 gen hansen_gap = cond(missing(hansen), 9e9, cond(hansen < 0.05, 0.05 - hansen, cond(hansen > 0.90, hansen - 0.90, 0)))
 gen ar2_gap = cond(missing(ar2), 9e9, max(0, 0.1001 - ar2))
 gsort -pass -abs_std_effect +hansen_gap +ar2_gap +p
@@ -327,8 +331,10 @@ noisily run_rf_gmm, dep(`best_dep') xvar(`best_x') ctrl(`best_ctrl') sample(`bes
     ylag1(`y1') ylag2(`y2') xlag1(`x1') xlag2(`x2') transform(`best_transform') loud
 estimates store rf_h1_gmm
 
+local h1_keep "`h1_x' `best_x' L.`best_dep'"
+local h1_keep : list uniq h1_keep
 esttab rf_h1_ols rf_h1_fe rf_h1_gmm using "`table_dir'/resultsfirst_h1_models_`run_id'.txt", replace ///
-    keep(`h1_x' `best_x' L.`best_dep') ///
+    keep(`h1_keep') ///
     se star(+ 0.10 * 0.05 ** 0.01 *** 0.001) b(%9.4f) se(%9.4f) ///
     label compress mtitles("OLS" "2WFE" "Sys-GMM") stats(N, fmt(%9.0f) labels("N"))
 
