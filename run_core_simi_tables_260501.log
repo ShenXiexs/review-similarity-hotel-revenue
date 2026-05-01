@@ -1,0 +1,1622 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: Single-user 2-core  perpetual
+Serial number: 501806366047
+  Licensed to: Sam Xie
+               samxie
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 5,000; see help set_maxvar.
+
+
+Running /Applications/Stata/profile.do ...
+command window is unrecognized
+r(199);
+
+. do scripts/stata/run_core_simi_tables_260501.do 
+
+. *******************************************************
+. * run_core_simi_tables_260501.do
+. * Core-simi H1-H4 rebuild.
+. * H1-H4 main similarity variable is always sim_mean.
+. *******************************************************
+. 
+. version 17.0
+
+. clear all
+
+. set more off
+
+. set linesize 255
+
+. capture log close
+
+. mata: mata set matafavor speed
+
+. 
+. local project "/Users/samxie/Research/ReviewSimi_Sales/Code"
+
+. local out_root "`project'/outputs/core_simi_260501"
+
+. local data_dir "`out_root'/data"
+
+. local csv_dir "`out_root'/csv"
+
+. local scan_dir "`out_root'/scans"
+
+. local table_dir "`out_root'/tables"
+
+. local log_dir "`out_root'/logs"
+
+. local run_id "260501"
+
+. 
+. cap mkdir "`out_root'"
+
+. cap mkdir "`data_dir'"
+
+. cap mkdir "`csv_dir'"
+
+. cap mkdir "`scan_dir'"
+
+. cap mkdir "`table_dir'"
+
+. cap mkdir "`log_dir'"
+
+. 
+. local data_main "`data_dir'/core_simi_panel_`run_id'.dta"
+
+. local gmm_candidates_csv "`csv_dir'/h1_gmm_candidates_`run_id'.csv"
+
+. local hetero_selected_csv "`csv_dir'/heterogeneity_selected_`run_id'.csv"
+
+. 
+. capture confirm file "`data_main'"
+
+. if _rc {
+.     di as error "Cannot find `data_main'. Run scripts/r/build_core_simi_panel_260501.R first."
+.     exit 601
+. }
+
+. 
+. program define build_panel_state
+  1.     capture drop hotel_id_num
+  2.     capture confirm numeric variable HotelID
+  3.     if _rc {
+  4.         encode HotelID, gen(hotel_id_num)
+  5.     }
+  6.     else {
+  7.         gen long hotel_id_num = HotelID
+  8.     }
+  9.     capture drop ym
+ 10.     gen ym = monthly(year_month, "YM")
+ 11.     format ym %tm
+ 12.     xtset hotel_id_num ym
+ 13.     sort hotel_id_num ym
+ 14.     capture drop cs_covid2020 cs_covid2021 cs_covid2022
+ 15.     gen byte cs_covid2020 = (Year == 2020)
+ 16.     gen byte cs_covid2021 = (Year == 2021)
+ 17.     gen byte cs_covid2022 = (Year == 2022)
+ 18. end
+
+. 
+. program define set_cs_controls, rclass
+  1.     syntax, FAMILY(string)
+  2.     if "`family'" == "rich8_current" {
+  3.         return local controls "ln_recent_volumn recent_sd ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean"
+  4.     }
+  5.     else if "`family'" == "quality6" {
+  6.         return local controls "ln_recent_volumn ln_lag_volumn_acc lag_avg_rating_acc lag_avg_rating_month ln_avg_com_RevPAR review_freshness ln_lag_RevPAR_clean"
+  7.     }
+  8.     else if "`family'" == "base4_acc" {
+  9.         return local controls "ln_recent_volumn ln_lag_volumn_acc lag_avg_rating_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean"
+ 10.     }
+ 11.     else if "`family'" == "base4_month" {
+ 12.         return local controls "ln_recent_volumn ln_lag_volumn_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean"
+ 13.     }
+ 14.     else if "`family'" == "lean3" {
+ 15.         return local controls "ln_recent_volumn ln_lag_volumn_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean"
+ 16.     }
+ 17.     else if "`family'" == "momentum_plus" {
+ 18.         return local controls "ln_recent_volumn ln_lag_volumn_acc lag_avg_rating_acc ln_avg_com_RevPAR rating_momentum volume_momentum review_freshness ln_lag_RevPAR_clean"
+ 19.     }
+ 20.     else {
+ 21.         di as error "Unknown control family: `family'"
+ 22.         exit 198
+ 23.     }
+ 24. end
+
+. 
+. program define set_cs_sample, rclass
+  1.     syntax, SAMPLE(string)
+  2.     if "`sample'" == "full" {
+  3.         return local condition "cs_sample_full == 1"
+  4.     }
+  5.     else if "`sample'" == "pre2020" {
+  6.         return local condition "cs_sample_pre2020 == 1"
+  7.     }
+  8.     else if "`sample'" == "exclude2020" {
+  9.         return local condition "cs_sample_exclude2020 == 1"
+ 10.     }
+ 11.     else if "`sample'" == "post2013" {
+ 12.         return local condition "cs_sample_post2013 == 1"
+ 13.     }
+ 14.     else if "`sample'" == "post2013_excl2020" {
+ 15.         return local condition "cs_sample_post2013_excl2020 == 1"
+ 16.     }
+ 17.     else if "`sample'" == "focus50" {
+ 18.         return local condition "cs_sample_focus50 == 1"
+ 19.     }
+ 20.     else if "`sample'" == "focus100" {
+ 21.         return local condition "cs_sample_focus100 == 1"
+ 22.     }
+ 23.     else if "`sample'" == "star_observed" {
+ 24.         return local condition "cs_sample_star_observed == 1"
+ 25.     }
+ 26.     else {
+ 27.         di as error "Unknown sample: `sample'"
+ 28.         exit 198
+ 29.     }
+ 30. end
+
+. 
+. program define run_cs_gmm
+  1.     syntax, DEP(string) CTRL(string) SAMPLE(string) TIMEFE(string) DYN(string) ///
+>         YLAG1(integer) YLAG2(integer) XLAG1(integer) XLAG2(integer) XSTYLE(string) [TRANSFORM(string) LOUD]
+  2. 
+.     set_cs_controls, family("`ctrl'")
+  3.     local rhs "`r(controls)'"
+  4.     set_cs_sample, sample("`sample'")
+  5.     local ifcond "`r(condition)'"
+  6. 
+.     local tf_rhs ""
+  7.     local tf_iv ""
+  8.     if "`timefe'" == "monthfe" {
+  9.         local tf_rhs "i.Mon"
+ 10.         local tf_iv "i.Mon"
+ 11.     }
+ 12.     else if "`timefe'" == "yearmon" {
+ 13.         local tf_rhs "i.Year i.Mon"
+ 14.         local tf_iv "i.Year i.Mon"
+ 15.     }
+ 16.     else if "`timefe'" == "covidmon" {
+ 17.         local tf_rhs "cs_covid2020 cs_covid2021 cs_covid2022 i.Mon"
+ 18.         local tf_iv "cs_covid2020 cs_covid2021 cs_covid2022 i.Mon"
+ 19.     }
+ 20.     else {
+ 21.         error 198
+ 22.     }
+ 23. 
+.     local lag_rhs "L.`dep'"
+ 24.     local gmm_y "L.`dep'"
+ 25.     if "`dyn'" == "L12" {
+ 26.         local lag_rhs "L.`dep' L2.`dep'"
+ 27.         local gmm_y "L.`dep' L2.`dep'"
+ 28.     }
+ 29. 
+.     local transform_opt ""
+ 30.     if "`transform'" == "orth" {
+ 31.         local transform_opt "orthogonal"
+ 32.     }
+ 33. 
+.     local run_prefix "quietly"
+ 34.     if "`loud'" != "" {
+ 35.         local run_prefix "noisily"
+ 36.     }
+ 37. 
+.     local x_gmm ""
+ 38.     local x_iv "`rhs' `tf_iv'"
+ 39.     if "`xstyle'" == "gmm" {
+ 40.         local x_gmm "gmm(sim_mean, laglimits(`xlag1' `xlag2') collapse)"
+ 41.     }
+ 42.     else if "`xstyle'" == "iv" {
+ 43.         local x_iv "sim_mean `rhs' `tf_iv'"
+ 44.     }
+ 45.     else {
+ 46.         error 198
+ 47.     }
+ 48. 
+.     `run_prefix' xtabond2 `dep' `lag_rhs' sim_mean `rhs' `tf_rhs' if `ifcond', ///
+>         gmm(`gmm_y', laglimits(`ylag1' `ylag2') collapse) ///
+>         `x_gmm' ///
+>         iv(`x_iv') twostep robust small `transform_opt'
+ 49. end
+
+. 
+. capture which reghdfe
+
+. if _rc {
+.     di as error "reghdfe not found. Install reghdfe first."
+.     exit 199
+. }
+
+. capture which esttab
+
+. if _rc {
+.     di as error "esttab not found. Install estout first."
+.     exit 199
+. }
+
+. capture which xtabond2
+
+. if _rc {
+.     di as error "xtabond2 not found. Install xtabond2 first."
+.     exit 199
+. }
+
+. 
+. tempfile rawdata cand heterosel gmmout h1final
+
+. 
+. use "`data_main'", clear
+
+. log using "`log_dir'/run_core_simi_tables_`run_id'.log", text replace
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/logs/run_core_simi_tables_260501.log
+  log type:  text
+ opened on:   1 May 2026, 13:03:41
+
+. build_panel_state
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+. save `rawdata', replace
+(file /var/folders/x9/p1d98gj518326zdc2s5gzn8w0000gn/T//St32980.000001 not found)
+file /var/folders/x9/p1d98gj518326zdc2s5gzn8w0000gn/T//St32980.000001 saved as .dta format
+
+. 
+. import delimited using "`gmm_candidates_csv'", clear varnames(1) stringcols(_all)
+(encoding automatically selected: ISO-8859-1)
+(21 vars, 4 obs)
+
+. gen long cand_id = _n
+
+. save `cand', replace
+(file /var/folders/x9/p1d98gj518326zdc2s5gzn8w0000gn/T//St32980.000002 not found)
+file /var/folders/x9/p1d98gj518326zdc2s5gzn8w0000gn/T//St32980.000002 saved as .dta format
+
+. 
+. di as text "============================================================"
+============================================================
+
+. di as text "Core-simi H1 system-GMM scan: sim_mean only"
+Core-simi H1 system-GMM scan: sim_mean only
+
+. di as text "============================================================"
+============================================================
+
+. 
+. postutil clear
+
+. postfile gg str16 sample str24 dep str18 ctrl str8 timefe str4 dyn str5 transform str5 xstyle str8 ylag str8 xlag ///
+>     double beta se p sim_sd std_effect ar1 ar2 hansen inst N hotels pass using `gmmout', replace
+(file /var/folders/x9/p1d98gj518326zdc2s5gzn8w0000gn/T//St32980.000004 not found)
+
+. 
+. quietly count
+
+. local n_cand = r(N)
+
+. forvalues k = 1/`n_cand' {
+  2.     use `cand', clear
+  3.     local sample "`=sample[`k']'"
+  4.     local dep "`=dep_var[`k']'"
+  5.     local ctrl "`=control_family[`k']'"
+  6. 
+.     foreach xstyle in gmm iv {
+  7.     foreach spec in month_L1_orth_4_7_3_5 month_L1_orth_5_8_4_5 month_L1_orth_5_8_6_7 month_L1_orth_6_10_4_6 month_L1_orth_7_11_5_8 month_L1_plain_4_7_3_5 month_L1_plain_5_8_4_5 yearmon_L1_plain_5_8_4_5 yearmon_L1_orth_5_8_4_5 month_L12_plain_5_8_4_5
+>  month_L12_orth_5_8_4_5 yearmon_L12_plain_7_10_6_7 covidmon_L12_plain_7_10_6_7 {
+  8.         local timefe "monthfe"
+  9.         local dyn "L1"
+ 10.         local transform "orth"
+ 11.         local y1 4
+ 12.         local y2 7
+ 13.         local x1 3
+ 14.         local x2 5
+ 15.         if "`spec'" == "month_L1_orth_5_8_4_5" {
+ 16.             local y1 5
+ 17.             local y2 8
+ 18.             local x1 4
+ 19.             local x2 5
+ 20.         }
+ 21.         if "`spec'" == "month_L1_orth_5_8_6_7" {
+ 22.             local y1 5
+ 23.             local y2 8
+ 24.             local x1 6
+ 25.             local x2 7
+ 26.         }
+ 27.         if "`spec'" == "month_L1_orth_6_10_4_6" {
+ 28.             local y1 6
+ 29.             local y2 10
+ 30.             local x1 4
+ 31.             local x2 6
+ 32.         }
+ 33.         if "`spec'" == "month_L1_orth_7_11_5_8" {
+ 34.             local y1 7
+ 35.             local y2 11
+ 36.             local x1 5
+ 37.             local x2 8
+ 38.         }
+ 39.         if "`spec'" == "month_L1_plain_4_7_3_5" {
+ 40.             local transform "plain"
+ 41.             local y1 4
+ 42.             local y2 7
+ 43.             local x1 3
+ 44.             local x2 5
+ 45.         }
+ 46.         if "`spec'" == "month_L1_plain_5_8_4_5" {
+ 47.             local transform "plain"
+ 48.             local y1 5
+ 49.             local y2 8
+ 50.             local x1 4
+ 51.             local x2 5
+ 52.         }
+ 53.         if "`spec'" == "yearmon_L1_plain_5_8_4_5" {
+ 54.             local timefe "yearmon"
+ 55.             local transform "plain"
+ 56.             local y1 5
+ 57.             local y2 8
+ 58.             local x1 4
+ 59.             local x2 5
+ 60.         }
+ 61.         if "`spec'" == "yearmon_L1_orth_5_8_4_5" {
+ 62.             local timefe "yearmon"
+ 63.             local transform "orth"
+ 64.             local y1 5
+ 65.             local y2 8
+ 66.             local x1 4
+ 67.             local x2 5
+ 68.         }
+ 69.         if "`spec'" == "month_L12_plain_5_8_4_5" {
+ 70.             local dyn "L12"
+ 71.             local transform "plain"
+ 72.             local y1 5
+ 73.             local y2 8
+ 74.             local x1 4
+ 75.             local x2 5
+ 76.         }
+ 77.         if "`spec'" == "month_L12_orth_5_8_4_5" {
+ 78.             local dyn "L12"
+ 79.             local transform "orth"
+ 80.             local y1 5
+ 81.             local y2 8
+ 82.             local x1 4
+ 83.             local x2 5
+ 84.         }
+ 85.         if "`spec'" == "yearmon_L12_plain_7_10_6_7" {
+ 86.             local timefe "yearmon"
+ 87.             local dyn "L12"
+ 88.             local transform "plain"
+ 89.             local y1 7
+ 90.             local y2 10
+ 91.             local x1 6
+ 92.             local x2 7
+ 93.         }
+ 94.         if "`spec'" == "covidmon_L12_plain_7_10_6_7" {
+ 95.             local timefe "covidmon"
+ 96.             local dyn "L12"
+ 97.             local transform "plain"
+ 98.             local y1 7
+ 99.             local y2 10
+100.             local x1 6
+101.             local x2 7
+102.         }
+103. 
+.         use `rawdata', clear
+104.         build_panel_state
+105.         set_cs_sample, sample("`sample'")
+106.         local ifcond "`r(condition)'"
+107.         quietly summarize sim_mean if `ifcond'
+108.         local sdsim = r(sd)
+109.         capture noisily run_cs_gmm, dep(`dep') ctrl(`ctrl') sample(`sample') timefe(`timefe') dyn(`dyn') ///
+>             ylag1(`y1') ylag2(`y2') xlag1(`x1') xlag2(`x2') xstyle(`xstyle') transform(`transform')
+110.         if _rc == 0 {
+111.             local pv = 2 * normal(-abs(_b[sim_mean] / _se[sim_mean]))
+112.             local std_eff = _b[sim_mean] * `sdsim'
+113.             local ok = (_b[sim_mean] < 0 & `pv' < 0.05 & e(ar1p) < 0.05 & e(ar2p) > 0.10 & e(hansenp) >= 0.05 & e(hansenp) <= 0.90 & e(j) < e(N_g))
+114.             post gg ("`sample'") ("`dep'") ("`ctrl'") ("`timefe'") ("`dyn'") ("`transform'") ("`xstyle'") ///
+>                 ("`y1'/`y2'") ("`x1'/`x2'") ///
+>                 (_b[sim_mean]) (_se[sim_mean]) (`pv') (`sdsim') (`std_eff') ///
+>                 (e(ar1p)) (e(ar2p)) (e(hansenp)) (e(j)) (e(N)) (e(N_g)) (`ok')
+115.         }
+116.     }
+117.     }
+118. }
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+. postclose gg
+
+. 
+. use `gmmout', clear
+
+. gen abs_std_effect = abs(std_effect)
+
+. gen sig_ok = (beta < 0 & p < 0.05)
+
+. gen hansen_gap = cond(missing(hansen), 9e9, cond(hansen < 0.05, 0.05 - hansen, cond(hansen > 0.90, hansen - 0.90, 0)))
+
+. gen ar2_gap = cond(missing(ar2), 9e9, max(0, 0.1001 - ar2))
+
+. gsort -pass -sig_ok +hansen_gap +ar2_gap +p -abs_std_effect
+
+. export delimited using "`scan_dir'/h1_gmm_scan_`run_id'.csv", replace
+file /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/scans/h1_gmm_scan_260501.csv saved
+
+. preserve
+
+. local topn = min(_N, 25)
+
+. keep in 1/`topn'
+(79 observations deleted)
+
+. export delimited using "`table_dir'/core_simi_h1_gmm_top25_`run_id'.txt", replace
+file /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/tables/core_simi_h1_gmm_top25_260501.txt saved
+
+. restore
+
+. preserve
+
+. keep in 1
+(103 observations deleted)
+
+. export delimited using "`csv_dir'/gmm_selected_`run_id'.csv", replace
+file /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/csv/gmm_selected_260501.csv saved
+
+. restore
+
+. 
+. quietly levelsof sample in 1, local(best_sample) clean
+
+. quietly levelsof dep in 1, local(best_dep) clean
+
+. quietly levelsof ctrl in 1, local(best_ctrl) clean
+
+. quietly levelsof timefe in 1, local(best_timefe) clean
+
+. quietly levelsof dyn in 1, local(best_dyn) clean
+
+. quietly levelsof transform in 1, local(best_transform) clean
+
+. quietly levelsof xstyle in 1, local(best_xstyle) clean
+
+. quietly levelsof ylag in 1, local(best_ylag) clean
+
+. quietly levelsof xlag in 1, local(best_xlag) clean
+
+. 
+. use `rawdata', clear
+
+. build_panel_state
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+. set_cs_controls, family("`best_ctrl'")
+
+. local best_controls "`r(controls)'"
+
+. set_cs_sample, sample("`best_sample'")
+
+. local best_if "`r(condition)'"
+
+. quietly summarize sim_mean if `best_if'
+
+. local best_sd = r(sd)
+
+. 
+. di as text "============================================================"
+============================================================
+
+. di as text "Core-simi H1 final same-spec OLS, 2WFE, and Sys-GMM"
+Core-simi H1 final same-spec OLS, 2WFE, and Sys-GMM
+
+. di as text "sample=`best_sample' dep=`best_dep' x=sim_mean controls=`best_ctrl'"
+sample=focus50 dep=ln_RevPAR_clean x=sim_mean controls=rich8_current
+
+. di as text "============================================================"
+============================================================
+
+. 
+. reg `best_dep' sim_mean `best_controls' if `best_if', vce(cluster hotel_id_num)
+
+Linear regression                               Number of obs     =     36,151
+                                                F(9, 664)         =    1218.77
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.7428
+                                                Root MSE          =     .35441
+
+                                 (Std. err. adjusted for 665 clusters in hotel_id_num)
+--------------------------------------------------------------------------------------
+                     |               Robust
+     ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+            sim_mean |  -.2317888   .1038416    -2.23   0.026    -.4356863   -.0278913
+    ln_recent_volumn |   .1096418   .0144504     7.59   0.000     .0812679    .1380157
+           recent_sd |   -.013896   .0086811    -1.60   0.110    -.0309416    .0031497
+   ln_lag_volumn_acc |  -.0035989    .003225    -1.12   0.265    -.0099313    .0027334
+  lag_avg_rating_acc |   .0672126   .0126922     5.30   0.000      .042291    .0921343
+          lag_sd_acc |  -.0371033   .0290334    -1.28   0.202    -.0941116    .0199049
+lag_avg_rating_month |   .0088231   .0025205     3.50   0.000     .0038739    .0137724
+   ln_avg_com_RevPAR |   .0914183   .0099925     9.15   0.000     .0717976    .1110391
+ ln_lag_RevPAR_clean |    .777137   .0230125    33.77   0.000      .731951    .8223231
+               _cons |   .1066442   .0865137     1.23   0.218    -.0632292    .2765176
+--------------------------------------------------------------------------------------
+
+. estimates store cs_h1_ols
+
+. local ols_b = _b[sim_mean]
+
+. local ols_se = _se[sim_mean]
+
+. local ols_p = 2 * ttail(e(df_r), abs(`ols_b' / `ols_se'))
+
+. local ols_n = e(N)
+
+. local ols_std = `ols_b' * `best_sd'
+
+. 
+. reghdfe `best_dep' sim_mean `best_controls' if `best_if', absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 6 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     36,145
+Absorbing 2 HDFE groups                           F(   9,    658) =      97.98
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8566
+                                                  Adj R-squared   =     0.8533
+                                                  Within R-sq.    =     0.2440
+Number of clusters (hotel_id_num) =        659    Root MSE        =     0.2676
+
+                                 (Std. err. adjusted for 659 clusters in hotel_id_num)
+--------------------------------------------------------------------------------------
+                     |               Robust
+     ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+            sim_mean |  -.1406017   .0650067    -2.16   0.031    -.2682474   -.0129561
+    ln_recent_volumn |   .0894643   .0098331     9.10   0.000     .0701562    .1087724
+           recent_sd |  -.0131444   .0080781    -1.63   0.104    -.0290063    .0027176
+   ln_lag_volumn_acc |   .0345817   .0079481     4.35   0.000     .0189749    .0501885
+  lag_avg_rating_acc |   .0210241   .0243819     0.86   0.389    -.0268517    .0688998
+          lag_sd_acc |  -.0115816   .0300343    -0.39   0.700    -.0705562    .0473931
+lag_avg_rating_month |   .0068215   .0019938     3.42   0.001     .0029065    .0107365
+   ln_avg_com_RevPAR |   .1318251    .013149    10.03   0.000     .1060061    .1576442
+ ln_lag_RevPAR_clean |    .388792   .0265772    14.63   0.000     .3366056    .4409784
+               _cons |   1.561045   .1457014    10.71   0.000     1.274949    1.847141
+--------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       659         659           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store cs_h1_fe
+
+. local fe_b = _b[sim_mean]
+
+. local fe_se = _se[sim_mean]
+
+. local fe_p = 2 * ttail(e(df_r), abs(`fe_b' / `fe_se'))
+
+. local fe_n = e(N)
+
+. local fe_std = `fe_b' * `best_sd'
+
+. 
+. gettoken y1 y2 : best_ylag, parse("/")
+
+. local y2 = subinstr("`y2'", "/", "", 1)
+
+. gettoken x1 x2 : best_xlag, parse("/")
+
+. local x2 = subinstr("`x2'", "/", "", 1)
+
+. noisily run_cs_gmm, dep(`best_dep') ctrl(`best_ctrl') sample(`best_sample') timefe(`best_timefe') dyn(`best_dyn') ///
+>     ylag1(`y1') ylag2(`y2') xlag1(`x1') xlag2(`x2') xstyle(`best_xstyle') transform(`best_transform') loud
+Favoring speed over space. To switch, type or click on mata: mata set matafavor space, perm.
+Warning: Two-step estimated covariance matrix of moments is singular.
+  Using a generalized inverse to calculate optimal weighting matrix for two-step estimation.
+  Difference-in-Sargan/Hansen statistics may be negative.
+
+Dynamic panel-data estimation, two-step system GMM
+------------------------------------------------------------------------------
+Group variable: hotel_id_num                    Number of obs      =     29654
+Time variable : ym                              Number of groups   =       653
+Number of instruments = 26                      Obs per group: min =         1
+F(22, 652)    =    441.21                                      avg =     45.41
+Prob > F      =     0.000                                      max =       131
+--------------------------------------------------------------------------------------
+                     |              Corrected
+     ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+     ln_RevPAR_clean |
+                 L1. |   23.00916   7.383179     3.12   0.002     8.511485    37.50684
+                     |
+            sim_mean |   -.223247   .1089164    -2.05   0.041    -.4371162   -.0093778
+    ln_recent_volumn |   .1220915   .0164851     7.41   0.000     .0897213    .1544617
+           recent_sd |   .0022608   .0093118     0.24   0.808     -.016024    .0205456
+   ln_lag_volumn_acc |    .005182   .0049191     1.05   0.293    -.0044772    .0148411
+  lag_avg_rating_acc |   .1132695   .0239418     4.73   0.000     .0662571     .160282
+          lag_sd_acc |  -.0353728   .0369732    -0.96   0.339    -.1079736     .037228
+lag_avg_rating_month |   .0075212   .0039504     1.90   0.057    -.0002359    .0152784
+   ln_avg_com_RevPAR |   .1178303   .0133395     8.83   0.000     .0916368    .1440238
+ ln_lag_RevPAR_clean |  -22.35856    7.41757    -3.01   0.003    -36.92377   -7.793353
+                     |
+                 Mon |
+                  1  |          0  (empty)
+                  2  |   .1744329   .0145989    11.95   0.000     .1457663    .2030996
+                  3  |   .0716913   .0197276     3.63   0.000     .0329539    .1104287
+                  4  |  -.0986463   .0217101    -4.54   0.000    -.1412764   -.0560161
+                  5  |  -.0380834   .0169368    -2.25   0.025    -.0713408   -.0048261
+                  6  |   .0019345    .018851     0.10   0.918    -.0350815    .0389506
+                  7  |  -.0509206   .0186156    -2.74   0.006    -.0874745   -.0143668
+                  8  |  -.1031671   .0141444    -7.29   0.000    -.1309411   -.0753931
+                  9  |   .0129594    .012685     1.02   0.307     -.011949    .0378678
+                 10  |   .1035088   .0153087     6.76   0.000     .0734484    .1335691
+                 11  |  -.1273997   .0203019    -6.28   0.000    -.1672647   -.0875346
+                 12  |  -.2055411   .0189513   -10.85   0.000     -.242754   -.1683282
+                     |
+               _cons |   .2879705   .1223582     2.35   0.019     .0477069    .5282341
+--------------------------------------------------------------------------------------
+Instruments for orthogonal deviations equation
+  Standard
+    FOD.(sim_mean ln_recent_volumn recent_sd ln_lag_volumn_acc
+    lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR
+    ln_lag_RevPAR_clean 1b.Mon 2.Mon 3.Mon 4.Mon 5.Mon 6.Mon 7.Mon 8.Mon 9.Mon
+    10.Mon 11.Mon 12.Mon)
+  GMM-type (missing=0, separate instruments for each period unless collapsed)
+    L(4/7).L.ln_RevPAR_clean collapsed
+Instruments for levels equation
+  Standard
+    sim_mean ln_recent_volumn recent_sd ln_lag_volumn_acc lag_avg_rating_acc
+    lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean
+    1b.Mon 2.Mon 3.Mon 4.Mon 5.Mon 6.Mon 7.Mon 8.Mon 9.Mon 10.Mon 11.Mon
+    12.Mon
+    _cons
+  GMM-type (missing=0, separate instruments for each period unless collapsed)
+    DL3.L.ln_RevPAR_clean collapsed
+------------------------------------------------------------------------------
+Arellano-Bond test for AR(1) in first differences: z =  -4.73  Pr > z =  0.000
+Arellano-Bond test for AR(2) in first differences: z =   0.42  Pr > z =  0.674
+------------------------------------------------------------------------------
+Sargan test of overid. restrictions: chi2(3)    =  17.56  Prob > chi2 =  0.001
+  (Not robust, but not weakened by many instruments.)
+Hansen test of overid. restrictions: chi2(3)    =  15.75  Prob > chi2 =  0.001
+  (Robust, but weakened by many instruments.)
+
+Difference-in-Hansen tests of exogeneity of instrument subsets:
+  GMM instruments for levels
+    Hansen test excluding group:     chi2(2)    =  11.53  Prob > chi2 =  0.003
+    Difference (null H = exogenous): chi2(1)    =   4.22  Prob > chi2 =  0.040
+
+
+. estimates store cs_h1_gmm
+
+. local gmm_b = _b[sim_mean]
+
+. local gmm_se = _se[sim_mean]
+
+. local gmm_p = 2 * normal(-abs(`gmm_b' / `gmm_se'))
+
+. local gmm_n = e(N)
+
+. local gmm_hotels = e(N_g)
+
+. local gmm_ar1 = e(ar1p)
+
+. local gmm_ar2 = e(ar2p)
+
+. local gmm_hansen = e(hansenp)
+
+. local gmm_inst = e(j)
+
+. local gmm_std = `gmm_b' * `best_sd'
+
+. 
+. postfile hf str16 sample str24 dep str18 ctrl double ols_beta ols_se ols_p ols_std_effect ols_N ///
+>     fe_beta fe_se fe_p fe_std_effect fe_N gmm_beta gmm_se gmm_p gmm_std_effect gmm_N gmm_hotels ///
+>     gmm_ar1 gmm_ar2 gmm_hansen gmm_inst using `h1final', replace
+(file /var/folders/x9/p1d98gj518326zdc2s5gzn8w0000gn/T//St32980.000005 not found)
+
+. post hf ("`best_sample'") ("`best_dep'") ("`best_ctrl'") (`ols_b') (`ols_se') (`ols_p') (`ols_std') (`ols_n') ///
+>     (`fe_b') (`fe_se') (`fe_p') (`fe_std') (`fe_n') (`gmm_b') (`gmm_se') (`gmm_p') (`gmm_std') (`gmm_n') (`gmm_hotels') ///
+>     (`gmm_ar1') (`gmm_ar2') (`gmm_hansen') (`gmm_inst')
+
+. postclose hf
+
+. use `h1final', clear
+
+. export delimited using "`csv_dir'/h1_final_`run_id'.csv", replace
+file /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/csv/h1_final_260501.csv saved
+
+. 
+. local keep_terms "sim_mean L.`best_dep'"
+
+. if "`best_dyn'" == "L12" {
+.     local keep_terms "`keep_terms' L2.`best_dep'"
+. }
+
+. esttab cs_h1_ols cs_h1_fe cs_h1_gmm using "`table_dir'/core_simi_h1_models_`run_id'.txt", replace ///
+>     keep(`keep_terms') ///
+>     se star(+ 0.10 * 0.05 ** 0.01 *** 0.001) b(%9.4f) se(%9.4f) ///
+>     label compress mtitles("OLS" "2WFE" "Sys-GMM") stats(N, fmt(%9.0f) labels("N"))
+(output written to /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/tables/core_simi_h1_models_260501.txt)
+
+. 
+. di as text "============================================================"
+============================================================
+
+. di as text "Core-simi H2-H4 grouped FE from R-selected specs"
+Core-simi H2-H4 grouped FE from R-selected specs
+
+. di as text "============================================================"
+============================================================
+
+. 
+. import delimited using "`hetero_selected_csv'", clear varnames(1) stringcols(_all)
+(encoding automatically selected: ISO-8859-1)
+(30 vars, 3 obs)
+
+. foreach hyp in h2 h3 h4 {
+  2.     quietly levelsof dep_var if hypothesis == "`hyp'", local(`hyp'_dep) clean
+  3.     quietly levelsof control_family if hypothesis == "`hyp'", local(`hyp'_ctrl) clean
+  4.     quietly levelsof sample if hypothesis == "`hyp'", local(`hyp'_sample) clean
+  5. }
+
+. save `heterosel', replace
+(file /var/folders/x9/p1d98gj518326zdc2s5gzn8w0000gn/T//St32980.000003 not found)
+file /var/folders/x9/p1d98gj518326zdc2s5gzn8w0000gn/T//St32980.000003 saved as .dta format
+
+. 
+. use `rawdata', clear
+
+. build_panel_state
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+. 
+. foreach hyp in h2 h3 h4 {
+  2.     local family_macro "`hyp'_ctrl"
+  3.     set_cs_controls, family("``family_macro''")
+  4.     local `hyp'_controls "`r(controls)'"
+  5. }
+
+. 
+. reghdfe `h2_dep' sim_mean `h2_controls' if cs_group_h2 == 0, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 16 singleton observations)
+(MWFE estimator converged in 8 iterations)
+
+HDFE Linear regression                            Number of obs   =     13,426
+Absorbing 2 HDFE groups                           F(   8,    313) =      61.24
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8468
+                                                  Adj R-squared   =     0.8415
+                                                  Within R-sq.    =     0.2816
+Number of clusters (hotel_id_num) =        314    Root MSE        =     0.2587
+
+                                 (Std. err. adjusted for 314 clusters in hotel_id_num)
+--------------------------------------------------------------------------------------
+                     |               Robust
+     ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+            sim_mean |  -.2144633   .1074272    -2.00   0.047    -.4258341   -.0030926
+    ln_recent_volumn |   .1004289   .0149937     6.70   0.000     .0709279      .12993
+   ln_lag_volumn_acc |   .0268775   .0276364     0.97   0.332    -.0274992    .0812542
+  lag_avg_rating_acc |   .0471845   .0412039     1.15   0.253    -.0338871    .1282561
+lag_avg_rating_month |   .0086159   .0026654     3.23   0.001     .0033715    .0138603
+   ln_avg_com_RevPAR |   .1797414   .0260179     6.91   0.000     .1285493    .2309336
+    review_freshness |  -.0091764   .0663641    -0.14   0.890    -.1397525    .1213997
+ ln_lag_RevPAR_clean |   .4077232   .0259979    15.68   0.000     .3565704     .458876
+               _cons |   1.092325   .2251229     4.85   0.000       .64938    1.535271
+--------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       314         314           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store cs_h2_low
+
+. reghdfe `h2_dep' sim_mean `h2_controls' if cs_group_h2 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 14 singleton observations)
+(MWFE estimator converged in 8 iterations)
+
+HDFE Linear regression                            Number of obs   =     13,455
+Absorbing 2 HDFE groups                           F(   8,    275) =      43.74
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8520
+                                                  Adj R-squared   =     0.8473
+                                                  Within R-sq.    =     0.2277
+Number of clusters (hotel_id_num) =        276    Root MSE        =     0.2797
+
+                                 (Std. err. adjusted for 276 clusters in hotel_id_num)
+--------------------------------------------------------------------------------------
+                     |               Robust
+     ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+            sim_mean |  -.0936048   .0969735    -0.97   0.335    -.2845096    .0972999
+    ln_recent_volumn |   .0715663   .0159864     4.48   0.000     .0400951    .1030375
+   ln_lag_volumn_acc |   .0359701    .018802     1.91   0.057     -.001044    .0729843
+  lag_avg_rating_acc |   .1377811   .0545949     2.52   0.012     .0303041     .245258
+lag_avg_rating_month |   .0025408   .0039923     0.64   0.525    -.0053186    .0104003
+   ln_avg_com_RevPAR |   .1288719   .0200027     6.44   0.000     .0894939    .1682498
+    review_freshness |   -.019298   .0528159    -0.37   0.715    -.1232729    .0846769
+ ln_lag_RevPAR_clean |    .366287   .0574875     6.37   0.000     .2531156    .4794585
+               _cons |   1.292196   .3095434     4.17   0.000     .6828199    1.901571
+--------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       276         276           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store cs_h2_high
+
+. reghdfe `h2_dep' c.sim_mean##i.cs_group_h2 `h2_controls' if !missing(cs_group_h2), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 8 singleton observations)
+(MWFE estimator converged in 8 iterations)
+
+HDFE Linear regression                            Number of obs   =     26,903
+Absorbing 2 HDFE groups                           F(  10,    537) =      67.65
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8605
+                                                  Adj R-squared   =     0.8569
+                                                  Within R-sq.    =     0.2534
+Number of clusters (hotel_id_num) =        538    Root MSE        =     0.2713
+
+                                   (Std. err. adjusted for 538 clusters in hotel_id_num)
+----------------------------------------------------------------------------------------
+                       |               Robust
+       ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-----------------------+----------------------------------------------------------------
+              sim_mean |  -.1915967   .1085211    -1.77   0.078    -.4047746    .0215813
+         1.cs_group_h2 |  -.0893117   .0452513    -1.97   0.049    -.1782031   -.0004204
+                       |
+cs_group_h2#c.sim_mean |
+                    1  |   .0839049   .1370259     0.61   0.541    -.1852676    .3530775
+                       |
+      ln_recent_volumn |   .0846832   .0115158     7.35   0.000     .0620616    .1073048
+     ln_lag_volumn_acc |   .0311413   .0140669     2.21   0.027     .0035084    .0587742
+    lag_avg_rating_acc |   .0726282   .0295656     2.46   0.014     .0145499    .1307065
+  lag_avg_rating_month |   .0065287   .0023321     2.80   0.005     .0019475    .0111099
+     ln_avg_com_RevPAR |   .1502684   .0159758     9.41   0.000     .1188857     .181651
+      review_freshness |   .0010746   .0402785     0.03   0.979    -.0780481    .0801972
+   ln_lag_RevPAR_clean |   .3887486   .0331411    11.73   0.000     .3236465    .4538506
+                 _cons |   1.336288   .1578249     8.47   0.000     1.026258    1.646317
+----------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       538         538           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store cs_h2_interact
+
+. 
+. reghdfe `h3_dep' sim_mean `h3_controls' if cs_group_h3 == 0, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 11 singleton observations)
+(MWFE estimator converged in 8 iterations)
+
+HDFE Linear regression                            Number of obs   =     16,070
+Absorbing 2 HDFE groups                           F(   9,    642) =      54.53
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8511
+                                                  Adj R-squared   =     0.8435
+                                                  Within R-sq.    =     0.2155
+Number of clusters (hotel_id_num) =        643    Root MSE        =     0.2755
+
+                                 (Std. err. adjusted for 643 clusters in hotel_id_num)
+--------------------------------------------------------------------------------------
+                     |               Robust
+     ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+            sim_mean |  -.0962103   .0844006    -1.14   0.255    -.2619448    .0695242
+    ln_recent_volumn |   .0972122   .0165626     5.87   0.000     .0646888    .1297356
+           recent_sd |  -.0156117   .0113681    -1.37   0.170    -.0379348    .0067115
+   ln_lag_volumn_acc |   .0505624   .0133739     3.78   0.000     .0243004    .0768243
+  lag_avg_rating_acc |   .0410473   .0361108     1.14   0.256    -.0298622    .1119568
+          lag_sd_acc |   .0424289   .0525644     0.81   0.420      -.06079    .1456479
+lag_avg_rating_month |   .0115763   .0042008     2.76   0.006     .0033273    .0198254
+   ln_avg_com_RevPAR |   .1420751   .0157282     9.03   0.000     .1111902    .1729599
+ ln_lag_RevPAR_clean |     .38966   .0482509     8.08   0.000     .2949113    .4844088
+               _cons |   1.239925   .2250632     5.51   0.000     .7979762    1.681874
+--------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       643         643           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store cs_h3_low
+
+. reghdfe `h3_dep' sim_mean `h3_controls' if cs_group_h3 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 7 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     20,063
+Absorbing 2 HDFE groups                           F(   9,    657) =      97.09
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8690
+                                                  Adj R-squared   =     0.8636
+                                                  Within R-sq.    =     0.2790
+Number of clusters (hotel_id_num) =        658    Root MSE        =     0.2588
+
+                                 (Std. err. adjusted for 658 clusters in hotel_id_num)
+--------------------------------------------------------------------------------------
+                     |               Robust
+     ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+            sim_mean |  -.1657957   .0752641    -2.20   0.028    -.3135829   -.0180086
+    ln_recent_volumn |   .0687819   .0112735     6.10   0.000     .0466454    .0909184
+           recent_sd |  -.0128402   .0099406    -1.29   0.197    -.0323593    .0066789
+   ln_lag_volumn_acc |   .0326499   .0073513     4.44   0.000     .0182151    .0470848
+  lag_avg_rating_acc |   .0177501   .0244328     0.73   0.468    -.0302256    .0657259
+          lag_sd_acc |  -.0258744   .0280491    -0.92   0.357     -.080951    .0292022
+lag_avg_rating_month |   .0043629   .0023474     1.86   0.064    -.0002464    .0089722
+   ln_avg_com_RevPAR |   .1188314   .0129191     9.20   0.000     .0934636    .1441991
+ ln_lag_RevPAR_clean |   .4050032   .0228297    17.74   0.000     .3601752    .4498313
+               _cons |   1.660241   .1401219    11.85   0.000       1.3851    1.935382
+--------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       658         658           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store cs_h3_high
+
+. reghdfe `h3_dep' c.sim_mean##i.cs_group_h3 `h3_controls' if !missing(cs_group_h3), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 6 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     36,145
+Absorbing 2 HDFE groups                           F(  11,    658) =      82.44
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8567
+                                                  Adj R-squared   =     0.8534
+                                                  Within R-sq.    =     0.2444
+Number of clusters (hotel_id_num) =        659    Root MSE        =     0.2675
+
+                                   (Std. err. adjusted for 659 clusters in hotel_id_num)
+----------------------------------------------------------------------------------------
+                       |               Robust
+       ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-----------------------+----------------------------------------------------------------
+              sim_mean |  -.0567142   .0738268    -0.77   0.443    -.2016788    .0882504
+         1.cs_group_h3 |   .0521774    .020143     2.59   0.010      .012625    .0917297
+                       |
+cs_group_h3#c.sim_mean |
+                    1  |  -.1368208   .0673979    -2.03   0.043    -.2691616   -.0044799
+                       |
+      ln_recent_volumn |   .0798909   .0109084     7.32   0.000     .0584715    .1013103
+             recent_sd |   -.013336   .0080917    -1.65   0.100    -.0292247    .0025526
+     ln_lag_volumn_acc |   .0370404   .0079864     4.64   0.000     .0213586    .0527223
+    lag_avg_rating_acc |   .0225816   .0243226     0.93   0.354    -.0251777    .0703408
+            lag_sd_acc |  -.0098938   .0299594    -0.33   0.741    -.0687213    .0489336
+  lag_avg_rating_month |   .0069996   .0020012     3.50   0.001     .0030702     .010929
+     ln_avg_com_RevPAR |   .1318186   .0131378    10.03   0.000     .1060216    .1576155
+   ln_lag_RevPAR_clean |   .3899072   .0266703    14.62   0.000      .337538    .4422763
+                 _cons |   1.529086   .1460941    10.47   0.000     1.242219    1.815953
+----------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       659         659           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store cs_h3_interact
+
+. 
+. reghdfe `h4_dep' sim_mean `h4_controls' if cs_group_h4 == 0, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 65 singleton observations)
+(MWFE estimator converged in 9 iterations)
+
+HDFE Linear regression                            Number of obs   =     17,616
+Absorbing 2 HDFE groups                           F(   9,    728) =      43.96
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8757
+                                                  Adj R-squared   =     0.8694
+                                                  Within R-sq.    =     0.2346
+Number of clusters (hotel_id_num) =        729    Root MSE        =     0.2367
+
+                                 (Std. err. adjusted for 729 clusters in hotel_id_num)
+--------------------------------------------------------------------------------------
+                     |               Robust
+     ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+            sim_mean |  -.0085634   .0819415    -0.10   0.917    -.1694332    .1523064
+    ln_recent_volumn |   .0834968   .0130915     6.38   0.000     .0577953    .1091984
+           recent_sd |  -.0067756    .009568    -0.71   0.479    -.0255598    .0120086
+   ln_lag_volumn_acc |   .0268284   .0110929     2.42   0.016     .0050505    .0486062
+  lag_avg_rating_acc |   .0136161   .0241897     0.56   0.574    -.0338738    .0611059
+          lag_sd_acc |  -.0196563   .0239302    -0.82   0.412    -.0666368    .0273241
+lag_avg_rating_month |    .004237   .0023157     1.83   0.068    -.0003091    .0087832
+   ln_avg_com_RevPAR |   .2150868   .0223871     9.61   0.000     .1711358    .2590378
+ ln_lag_RevPAR_clean |     .34003   .0365158     9.31   0.000     .2683412    .4117189
+               _cons |   1.513378   .1683816     8.99   0.000     1.182806    1.843949
+--------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       729         729           0    *|
+           ym |       123           1         122     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store cs_h4_low
+
+. reghdfe `h4_dep' sim_mean `h4_controls' if cs_group_h4 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 79 singleton observations)
+(MWFE estimator converged in 8 iterations)
+
+HDFE Linear regression                            Number of obs   =     17,564
+Absorbing 2 HDFE groups                           F(   9,    550) =      68.85
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8802
+                                                  Adj R-squared   =     0.8754
+                                                  Within R-sq.    =     0.2627
+Number of clusters (hotel_id_num) =        551    Root MSE        =     0.2286
+
+                                 (Std. err. adjusted for 551 clusters in hotel_id_num)
+--------------------------------------------------------------------------------------
+                     |               Robust
+     ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+            sim_mean |  -.1387865   .0715726    -1.94   0.053    -.2793756    .0018027
+    ln_recent_volumn |   .0392772   .0100365     3.91   0.000     .0195626    .0589918
+           recent_sd |  -.0069468   .0089387    -0.78   0.437     -.024505    .0106114
+   ln_lag_volumn_acc |   .0404466   .0089332     4.53   0.000     .0228993    .0579938
+  lag_avg_rating_acc |   .0453287   .0259133     1.75   0.081    -.0055725    .0962299
+          lag_sd_acc |   .0192749   .0300306     0.64   0.521    -.0397138    .0782636
+lag_avg_rating_month |   .0101356     .00256     3.96   0.000     .0051071    .0151641
+   ln_avg_com_RevPAR |   .1309826   .0133795     9.79   0.000     .1047013    .1572638
+ ln_lag_RevPAR_clean |   .4289246   .0374097    11.47   0.000     .3554413    .5024079
+               _cons |   1.378077   .1758263     7.84   0.000     1.032704     1.72345
+--------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       551         551           0    *|
+           ym |       123           1         122     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store cs_h4_high
+
+. reghdfe `h4_dep' c.sim_mean##i.cs_group_h4 `h4_controls' if !missing(cs_group_h4), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 39 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     35,285
+Absorbing 2 HDFE groups                           F(  11,    866) =      70.17
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8797
+                                                  Adj R-squared   =     0.8762
+                                                  Within R-sq.    =     0.2587
+Number of clusters (hotel_id_num) =        867    Root MSE        =     0.2379
+
+                                   (Std. err. adjusted for 867 clusters in hotel_id_num)
+----------------------------------------------------------------------------------------
+                       |               Robust
+       ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-----------------------+----------------------------------------------------------------
+              sim_mean |  -.0271313   .0763017    -0.36   0.722    -.1768893    .1226266
+         1.cs_group_h4 |   -.049271   .0287812    -1.71   0.087    -.1057601    .0072181
+                       |
+cs_group_h4#c.sim_mean |
+                    1  |  -.1050975   .0973373    -1.08   0.281    -.2961422    .0859471
+                       |
+      ln_recent_volumn |   .0599315   .0084203     7.12   0.000      .043405    .0764581
+             recent_sd |  -.0083404   .0067618    -1.23   0.218    -.0216119    .0049311
+     ln_lag_volumn_acc |   .0347896   .0073355     4.74   0.000     .0203922    .0491871
+    lag_avg_rating_acc |   .0249352   .0178953     1.39   0.164     -.010188    .0600584
+            lag_sd_acc |  -.0198698   .0198784    -1.00   0.318    -.0588852    .0191457
+  lag_avg_rating_month |   .0065249   .0018055     3.61   0.000     .0029813    .0100685
+     ln_avg_com_RevPAR |   .1387953   .0123849    11.21   0.000     .1144874    .1631032
+   ln_lag_RevPAR_clean |   .4040633   .0296213    13.64   0.000     .3459255    .4622012
+                 _cons |   1.565871   .1381889    11.33   0.000     1.294647    1.837095
+----------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       867         867           0    *|
+           ym |       123           1         122     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store cs_h4_interact
+
+. 
+. esttab cs_h2_low cs_h2_high cs_h3_low cs_h3_high cs_h4_low cs_h4_high ///
+>     using "`table_dir'/core_simi_h2_h4_grouped_fe_`run_id'.txt", replace ///
+>     keep(sim_mean) ///
+>     se star(+ 0.10 * 0.05 ** 0.01 *** 0.001) b(%9.4f) se(%9.4f) ///
+>     label compress mtitles("H2 low" "H2 high" "H3 low" "H3 high" "H4 low" "H4 high") ///
+>     stats(N r2, fmt(%9.0f %9.4f) labels("N" "R2"))
+(output written to /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/tables/core_simi_h2_h4_grouped_fe_260501.txt)
+
+. 
+. esttab cs_h2_interact cs_h3_interact cs_h4_interact ///
+>     using "`table_dir'/core_simi_h2_h4_interactions_`run_id'.txt", replace ///
+>     se star(+ 0.10 * 0.05 ** 0.01 *** 0.001) b(%9.4f) se(%9.4f) ///
+>     label compress mtitles("H2 interaction" "H3 interaction" "H4 interaction") ///
+>     stats(N r2, fmt(%9.0f %9.4f) labels("N" "R2"))
+(output written to /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/tables/core_simi_h2_h4_interactions_260501.txt)
+
+. 
+. log close
+      name:  <unnamed>
+       log:  /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/logs/run_core_simi_tables_260501.log
+  log type:  text
+ closed on:   1 May 2026, 13:05:21
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+. 
+end of do-file
