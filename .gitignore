@@ -1,1 +1,3 @@
+# Generated outputs should not be uploaded.
 outputs/
+outputs/paper/
