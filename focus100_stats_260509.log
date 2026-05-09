@@ -1,0 +1,169 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: Single-user 2-core  perpetual
+Serial number: 501806366047
+  Licensed to: Sam Xie
+               samxie
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 5,000; see help set_maxvar.
+
+
+Running /Applications/Stata/profile.do ...
+command window is unrecognized
+r(199);
+
+. do /private/tmp/focus100_stats_260509.do 
+
+. version 17.0
+
+. clear all
+
+. set more off
+
+. use "/Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/da
+> ta/core_simi_panel_260501.dta", clear
+
+. keep if cs_sample_focus100 == 1
+(5,406 observations deleted)
+
+. count
+  34,791
+
+. local n_obs = r(N)
+
+. egen tag_hotel = tag(HotelID)
+
+. count if tag_hotel == 1
+  565
+
+. local n_hotels = r(N)
+
+. 
+. capture confirm variable review_total_hotel
+
+. if _rc {
+.     bysort HotelID: egen review_total_hotel = max(volumn_acc)
+. }
+
+. summarize review_total_hotel if tag_hotel == 1, detail
+
+                     review_total_hotel
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%          102            100
+ 5%          111            100
+10%          126            101       Obs                 565
+25%          185            101       Sum of wgt.         565
+
+50%          353                      Mean           611.6991
+                        Largest       Std. dev.      760.8007
+75%          767           4476
+90%         1247           4507       Variance       578817.7
+95%         1814           4632       Skewness       4.103267
+99%         4061           8391       Kurtosis       29.00853
+
+. local avg_reviews = r(mean)
+
+. local med_reviews = r(p50)
+
+. local min_reviews = r(min)
+
+. local max_reviews = r(max)
+
+. 
+. bysort HotelID: gen hotel_month_rows = _N
+
+. summarize hotel_month_rows if tag_hotel == 1, detail
+
+                      hotel_month_rows
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            6              2
+ 5%           11              2
+10%           18              3       Obs                 565
+25%           36              4       Sum of wgt.         565
+
+50%           58                      Mean           61.57699
+                        Largest       Std. dev.      33.75411
+75%           86            134
+90%          113            134       Variance        1139.34
+95%          121            134       Skewness       .3185679
+99%          133            134       Kurtosis       2.179252
+
+. local avg_months = r(mean)
+
+. local med_months = r(p50)
+
+. local min_months = r(min)
+
+. local max_months = r(max)
+
+. 
+. summarize Year
+
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+        Year |     34,791    2017.203    3.033104       2011       2022
+
+. local min_year = r(min)
+
+. local max_year = r(max)
+
+. 
+. capture drop tag_ym
+
+. egen tag_ym = tag(year_month)
+
+. count if tag_ym == 1
+  136
+
+. local n_months = r(N)
+
+. 
+. file open fh using "/private/tmp/focus100_stats_260509.txt", write replace
+(file /private/tmp/focus100_stats_260509.txt not found)
+
+. file write fh "n_obs=`n_obs'" _n
+
+. file write fh "n_hotels=`n_hotels'" _n
+
+. file write fh "avg_reviews=`avg_reviews'" _n
+
+. file write fh "med_reviews=`med_reviews'" _n
+
+. file write fh "min_reviews=`min_reviews'" _n
+
+. file write fh "max_reviews=`max_reviews'" _n
+
+. file write fh "avg_months=`avg_months'" _n
+
+. file write fh "med_months=`med_months'" _n
+
+. file write fh "min_months=`min_months'" _n
+
+. file write fh "max_months=`max_months'" _n
+
+. file write fh "min_year=`min_year'" _n
+
+. file write fh "max_year=`max_year'" _n
+
+. file write fh "n_months=`n_months'" _n
+
+. file close fh
+
+. 
+end of do-file

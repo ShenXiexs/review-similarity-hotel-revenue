@@ -23,6 +23,23 @@
 | Year range | 2011-2022 |
 | Month range | 2011-01 to 2022-09 |
 
+## Focus100 Baseline Sample Size
+
+The baseline review-volume sample used in the final H1-H4 and COVID regressions is `cs_sample_focus100 == 1`. In this sample:
+
+| Item | Value |
+|---|---:|
+| Observations / hotel-month rows | 34,791 |
+| Hotels | 565 |
+| Average cumulative reviews per hotel | 611.70 |
+| Median cumulative reviews per hotel | 353 |
+| Review range per hotel | 100-8,391 |
+| Average hotel-month rows per hotel | 61.58 |
+| Median hotel-month rows per hotel | 58 |
+| Hotel-month row range per hotel | 2-134 |
+| Distinct calendar months | 136 |
+| Year range | 2011-2022 |
+
 ## Sample Flags
 
 | Sample variable | Meaning | Observations | Hotels |
