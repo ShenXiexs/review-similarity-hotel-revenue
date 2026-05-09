@@ -1,0 +1,1100 @@
+---
+title: "Review_Simi_Extension1208"
+author: "Samxie"
+date: "2025-12-08"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+library(vroom)
+library(readr)
+library(tibble)
+library(dplyr)
+library(lubridate)
+library(tidyverse)
+library(haven)
+library(foreign)
+library(text2vec)
+library(data.table)
+library(bigstatsr)
+library(progressr)
+library(progress)
+library(patchwork)
+```
+
+## 1 Tax_Revenue Data Preparation
+
+### 1.1 Tax Loading
+
+
+```{r}
+# 处理 11-16 年数据：统一字段名与 ID 类型 (Character)
+tax_11to16 <- read_csv("/Users/samxie/Research/ReviewSimi_Sales/1209new/tax2011_2016.csv") |>
+  mutate(
+    Year = year, Mon = month,
+    across(c(TaxpayerNumber, LocationNumber, LocationZip), as.character),
+    Taxpayer_Number = TaxpayerNumber, Taxpayer_Name = TaxpayerName, Taxpayer_Address = TaxpayerAddress,
+    Location_Number = LocationNumber, Location_Name = LocationName, Location_Address = LocationAddress, 
+    Location_City = LocationCity, Location_Zip = LocationZip, 
+    Unit_Capacity = UnitCapacity, Total_Room_Receipts = TotalRoomReceipts, Taxable_Receipts = TaxableReceipts
+  ) |>
+  select(Year, Mon, Taxpayer_Number, Taxpayer_Name, Taxpayer_Address, Location_Number, Location_Name, Location_Address, Location_City, Location_Zip, Unit_Capacity, Total_Room_Receipts, Taxable_Receipts)
+
+#  处理 17-23 年数据：从 Obligation_End_Date 解析日期
+root <- "/Users/samxie/Research/ReviewSimi_Sales/1209new/Month_Revenue"
+col_names <- c("Taxpayer_Number", "Taxpayer_Name", "Taxpayer_Address", "Taxpayer_City", "Taxpayer_State", "Taxpayer_Zip", "Taxpayer_County", "Taxpayer_Phone", "Location_Number", "Location_Name", "Location_Address", "Location_City", "Location_State", "Location_Zip", "Location_County", "Location_Phone", "Unit_Capacity", "Responsibility_Begin_Date", "Responsibility_End_Date", "Obligation_End_Date", "Filer_Type", "Total_Room_Receipts", "Taxable_Receipts")
+
+# 批量读取并强制所有列为字符型，防止合并报错
+subdirs <- list.dirs(root, recursive = FALSE) |> str_subset("HOT\\d{4}$")
+df_hot <- map_df(subdirs, ~ {
+  f <- file.path(.x, paste0(basename(.x), ".CSV"))
+  if (file.exists(f)) read_csv(f, col_names = col_names, show_col_types = FALSE, col_types = cols(.default = "c")) else NULL
+})
+
+df_hotel <- map_df(c("2017", "2018", "2019"), ~ {
+  f <- list.files(file.path(root, paste0("HOTEL", substr(.x, 3, 4))), pattern = "\\.csv$", full.names = TRUE)
+  if (length(f) > 0) read_csv(f[1], col_names = col_names, show_col_types = FALSE, col_types = cols(.default = "c")) else NULL
+})
+
+# 转换类型并解析日期 (YYYYMMDD)
+tax_17to23 <- bind_rows(df_hot, df_hotel) |>
+  filter(Filer_Type == "50") |>
+  mutate(
+    d_num = as.numeric(Obligation_End_Date),
+    Year = as.integer(d_num %/% 10000),
+    Mon  = as.integer((d_num %% 10000) %/% 100),
+    Unit_Capacity = as.numeric(Unit_Capacity),
+    Total_Room_Receipts = as.numeric(Total_Room_Receipts)
+  ) |>
+  select(Year, Mon, Taxpayer_Number, Taxpayer_Name, Taxpayer_Address, Location_Number, Location_Name, Location_Address, Location_City, Location_Zip, Unit_Capacity, Total_Room_Receipts)
+
+# 合并全集并去重
+tax_all <- bind_rows(tax_11to16, tax_17to23) |>
+  arrange(Location_City, Location_Name, Location_Address, Year, Mon) |>
+  group_by(Location_City, Location_Name, Location_Address, Year, Mon) |>
+  filter(n() == 1) |> # 剔除重复申报
+  ungroup() |>
+  filter(Unit_Capacity >= 1)
+
+# 计算 RevPAR 与 竞争对手均值 (Data.table 高速处理)
+dt <- as.data.table(tax_all)
+dt[, DaysInMonth := days_in_month(as.Date(sprintf("%d-%02d-01", Year, Mon)))]
+
+# 聚合计算
+revenue_all <- dt[, .(
+  # 必须在这里显式定义 Unit_Capacity，否则结果表里没这一列
+  Unit_Capacity  = Unit_Capacity, 
+  Total_Receipts = sum(Total_Room_Receipts, na.rm = TRUE),
+  # 确保 RevPAR 计算逻辑完整（除以天数）
+  RevPAR = sum(Total_Room_Receipts, na.rm = TRUE) / (Unit_Capacity * first(DaysInMonth))
+), by = .(Location_Zip, Location_Name, Location_Address, Year, Mon)]
+
+# 现在这里就不会报错了
+revenue_all_clean <- revenue_all[RevPAR<10000]
+
+revenue_all_clean[, `:=`(
+  hotel_number = .N,
+  avg_com_RevPAR = {
+    if (.N <= 1) NA_real_
+    else (sum(RevPAR, na.rm = TRUE) - RevPAR) / (.N - 1)
+  }
+), by = .(Location_Zip, Year, Mon)]
+
+# 处理孤立点
+revenue_all_clean[hotel_number <= 1, avg_com_RevPAR := NA_real_]
+
+# 清理内存：删除所有中间过程变量
+
+rm(tax_11to16, tax_17to23, df_hot, df_hotel, dt, subdirs, root, col_names)
+```
+
+
+```{r}
+write_csv(revenue_all_clean, "/Users/samxie/Research/ReviewSimi_Sales/1209new/revenue_all_clean0123.csv")
+revenue_all_clean <- read_csv("/Users/samxie/Research/ReviewSimi_Sales/1209new/revenue_all_clean0123.csv")
+```
+
+**match_tp_hotel**
+
+```{r}
+allmatched <- read_csv("/Users/samxie/Research/ReviewSimi_Sales/1209new/allmatched.csv") |>
+  group_by(HotelID) |>
+  mutate(num = n()) |>
+  ungroup() |>
+  arrange(desc(num), LocationAddress, LocationAddress, HotelID)
+```
+
+```{r}
+allmatched <- allmatched |>
+  group_by(HotelID) |>
+  slice(1) |>
+  ungroup() |>
+  group_by(LocationName, LocationAddress) |>
+  mutate(
+    num = n()
+  ) |>
+  filter(num==1) |>
+  ungroup()
+```
+
+```{r}
+revenue_tp_all <- inner_join(revenue_all_clean, allmatched |> select(HotelID, CityID, CityName, Zip, LocationAddress, LocationName), by=c("Location_Name"="LocationName","Location_Address"="LocationAddress")) |>
+  group_by(HotelID, Year, Mon) |>
+  mutate(num = n()) |>
+  ungroup() |>
+  # 找出有任意 num > 1 的 HotelID
+  group_by(HotelID) |>
+  mutate(has_dup = any(num > 1)) |>
+  ungroup() |>
+  # 只保留没有重复的酒店
+  filter(!has_dup) |>
+  filter(avg_com_RevPAR>0) |>
+  select(-num, -has_dup)
+```
+
+
+```{r}
+month_revenue10_2010new <- read_dta("/Users/samxie/Research/ReviewSimi_Sales/Data/revenue_data/month_revenue10_2010new.dta")
+
+revenue_tp_all_temp <- revenue_tp_all |>
+  dplyr::select(CityID, Zip, HotelID, Year, Mon, RevPAR, avg_com_RevPAR, hotel_number) |>
+  mutate(
+    from = "now"
+  )
+month_revenue10_2010new_temp <- month_revenue10_2010new |>
+  mutate(
+    Year = year,
+    Mon = month,
+    from = "past",
+    hotel_number = hotel_num
+  ) |>
+  dplyr::select(CityID, Zip, HotelID, Year, Mon, RevPAR, avg_com_RevPAR, hotel_number, from)
+
+test <- rbind(month_revenue10_2010new_temp, revenue_tp_all_temp) |>
+  group_by(HotelID, Year, Mon) |>
+  mutate(
+    n = n()
+  ) |>
+  arrange(desc(n), HotelID, Year, Mon)
+test
+rm(test)
+```
+
+```{r test}
+month_revenue10_raw <- read_dta("/Users/samxie/Research/ReviewSimi_Sales/Data/revenue_data/month_revenue_20250309.dta")
+month_revenue10_raw |>
+  group_by(Zip, year, month) |>
+  mutate(
+    hotel_number_in = n()
+  ) |>
+  select(CityID, Zip, HotelID, year, month, RevPAR, avg_com_RevPAR, hotel_num, hotel_number_in) |>
+  arrange(hotel_num, Zip, year, month)
+```
+
+```{r}
+revenue_tp_all_bind <- revenue_tp_all_temp
+```
+
+```{r test other var}
+revenue_tp_all_bind <- rbind(month_revenue10_2010new_temp, revenue_tp_all_temp) |> 
+  group_by(HotelID, Year, Mon) |> 
+   mutate(
+     n = n(),
+     RevPAR = ifelse(n==1, RevPAR, RevPAR[from == "now"][1]),
+     avg_com_RevPAR = ifelse(n==1, avg_com_RevPAR, avg_com_RevPAR[from == "now"][1])
+   ) |> 
+   slice(1) |>
+   ungroup() |>
+   arrange(HotelID, Year, Mon)
+
+rm(revenue_tp_all_temp, month_revenue10_2010new_temp)
+```
+
+```{r}
+write_csv(revenue_tp_all_bind, "/Users/samxie/Research/ReviewSimi_Sales/1209new/revenue_tp_all_bind0123Zip.csv")
+```
+
+```{r}
+summary(revenue_tp_all_bind$RevPAR)
+summary(revenue_tp_all_bind$avg_com_RevPAR)
+print("--------------------------")
+summary(month_revenue10_2010new$RevPAR)
+summary(month_revenue10_2010new$avg_com_RevPAR)
+```
+
+### 1.2 Review Match
+```{r}
+reviews_texas <- read_csv("/Users/samxie/Research/ReviewSimi_Sales/1209new/TP_texas_data/reviews_texas.csv")
+```
+
+```{r}
+reviews_texas_clean <- reviews_texas |>
+  dplyr::select(
+    HotelID         = location_id,
+    CityID          = geo_id,
+    ReviewID        = review_id,
+    Review_Date     = review_created_date,
+    Review_Published_Date = review_published_date,
+    Review_Rating   = review_rating,
+    Review_Language = review_language,
+    Review_Title    = review_title,
+    Review_Text     = review_text,
+    Helpfulness     = review_helpful,
+    Trip_Date       = trip_date,
+    Trip_Type       = trip_type,
+    UserID         = review_author_id,
+    Review_Verified = review_author_verified
+  ) |>
+  mutate(
+    # 处理日期 → Year / Mon
+    Review_Date = as.Date(Review_Date),
+    Year = year(Review_Date),
+    Mon  = month(Review_Date)
+  ) |>
+  dplyr::select(HotelID, Year, Mon, everything()) |>
+  arrange(HotelID, Year, Mon)
+valid_hotel <- revenue_tp_all_bind |>
+  group_by(HotelID) |>
+  slice(1) |>
+  select(HotelID)
+valid_match <- inner_join(valid_hotel, reviews_texas_clean)
+valid_match_test <- inner_join(revenue_tp_all_bind, reviews_texas_clean) |>
+  dplyr::select(-from)
+rm(valid_hotel, valid_match_test)
+```
+
+```{r}
+valid_match_review <- valid_match |>
+  filter(Review_Language=="en") |>
+  group_by(HotelID) |>
+  mutate(ReviewNum = n()) |>
+  ungroup() |>
+  # filter(ReviewNum >= 30) |>     # step 1: 保留评论数高于30的酒店
+  group_by(CityID) |>
+  mutate(
+    HotelCount = n_distinct(HotelID)    # step 2: 统计每个 CityID 的酒店数量
+  ) |>
+  ungroup() |>
+  filter(HotelCount >=150) |>          # step 3: 只保留拥有≥150家酒店的城市
+  select(-HotelCount)
+# rm(valid_match_review)
+```
+
+```{r}
+valid_match_review |>
+  group_by(HotelID)
+unique(valid_match_review$CityID)
+# 对应的是"DALLAS", "AUSTIN", "HOUSTON", "SAN ANTONIO"
+```
+
+
+```{r}
+write_csv(valid_match_review, "/Users/samxie/Research/ReviewSimi_Sales/1209new/TP_texas_data/valid_match_review0118.csv")
+```
+
+
+## 2 Review Simi
+
+#### 2.1 Join simi
+
+```{r}
+review_vector_filtered <- read_csv( "/Users/samxie/Research/ReviewSimi_Sales/1209new/TP_texas_data/reviews_texas_en_doc2vec200_joined.csv")
+```
+
+```{r}
+valid_match_review <- read_csv("/Users/samxie/Research/ReviewSimi_Sales/1209new/TP_texas_data/valid_match_review0118.csv") |>
+  group_by(CityID) |>
+  mutate(
+    HotelCount = n_distinct(HotelID)    # step 2: 统计每个 CityID 的酒店数量
+  ) |>
+  ungroup() |> 
+  filter(HotelCount>=150) |>
+  select(-HotelCount)
+unique(valid_match_review$CityID)
+valid_match_review |>
+  group_by(HotelID)
+```
+
+```{r}
+library(progress)
+
+# 准备目标 ID
+target_ids <- valid_match_review$ReviewID
+file_path <- "/Users/samxie/Research/ReviewSimi_Sales/1209new/TP_texas_data/reviews_texas_en_doc2vec200_joined.csv"
+
+# 估算行数以设置进度条
+# 使用系统命令快速获取行数 (Mac/Linux)
+total_lines <- as.numeric(system(paste("wc -l <", file_path), intern = TRUE))
+pb <- progress_bar$new(
+  format = "  读取中 [:bar] :percent 耗时: :elapsedfull",
+  total = total_lines, clear = FALSE, width = 60
+)
+
+# 定义回调函数：每次读取一块数据时执行的操作
+filter_chunk <- function(chunk, pos) {
+  # 更新进度条
+  pb$tick(nrow(chunk))
+  
+  # 执行筛选和重命名
+  chunk |>
+    filter(ReviewID %in% target_ids) |>
+    rename(
+      ReviewID              = ReviewID,
+      Review_Published_Date = ReviewDate
+    )
+}
+
+# 执行分块读取
+review_vector_filtered <- read_csv_chunked(
+  file_path,
+  callback = DataFrameCallback$new(filter_chunk),
+  chunk_size = 50000,      # 每次读 5w 行，根据内存调整
+  col_types = cols(.default = "c"), # 保持全字符型
+  progress = FALSE         # 关闭自带进度条，使用我们自定义的
+)
+
+# 清理
+rm(target_ids, pb, filter_chunk, total_lines,file_path)
+```
+
+
+```{r}
+write_csv(review_vector_filtered, "/Users/samxie/Research/ReviewSimi_Sales/Data/review_vector_filtered0118.csv")
+```
+
+#### 2.2 month and before review
+
+```{r}
+valid_match_review <- read_csv("/Users/samxie/Research/ReviewSimi_Sales/1209new/TP_texas_data/valid_match_review0118.csv")
+review_vector_filtered <- read_csv( "/Users/samxie/Research/ReviewSimi_Sales/Data/review_vector_filtered0118.csv")
+```
+
+
+```{r}
+review_content <- review_vector_filtered |>
+  mutate(
+    RatingDate = as.Date(Review_Published_Date),
+    Rating = ReviewRating
+  ) |>
+  dplyr::select(-Review_Published_Date, -ReviewRating)
+
+review_content <- review_content |>
+  rename_with(
+    .fn = ~ str_replace(.x, "^vector_(\\d+)$", "V\\1"),
+    .cols = starts_with("vector_")
+  ) |>
+  mutate(
+    AvgRatingStarsThisUser = Rating
+  ) |>
+  arrange(HotelID, RatingDate, ReviewID) |>
+  select(ReviewID, HotelID, RatingDate, AvgRatingStarsThisUser, V0:V199)
+
+start_date <- min(review_content$RatingDate)
+end_date <- max(review_content$RatingDate)
+
+monthly_end_dates <- seq.Date(from = floor_date(start_date, "year"), 
+                              to = ceiling_date(end_date, "year") - days(1), 
+                              by = "month")
+
+monthly_end_dates <- sapply(monthly_end_dates, function(date) {
+  last_day_of_month <- ceiling_date(date, "month") - days(1)
+  return(last_day_of_month)
+}) |> 
+  as.Date()
+
+all_hotel_months <- expand.grid(
+  HotelID = as.integer(unique(review_content$HotelID)),
+  month_end_dates = monthly_end_dates
+) |>
+  mutate(
+    month_begin_dates = floor_date(month_end_dates, "month")
+  ) |>
+  dplyr::select(HotelID, month_begin_dates, month_end_dates)
+
+review_content <- review_content |>
+  arrange(HotelID, RatingDate, ReviewID) |>
+  select(ReviewID, HotelID, RatingDate, AvgRatingStarsThisUser, V0:V199)
+
+rm(end_date, monthly_end_dates, start_date)
+```
+
+##### 2.2.1 10 before
+
+```{r 10 before}
+pb <- progress_bar$new(
+  format = "处理进度 [:bar] :percent 预计剩余: :eta",
+  total = nrow(all_hotel_months), 
+  clear = FALSE
+)
+
+panel_reviews_before10 <- all_hotel_months |>
+  mutate(recent_reviews_before = map2(HotelID, month_begin_dates, ~ {
+    reviews_before <- review_content |>
+      filter(HotelID == .x & RatingDate < .y) |>
+      slice_tail(n = min(10, n()))  # 获取最多10条评论
+    pb$tick()
+    return(reviews_before)
+  }))
+save(panel_reviews_before10, file="/Users/samxie/Research/ReviewSimi_Sales/Data/panel_reviews_before10.RData")
+```
+##### 2.2.2 20 before
+
+```{r 20 before}
+pb <- progress_bar$new(
+  format = "处理进度 [:bar] :percent 预计剩余: :eta",
+  total = nrow(all_hotel_months), 
+  clear = FALSE
+)
+
+panel_reviews_before20 <- all_hotel_months |>
+  mutate(recent_reviews_before = map2(HotelID, month_begin_dates, ~ {
+    reviews_before <- review_content |>
+      filter(HotelID == .x & RatingDate < .y) |>
+      slice_tail(n = min(20, n()))  # 获取最多30条评论
+  
+    pb$tick()
+    return(reviews_before)
+  }))
+save(panel_reviews_before20, file="/Users/samxie/Research/ReviewSimi_Sales/Data/panel_reviews_before20.RData")
+```
+
+
+##### 2.2.3. 30 before
+
+```{r 30 before}
+pb <- progress_bar$new(
+  format = "处理进度 [:bar] :percent 预计剩余: :eta",
+  total = nrow(all_hotel_months), 
+  clear = FALSE
+)
+
+panel_reviews_before30 <- all_hotel_months |>
+  mutate(recent_reviews_before = map2(HotelID, month_begin_dates, ~ {
+    reviews_before <- review_content |>
+      filter(HotelID == .x & RatingDate < .y) |>
+      slice_tail(n = min(30, n()))  # 获取最多30条评论
+  
+    pb$tick()
+    return(reviews_before)
+  }))
+save(panel_reviews_before30, file="/Users/samxie/Research/ReviewSimi_Sales/Data/panel_reviews_before30.RData")
+```
+
+##### 2.2.4 month
+```{r mon}
+# 创建进度条
+pb <- progress_bar$new(
+  format = "处理进度 [:bar] :percent 预计剩余: :eta",
+  total = nrow(all_hotel_months),
+  clear = FALSE
+)
+
+# 获取当前月的所有评论，并跟踪进度
+panel_reviews_month <- all_hotel_months |> 
+  mutate(recent_reviews_month = map2(HotelID, month_begin_dates, ~ {
+    
+    new_reviews <- review_content |> 
+      filter(
+        HotelID == .x,
+        month(RatingDate) == month(.y),
+        year(RatingDate) == year(.y)
+      )
+    
+    pb$tick()  # 进度+1
+    
+    return(new_reviews)
+  }))
+save(panel_reviews_month, file="/Users/samxie/Research/ReviewSimi_Sales/Data/panel_reviews_month.RData")
+```
+
+```{r load data}
+# load(file="/Users/samxie/Research/ReviewSimi_Sales/Data/panel_reviews_month.RData")
+# load(file="/Users/samxie/Research/ReviewSimi_Sales/Data/panel_reviews_before10.RData")
+# load(file="/Users/samxie/Research/ReviewSimi_Sales/Data/panel_reviews_before20.RData")
+# load(file="/Users/samxie/Research/ReviewSimi_Sales/Data/panel_reviews_before30.RData")
+
+pb <- progress_bar$new(
+  format = "处理进度 [:bar] :percent 预计剩余: :eta",
+  total = nrow(panel_reviews_before10),
+  clear = FALSE
+)
+
+panel_reviews_combined_10 <- panel_reviews_before10 |>
+  left_join(
+    panel_reviews_month,
+    by = c("HotelID", "month_begin_dates", "month_end_dates")
+  ) |>
+  mutate(
+    combined_reviews = map2(
+      recent_reviews_before,
+      recent_reviews_month,
+      ~ {
+        pb$tick()  # 每处理一行更新进度条
+        x <- .x |>
+          mutate(
+            AvgRatingStarsThisUser = as.numeric(AvgRatingStarsThisUser)
+          )
+        y <- .y |>
+          mutate(
+            AvgRatingStarsThisUser = as.numeric(AvgRatingStarsThisUser)
+          )
+        bind_rows(x, y)
+      }
+    ),
+    recent_volumn = map_int(combined_reviews, nrow),
+    recent_rating = map_dbl(
+      combined_reviews,
+      ~ {
+        r <- .x$AvgRatingStarsThisUser
+        if (length(r) == 0 || all(is.na(r))) NA_real_
+        else mean(r, na.rm = TRUE)
+      }
+    ),
+    recent_sd = map_dbl(
+      combined_reviews,
+      ~ {
+        r <- .x$AvgRatingStarsThisUser
+        if (length(r) <= 1 || all(is.na(r))) NA_real_
+        else sd(r, na.rm = TRUE)
+      }
+    )
+  ) |>
+  ungroup() |>
+  select(HotelID,month_begin_dates,recent_reviews=combined_reviews,recent_volumn,recent_sd,recent_rating)
+```
+
+```{r}
+pb <- progress_bar$new(
+  format = "处理进度 [:bar] :percent 预计剩余: :eta",
+  total = nrow(panel_reviews_combined_10 |> filter(recent_volumn != 0)),
+  clear = FALSE
+)
+
+balanced_panel_before10 <- panel_reviews_combined_10 |>
+  filter(recent_volumn != 0) |>
+  unnest(recent_reviews, names_sep = "_") |>
+  group_by(HotelID, month_begin_dates) |>
+  group_modify(~ {
+    pb$tick()   # 处理每个组时更新进度条
+    summarised <- .x |>
+      arrange(recent_reviews_RatingDate, recent_reviews_ReviewID) |>
+      summarise(
+        vector_matrix = list(as.matrix(pick(starts_with("recent_reviews_V")))),
+        recent_volumn = first(recent_volumn),
+        recent_sd = first(recent_sd),
+        recent_rating = first(recent_rating)
+      )
+    summarised
+  }) |>
+  ungroup()
+```
+
+```{r}
+balanced_panel_before10 <- balanced_panel_before10 |>
+  group_by(HotelID, month_begin_dates) |>
+  slice(1) |>
+  ungroup()
+
+save(balanced_panel_before10, file="/Users/samxie/Research/ReviewSimi_Sales/Data/balanced_panel_before10.RData")
+```
+
+#### 2.3  Simi Calculate
+
+```{r}
+load("/Users/samxie/Research/ReviewSimi_Sales/Data/balanced_panel_before10.RData")
+# load("/Users/samxie/Research/ReviewSimi_Sales/Data/balanced_panel_before20.RData")
+# load("/Users/samxie/Research/ReviewSimi_Sales/Data/balanced_panel_before30.RData")
+```
+
+
+```{r}
+calc_sim_safe <- function(mat_input) {
+  # 空值检查
+  if (is.null(mat_input) || length(mat_input) == 0) {
+    return(NA_real_)
+  }
+  mat_num <- suppressWarnings(apply(mat_input, 2, as.numeric))
+  # 容错：如果转完不是矩阵（比如变成了向量），强转回矩阵
+  if (!is.matrix(mat_num)) {
+    mat_num <- matrix(mat_num, nrow = 1)
+  }
+  # 如果行数小于2，说明只有1条评论，无法计算内部差异，返回NA
+  if (nrow(mat_num) < 2) {
+    return(NA_real_)
+  }
+  # 计算相似度
+  sim_matrix <- sim2(mat_num, mat_num, method = "cosine")
+  diag(sim_matrix) <- NA # 对角线设为NA
+  return(mean(sim_matrix, na.rm = TRUE))
+}
+
+simi_results2 <- balanced_panel_before10 |>
+  group_by(HotelID) |>
+  arrange(month_begin_dates) |>
+  # 先生成滞后期的矩阵数据
+  mutate(vector_matrix_lag = lag(vector_matrix)) |>
+  # 再计算两者的相似度
+  mutate(
+    sim_mean_lag = map_dbl(vector_matrix_lag, calc_sim_safe),
+    sim_mean     = map_dbl(vector_matrix, calc_sim_safe)
+  ) |>
+  ungroup() |>
+  arrange(HotelID, month_begin_dates)
+```
+
+## 3 Data Processing and Final Join
+
+#### Acc variable Processing
+```{r}
+valid_match_review <- read_csv("/Users/samxie/Research/ReviewSimi_Sales/1209new/TP_texas_data/valid_match_review0118.csv")
+
+revenue_tp_all_bind <-read_csv("/Users/samxie/Research/ReviewSimi_Sales/1209new/revenue_tp_all_bind0123Zip.csv")
+```
+
+```{r}
+valid_match_review <- valid_match_review |>
+  mutate(
+    RatingDate = Review_Published_Date,
+    AvgRatingStarsThisUser = Review_Rating
+  )
+
+entropy <- function(x) {
+  freq <- table(x) / length(x)
+  -sum(freq * log2(freq), na.rm = TRUE)
+}
+inverse_hhi <- function(x) {
+  freq <- table(x) / length(x)
+  1 / sum(freq^2)
+}
+review_sd <- valid_match_review |> 
+  dplyr::select(HotelID, Year, Mon, RatingDate, AvgRatingStarsThisUser) |> 
+  group_by(HotelID, Year, Mon) |> 
+  summarise(
+    sd_mon = sd(AvgRatingStarsThisUser),
+    monvol = n(),
+    sd_entropy = entropy(AvgRatingStarsThisUser),
+    sd_inverse_HHI = inverse_hhi(AvgRatingStarsThisUser)
+  ) |> 
+  ungroup() |>
+  arrange(HotelID, Year, Mon) 
+
+rm(entropy, inverse_hhi)
+```
+
+```{r}
+review_sd |>
+  group_by(HotelID)
+
+valid_match_review_process <- inner_join(valid_match_review, review_sd) |>
+  mutate(
+    monvol = replace_na(monvol, 0)
+  )
+```
+
+
+```{r}
+Hotel_Char <- read_csv("/Users/samxie/Research/ReviewSimi_Sales/1209new/TP_texas_data/hotel_texas_tp.csv") |>
+  mutate(
+    HotelID = as.character(hotel_id_ta),
+    HotelEval = as.character(hotel_evaluation),
+    StarClass = as.character(hotel_class)
+  ) |>
+  select(HotelID, HotelEval, StarClass)
+
+valid_match_review_process <- inner_join(valid_match_review_process |> mutate(
+  HotelID = as.character(HotelID)
+), Hotel_Char)
+```
+
+```{r}
+valid_match_review_process |>
+  group_by(HotelID)
+revenue_tp_all_bind |>
+  group_by(HotelID)
+valid_match_review_acc |>
+  group_by(HotelID)
+
+revenue_tp_all_bind |>
+  filter(HotelID==10006331)
+```
+
+
+```{r}
+# 月级别 summarise
+valid_match_review_acc <- left_join(valid_match_review_process, revenue_tp_all_bind|>mutate(HotelID=as.character(HotelID))|>select(-from, -CityID)) |>
+  mutate(
+    year_month = sprintf("%04d-%02d", Year, Mon),
+    characters = nchar(Review_Text),
+    words = str_count(Review_Text, "\\S+")
+  ) |>
+  group_by(HotelID, Year, Mon) |>
+  arrange(HotelID, Year, Mon, Review_Date) |>
+  summarise(
+    avg_rating_month = mean(Review_Rating, na.rm = TRUE),
+    characters_month = sum(characters, na.rm = TRUE),
+    words_month = sum(words, na.rm = TRUE),
+    volumn_month = n(),
+    RevPAR = mean(RevPAR, na.rm = T),
+    avg_com_RevPAR = mean(avg_com_RevPAR, na.rm = T),
+    rating_last_5 = mean(tail(Review_Rating, 5), na.rm = TRUE),
+    rating_last_10 = mean(tail(Review_Rating, 10), na.rm = TRUE),
+    year_month = sprintf("%04d-%02d", first(Year), first(Mon)),
+    rating_list = list(Review_Rating),
+    .groups = "drop"
+  ) |>
+  arrange(HotelID, Year, Mon) |>
+  group_by(HotelID) |>
+  mutate(
+    avg_rating_acc = cummean(avg_rating_month),
+    characters_acc = cumsum(characters_month),
+    words_acc = cumsum(words_month),
+    volumn_acc = cumsum(volumn_month),
+
+    # 累积标准差：合并截至当月的所有 rating
+    sd_acc = sapply(seq_along(rating_list), function(i) {
+      ratings <- unlist(rating_list[1:i])
+      sd(ratings, na.rm = TRUE)
+    })
+  ) |>
+  ungroup()
+```
+
+
+```{r}
+valid_match_review_acc_invalid <- valid_match_review_acc |>
+  filter(is.na(RevPAR))
+
+valid_match_review_acc <- valid_match_review_acc |>
+  filter(!is.na(RevPAR))
+
+```
+
+```{r}
+lag_vars <- c(
+  "sim_mean", "RevPAR", "recent_sd", "recent_volumn", "recent_rating",
+  "sd_mon", "sd_acc", "monvol", "sd_entropy", "sd_inverse_HHI",
+  "avg_rating_month", "characters_month", "words_month",
+  "volumn_month", "avg_com_RevPAR", "rating_last_5", "rating_last_10",
+  "avg_rating_acc", "characters_acc", "words_acc", "volumn_acc"
+)
+
+
+valid_match_review_acc <- inner_join(
+  valid_match_review_acc,
+  valid_match_review |>
+    mutate(HotelID = as.character(HotelID)) |>
+    group_by(HotelID) |>
+    slice(1) |>
+    ungroup() |>
+    select(HotelID, CityID),
+  by = "HotelID"
+)
+
+
+valid_match_review_acc_10 <- valid_match_review_acc |>
+  inner_join(
+    simi_results2 |>
+      dplyr::select(-vector_matrix, -vector_matrix_lag) |>
+      mutate(
+        HotelID = as.character(HotelID),
+        Year = year(month_begin_dates),
+        Mon  = month(month_begin_dates)
+      ),
+    by = c("HotelID", "Year", "Mon")
+  ) |>
+  left_join(
+    review_sd |>
+      mutate(HotelID = as.character(HotelID)),
+    by = c("HotelID", "Year", "Mon")
+  ) |>
+  arrange(HotelID, Year, Mon) |>
+  group_by(HotelID) |>
+  mutate(
+    across(
+      all_of(lag_vars),
+      ~ dplyr::lag(
+          zoo::na.locf(.x, na.rm = FALSE), 
+          n = 1
+        ),
+      .names = "lag_{.col}"
+    )
+  ) |>
+  ungroup() |>
+  select(HotelID, Year, Mon, year_month, everything()) |>
+  select(-rating_list)
+
+rm(lag_vars)
+
+valid_match_review_acc_beforeCOVID_10 <- valid_match_review_acc_10 |>
+  filter(Year < 2020)
+```
+
+```{r}
+write_dta(valid_match_review_acc_10, "/Users/samxie/Research/ReviewSimi_Sales/Data/revenue_1205/valid_match_review_acc_10_zip.dta")
+write_dta(valid_match_review_acc_beforeCOVID_10, "/Users/samxie/Research/ReviewSimi_Sales/Data/revenue_1205/valid_match_review_acc_beforeCOVID_10_zip.dta")
+```
+
+#### fac dataset
+
+```{r}
+valid_match_review_acc_10_fac |>
+  group_by(HotelID)
+```
+
+```{r}
+valid_match_review_acc_10_fac <- read_dta("/Users/samxie/Research/ReviewSimi_Sales/Data/revenue_1205/valid_match_review_acc_10_zip.dta") |>
+  mutate(
+    HotelID = factor(HotelID),
+    year_month = factor(year_month)
+  )
+
+valid_match_review_acc_beforeCOVID_10_fac <- read_dta("/Users/samxie/Research/ReviewSimi_Sales/Data/revenue_1205/valid_match_review_acc_beforeCOVID_10_zip.dta") |>
+  mutate(
+    HotelID = factor(HotelID),
+    year_month = factor(year_month)
+  )
+
+write_dta(valid_match_review_acc_10_fac, "/Users/samxie/Research/ReviewSimi_Sales/Data/revenue_1205/valid_match_review_acc_10_fac_zip.dta")
+
+write_dta(valid_match_review_acc_beforeCOVID_10_fac, "/Users/samxie/Research/ReviewSimi_Sales/Data/revenue_1205/valid_match_review_acc_beforeCOVID_10fac_zip.dta")
+```
+
+```{r}
+zip <- read_csv("/Users/samxie/Research/ReviewSimi_Sales/1209new/allmatched.csv") |>
+  group_by(HotelID) |>
+  slice(1) |>
+  mutate(
+    HotelID = as.character(HotelID)
+  ) |>
+  select(HotelID, Zip)
+```
+
+
+```{r}
+valid_match_review_acc_10_fac <- read_dta("/Users/samxie/Research/ReviewSimi_Sales/Data/revenue_1205/valid_match_review_acc_10_zip.dta") |>
+  left_join(zip) |>
+  mutate(
+    HotelID = factor(HotelID),
+    year_month = factor(year_month)
+  ) |>
+  group_by(HotelID) |>
+  mutate(
+    max_vol_acc = max(volumn_acc)
+  ) |>
+  ungroup() |>
+  filter(max_vol_acc>=133)
+
+valid_match_review_acc_beforeCOVID_10_fac <- read_dta("/Users/samxie/Research/ReviewSimi_Sales/Data/revenue_1205/valid_match_review_acc_beforeCOVID_10_zip.dta") |>
+  left_join(zip) |>
+  mutate(
+    HotelID = factor(HotelID),
+    year_month = factor(year_month)
+  ) |>
+  group_by(HotelID) |>
+  mutate(
+    max_vol_acc = max(volumn_acc)
+  ) |>
+  ungroup() |>
+  filter(max_vol_acc>=133)
+
+write_dta(valid_match_review_acc_10_fac, "/Users/samxie/Research/ReviewSimi_Sales/Data/revenue_1205/valid_match_review_acc_10_fac_zip_133.dta")
+
+write_dta(valid_match_review_acc_beforeCOVID_10_fac, "/Users/samxie/Research/ReviewSimi_Sales/Data/revenue_1205/valid_match_review_acc_beforeCOVID_10_fac_zip_133.dta")
+```
+
+```{r}
+test <- read_dta("/Users/samxie/Research/ReviewSimi_Sales/Data/revenue_1205/valid_match_review_acc_beforeCOVID_10_zip.dta") |>
+  mutate(
+    HotelID = factor(HotelID),
+    year_month = factor(year_month)
+  ) |>
+  group_by(HotelID) |>
+  mutate(
+    max_vol_acc = max(volumn_acc)
+  ) |>
+  slice(1) |>
+  select(HotelID, max_vol_acc)
+  
+
+summary(test$max_vol_acc)
+sd(test$max_vol_acc)
+test <- test |>
+  filter(max_vol_acc>133)
+```
+
+## 4 Variable Checking
+
+```{r}
+month_revenue10_2010new <- read_dta("/Users/samxie/Research/ReviewSimi_Sales/Data/revenue_data/month_revenue10_2010new.dta")
+valid_match_review_acc_10 <- read_dta("/Users/samxie/Research/ReviewSimi_Sales/Data/revenue_1205/valid_match_review_acc_10_city.dta")
+```
+
+```{r}
+colnames(month_revenue10_2010new)
+print("------------------------")
+colnames(valid_match_review_acc_10)
+```
+
+##### 4.1 Distribution
+
+```{r}
+month_revenue_table <- month_revenue10_2010new |>
+  dplyr::select(RevPAR, ARS_new_date, recent_volume, recent_sd, volumn_acc, lag_rating_acc, lag_rating_sd, rating_last_5, lag_month_rating, avg_com_RevPAR, lag_RevPAR)
+correlation_matrix <- as.data.frame(cor(month_revenue_table, use = "complete.obs"))
+write_csv(correlation_matrix, "Correlation_Matrix_past2.csv")
+# rm(correlation_matrix)
+```
+
+```{r}
+valid_match_table <- valid_match_review_acc_10 |>
+  filter(RevPAR>0) |>
+  dplyr::select(RevPAR, sim_mean, recent_volumn, recent_sd, volumn_acc, lag_avg_rating_acc, lag_sd_acc, rating_last_5, lag_avg_rating_month, avg_com_RevPAR, lag_RevPAR)
+correlation_matrix_valid <- as.data.frame(cor(valid_match_table, use = "complete.obs"))
+write_csv(correlation_matrix_valid, "Correlation_Matrix_extent_city.csv")
+# rm(correlation_matrix)
+```
+
+```{r}
+valid_match_table_test17l <- valid_match_review_acc_10 |>
+  filter(Year<2017) |>
+  dplyr::select(RevPAR, sim_mean, recent_volumn, recent_sd, volumn_acc, lag_avg_rating_acc, lag_sd_acc, rating_last_5, lag_avg_rating_month, avg_com_RevPAR, lag_RevPAR)
+correlation_matrix_validtest <- as.data.frame(cor(valid_match_table_test17l, use = "complete.obs"))
+write_csv(correlation_matrix_validtest, "Correlation_Matrix_test2017l.csv")
+# rm(correlation_matrix)
+
+
+valid_match_table_test17u <- valid_match_review_acc_10 |>
+  filter(Year>=2017) |>
+  dplyr::select(RevPAR, sim_mean, recent_volumn, recent_sd, volumn_acc, lag_avg_rating_acc, lag_sd_acc, rating_last_5, lag_avg_rating_month, avg_com_RevPAR, lag_RevPAR)
+correlation_matrix_validtest <- as.data.frame(cor(valid_match_table_test17u, use = "complete.obs"))
+write_csv(correlation_matrix_validtest, "Correlation_Matrix_test2017u.csv")
+# rm(correlation_matrix)
+```
+
+
+```{r}
+valid_match_review20_100_temp <- valid_match_review20_100_acc_10 |>
+  filter(HotelID==73242) |>
+  select(HotelID, Year, Mon, sim_mean, sim_mean_lag, RevPAR, lag_RevPAR, avg_com_RevPAR, lag_avg_com_RevPAR)
+month_revenue10_2010new_temp <- month_revenue10_2010new |>
+  filter(HotelID==73242) |>
+  select(HotelID, year, month, ARS_10, RevPAR, lag_RevPAR, avg_com_RevPAR, lag_avg_com_RevPAR)
+```
+
+```{r}
+print("------RevPAR-----")
+summary(month_revenue_table$RevPAR)
+summary(valid_match_table$RevPAR)
+summary(valid_match_table_test17l$RevPAR)
+summary(valid_match_table_test17u$RevPAR)
+print("------avg_com_RevPAR-----")
+summary(month_revenue_table$avg_com_RevPAR)
+summary(valid_match_table$avg_com_RevPAR)
+summary(valid_match_table_test17l$avg_com_RevPAR)
+summary(valid_match_table_test17u$avg_com_RevPAR)
+print("------simi-----")
+summary(month_revenue_table$ARS_new_date)
+summary(valid_match_table$sim_mean)
+summary(valid_match_table_test17l$sim_mean)
+summary(valid_match_table_test17u$sim_mean)
+print("------lag_avg_rating_mon-----")
+summary(month_revenue_table$lag_month_rating)
+summary(valid_match_table$lag_avg_rating_month)
+summary(valid_match_table_test17l$lag_avg_rating_month)
+summary(valid_match_table_test17u$lag_avg_rating_month)
+```
+
+#### 4.2 Only In Restaurant
+
+```{r}
+month_revenue10_2010new <- read_dta("/Users/samxie/Research/ReviewSimi_Sales/Data/revenue_data/month_revenue10_2010new.dta")
+valid_match_review_acc_10 <- read_dta("/Users/samxie/Research/ReviewSimi_Sales/Data/revenue_1205/valid_match_review_acc_10_zip_fac.dta")
+```
+
+```{r}
+valid_match_review_acc_10_2017valid <- valid_match_review_acc_10 |>
+  filter(Year < 2017)
+hotelid_valid <- unique(valid_match_review_acc_10_2017valid$HotelID)
+in_match_fac <- valid_match_review_acc_10 |>
+  filter(HotelID %in% hotelid_valid) |>
+  mutate(HotelID = as.factor(HotelID),
+         year_month = as.factor(year_month))
+in_match_fac |>
+  group_by(HotelID)
+
+write_dta(in_match_fac, "/Users/samxie/Research/ReviewSimi_Sales/Data/revenue_1205/in_match_fac.dta")
+```
+
+
+#### 4.3 Test for Revenue
+
+```{r}
+month_revenue10_2010new <- read_dta("/Users/samxie/Research/ReviewSimi_Sales/Data/revenue_data/month_revenue10_2010new.dta")
+valid_match_review_acc_10 <- read_dta("/Users/samxie/Research/ReviewSimi_Sales/Data/revenue_1205/valid_match_review_acc_10_zip_fac.dta")
+```
+
+```{r}
+# revenue_all <- read_csv("/Users/samxie/Research/ReviewSimi_Sales/1209new/revenue_all0108.csv")
+allmatched <- read_csv("/Users/samxie/Research/ReviewSimi_Sales/1209new/allmatched.csv")
+
+allmatched <- allmatched |>
+  group_by(HotelID) |>
+  mutate(num = n()) |>
+  ungroup() |>
+  arrange(desc(num), LocationAddress, LocationAddress, HotelID)
+
+
+allmatched <- allmatched |>
+  group_by(HotelID) |>
+  slice(1) |>
+  ungroup()
+
+allmatched <- allmatched |>
+  group_by(LocationName, LocationAddress) |>
+  mutate(
+    num = n()
+  ) |>
+  filter(num==1) |>
+  ungroup()
+
+revenue_tp_all <- inner_join(revenue_all, allmatched |> select(HotelID, CityID, CityName, Zip, LocationAddress, LocationName), by=c("Location_Name"="LocationName","Location_Address"="LocationAddress")) |>
+  group_by(HotelID, Year, Mon) |>
+  mutate(num = n()) |>
+  ungroup() |>
+  # 找出有任意 num > 1 的 HotelID
+  group_by(HotelID) |>
+  mutate(has_dup = any(num > 1)) |>
+  ungroup() |>
+  # 只保留没有重复的酒店
+  filter(!has_dup) |>
+  filter(hotel_number>=5) |>
+  filter(avg_com_RevPAR>0) |>
+  filter(RevPAR>0) |>
+  select(-num, -has_dup)
+```
+
+
+```{r}
+revenue_tp_all_processed <- revenue_tp_all |>
+  select(HotelID, Year, Mon, RevPAR, avg_com_RevPAR) |>
+  mutate(HotelID = as.character(HotelID))
+valid_match_review_acc_10 <- valid_match_review_acc_10 |>
+  select(-RevPAR, -avg_com_RevPAR) |>
+  inner_join(revenue_tp_all_processed)
+```
+
+
+```{r}
+valid_match_review_acc_10_fac <- valid_match_review_acc_10 |>
+  mutate(
+    HotelID = factor(HotelID),
+    year_month = factor(year_month),
+    Zip = factor(Zip)
+  )
+write_dta(valid_match_review_acc_10_fac, "/Users/samxie/Research/ReviewSimi_Sales/Data/revenue_1205/valid_match_review_acc_10_facnew.dta")
+```
+

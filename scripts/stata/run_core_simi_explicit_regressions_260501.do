@@ -125,6 +125,7 @@ est store h1_fe_nolag
 reghdfe ln_RevPAR_clean sim_mean rating_last_5 ln_recent_volumn recent_sd ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store h1_fe_lag
 
+
 esttab h1_ols_nolag h1_ols_lag h1_fe_nolag h1_fe_lag ///
     using "h1_basic_ols_fe_260501.rtf", replace ///
     order( ///
@@ -153,8 +154,10 @@ esttab h1_ols_nolag h1_ols_lag h1_fe_nolag h1_fe_lag ///
 reghdfe ln_lag_RevPAR_clean sim_mean ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR L.ln_lag_RevPAR_clean if cs_sample_full == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store h1_fe_lag_RevPAR
 
+reghdfe ln_RevPAR_clean sim_mean ln_recent_volumn recent_sd ln_lag_volumn_acc rating_last_5  lag_avg_rating_acc lag_sd_acc  lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store h1_fe_full
 
-esttab h1_fe_lag_RevPAR ///
+esttab h1_fe_lag_RevPAR h1_fe_full ///
     using "h1_robust_fe_260501.rtf", replace ///
     order( ///
         sim_mean ///
@@ -655,6 +658,7 @@ reghdfe ln_RevPAR_clean sim_mean ///
     if cs_sample_focus100 == 1 & covid2020_2022==0, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store h1_fe_bf_2020
 
+
 ************ H1 COVID shock: 2020 only, level outcome ************
 reghdfe ln_RevPAR_clean c.sim_mean##i.covid2020 ///
 ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w ///
@@ -693,10 +697,164 @@ esttab h1_fe_bf_2020 h1_covid_2020_level h1_covid_pandemic_level h1_covid_pandem
     mtitles("Pre2020" "2020 shock level" "2020-2022 level" "2020-2022 growth") ///
     nogap compress
 
-	
 
 *******************************************************
-************ 13. close log ************
+************ 13. H1 alternative ARS robustness ************
+*******************************************************
+
+local data_altars "`data_dir'/core_simi_panel_260501_with_altars.dta"
+
+capture confirm file "`data_altars'"
+if _rc {
+    di as text "Skipping alternative ARS robustness. Run scripts/r/build_alt_ars_260509.R first."
+}
+else {
+    preserve
+    use "`data_altars'", clear
+
+    capture drop hotel_id_num
+    capture confirm numeric variable HotelID
+    if _rc {
+        encode HotelID, gen(hotel_id_num)
+    }
+    else {
+        gen long hotel_id_num = HotelID
+    }
+
+    capture drop ym
+    gen ym = monthly(year_month, "YM")
+    format ym %tm
+    xtset hotel_id_num ym
+    sort hotel_id_num ym
+
+    estimates clear
+
+    ************ H1 robustness: lagged core ARS ************
+    reghdfe ln_RevPAR_clean lag_sim_mean ///
+        ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc ///
+        lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ///
+        ln_avg_com_RevPAR ln_lag_RevPAR_clean ///
+        if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+    est store h1_lag_ars
+
+    ************ H1 robustness: daily rolling ARS, latest 10 reviews ************
+    reghdfe ln_RevPAR_clean ars_roll_10 ///
+        ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc ///
+        lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ///
+        ln_avg_com_RevPAR ln_lag_RevPAR_clean ///
+        if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+    est store h1_roll_ars
+
+    ************ H1 robustness: JS-distance ARS transformed to similarity ************
+    reghdfe ln_RevPAR_clean ars_jsd_sim ///
+        ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc ///
+        lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ///
+        ln_avg_com_RevPAR ln_lag_RevPAR_clean ///
+        if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+    est store h1_jsd_ars
+
+    esttab h1_lag_ars h1_roll_ars h1_jsd_ars ///
+        using "`table_dir'/h1_alt_ars_robustness_260509.rtf", replace ///
+        order( ///
+            lag_sim_mean ///
+            ars_roll_10 ///
+            ars_jsd_sim ///
+            ln_recent_volumn ///
+            recent_sd ///
+            ln_lag_volumn_acc ///
+            lag_avg_rating_acc ///
+            lag_sd_acc ///
+            rating_last_5 ///
+            lag_avg_rating_month ///
+            ln_avg_com_RevPAR ///
+            ln_lag_RevPAR_clean ///
+        ) ///
+        star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
+        cells(b(star fmt(3)) se(par fmt(3))) ///
+        stats(N r2, labels("Observations" "R-squared")) ///
+        mtitles("Lagged ARS" "Rolling ARS" "JSD ARS") ///
+        nogap compress
+
+    restore
+}
+
+
+*******************************************************
+************ 14. descriptive statistics tables ************
+*******************************************************
+
+* Table 3 covers all numeric variables used in this explicit do-file.
+* Table 4 keeps the main continuous regression variables to avoid an unreadable dummy-heavy matrix.
+
+capture label variable ln_RevPAR_clean "Log RevPAR"
+capture label variable ln_RevPAR_clean_w "Winsorized log RevPAR"
+capture label variable d_ln_RevPAR "Change in log RevPAR"
+capture label variable sim_mean "ARS / review similarity"
+capture label variable ln_recent_volumn "Log recent review volume"
+capture label variable recent_volumn "Recent review volume"
+capture label variable recent_sd "Recent rating dispersion"
+capture label variable rating_last_5 "Recent rating, last 5 reviews"
+capture label variable ln_lag_volumn_acc "Log lagged cumulative review volume"
+capture label variable lag_volumn_acc "Lagged cumulative review volume"
+capture label variable lag_recent_volumn "Lagged recent review volume"
+capture label variable lag_avg_rating_acc "Lagged cumulative rating"
+capture label variable lag_sd_acc "Lagged cumulative rating dispersion"
+capture label variable lag_avg_rating_month "Lagged monthly rating"
+capture label variable lag_rating_last_5 "Lagged recent rating, last 5 reviews"
+capture label variable ln_avg_com_RevPAR "Log competitor RevPAR"
+capture label variable ln_lag_RevPAR_clean "Log lagged RevPAR"
+capture label variable ln_lag_RevPAR_clean_w "Winsorized log lagged RevPAR"
+capture label variable star_class "Hotel star class"
+capture label variable covid2020 "COVID shock: 2020"
+capture label variable covid2020_2022 "COVID pandemic: 2020-2022"
+capture label variable post2020 "Post-2020 period"
+capture label variable pre_covid "Pre-COVID period"
+
+local desc_candidates ln_RevPAR_clean ln_RevPAR_clean_w d_ln_RevPAR sim_mean ///
+    ln_recent_volumn recent_volumn recent_sd rating_last_5 ///
+    ln_lag_volumn_acc lag_volumn_acc lag_recent_volumn ///
+    lag_avg_rating_acc lag_sd_acc lag_avg_rating_month lag_rating_last_5 ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean ln_lag_RevPAR_clean_w ///
+    star_class ///
+    h2_low_rating5_ym h2_low_lag_avg_rating_acc h2_low_lag_avg_rating_month ///
+    h3_low_lag_recent_volumn h3_low_ln_lag_volumn_acc ///
+    h4_low_star35 h4_low_star4 h5_low_recent_sd h5_low_lag_sd_acc ///
+    covid2020 covid2020_2022 post2020 pre_covid ///
+    cs_sample_full cs_sample_focus50 cs_sample_focus100 ///
+    cs_sample_exclude2020 cs_sample_post2013
+
+local desc_vars
+foreach v of local desc_candidates {
+    capture confirm numeric variable `v'
+    if !_rc local desc_vars `desc_vars' `v'
+}
+
+estpost summarize `desc_vars' if cs_sample_focus100 == 1, detail
+esttab using "`table_dir'/table3_descriptive_statistics_allvars_260501.rtf", replace rtf ///
+    cells("count(fmt(0)) mean(fmt(3)) sd(fmt(3)) min(fmt(3)) p50(fmt(3)) max(fmt(3))") ///
+    label noobs nonumber nomtitle ///
+    title("Table 3. Descriptive statistics of all variables used in regressions")
+
+local corr_candidates ln_RevPAR_clean ln_RevPAR_clean_w d_ln_RevPAR sim_mean ///
+    ln_recent_volumn recent_volumn recent_sd rating_last_5 ///
+    ln_lag_volumn_acc lag_volumn_acc lag_recent_volumn ///
+    lag_avg_rating_acc lag_sd_acc lag_avg_rating_month lag_rating_last_5 ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean ln_lag_RevPAR_clean_w star_class
+
+local corr_vars
+foreach v of local corr_candidates {
+    capture confirm numeric variable `v'
+    if !_rc local corr_vars `corr_vars' `v'
+}
+
+estpost correlate `corr_vars' if cs_sample_focus100 == 1, matrix
+esttab using "`table_dir'/table4_correlation_matrix_mainvars_260501.rtf", replace rtf ///
+    cells("b(fmt(3))") unstack not noobs compress label nonumber nostar ///
+    title("Table 4. Correlation matrix of main continuous variables")
+
+
+*******************************************************
+************ 15. close log ************
 *******************************************************
 
 log close
