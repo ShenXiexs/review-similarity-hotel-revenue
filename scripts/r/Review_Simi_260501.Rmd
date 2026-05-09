@@ -2418,3 +2418,13 @@ write_csv(perm_scan, paths[[10]])
 message("Wrote core-simi outputs under: ", out_root)
 
 ```
+
+## 9. Alternative RRS Scopes 5/10/15/20/30
+
+This section builds robustness versions of review similarity using alternative recent-review scopes. For each hotel-month and each scope `N` in `5, 10, 15, 20, 30`, the review set is defined as the most recent `N` reviews before the month starts plus all reviews posted during the month. The script computes pairwise cosine similarity from the same Doc2Vec 200-dimensional vectors, and recomputes the scope-specific `recent_volumn_N`, `ln_recent_volumn_N`, `recent_sd_N`, and `recent_rating_N`.
+
+The implementation is checkpointed by hotel batches to avoid keeping large nested review matrices in memory. If the run stops, rerunning the chunk skips existing checkpoint files and resumes from the remaining batches.
+
+```{r alternative-rrs-scopes-260509, eval=FALSE}
+source(file.path(project_dir, "scripts/r/build_scope_ars_260509.R"))
+```

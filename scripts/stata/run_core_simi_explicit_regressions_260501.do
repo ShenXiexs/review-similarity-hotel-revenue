@@ -780,7 +780,114 @@ else {
 
 
 *******************************************************
-************ 14. descriptive statistics tables ************
+************ 14. H1 review-scope ARS robustness ************
+*******************************************************
+
+local data_scope "`data_dir'/core_simi_panel_260501_with_scope_ars.dta"
+
+capture confirm file "`data_scope'"
+if _rc {
+    di as text "Skipping review-scope ARS robustness. Run scripts/r/build_scope_ars_260509.R first."
+}
+else {
+    preserve
+    use "`data_scope'", clear
+
+    capture drop hotel_id_num
+    capture confirm numeric variable HotelID
+    if _rc {
+        encode HotelID, gen(hotel_id_num)
+    }
+    else {
+        gen long hotel_id_num = HotelID
+    }
+
+    capture drop ym
+    gen ym = monthly(year_month, "YM")
+    format ym %tm
+    xtset hotel_id_num ym
+    sort hotel_id_num ym
+
+    estimates clear
+
+    ************ H1 robustness: RRS scope 5 ************
+    reghdfe ln_RevPAR_clean sim_mean_5 ///
+        ln_recent_volumn_5 recent_sd_5 rating_last_5 ln_lag_volumn_acc ///
+        lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ///
+        ln_avg_com_RevPAR ln_lag_RevPAR_clean ///
+        if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+    est store h1_scope5
+
+    ************ H1 robustness: RRS scope 10 ************
+    reghdfe ln_RevPAR_clean sim_mean_10 ///
+        ln_recent_volumn_10 recent_sd_10 rating_last_5 ln_lag_volumn_acc ///
+        lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ///
+        ln_avg_com_RevPAR ln_lag_RevPAR_clean ///
+        if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+    est store h1_scope10
+
+    ************ H1 robustness: RRS scope 15 ************
+    reghdfe ln_RevPAR_clean sim_mean_15 ///
+        ln_recent_volumn_15 recent_sd_15 rating_last_5 ln_lag_volumn_acc ///
+        lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ///
+        ln_avg_com_RevPAR ln_lag_RevPAR_clean ///
+        if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+    est store h1_scope15
+
+    ************ H1 robustness: RRS scope 20 ************
+    reghdfe ln_RevPAR_clean sim_mean_20 ///
+        ln_recent_volumn_20 recent_sd_20 rating_last_5 ln_lag_volumn_acc ///
+        lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ///
+        ln_avg_com_RevPAR ln_lag_RevPAR_clean ///
+        if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+    est store h1_scope20
+
+    ************ H1 robustness: RRS scope 30 ************
+    reghdfe ln_RevPAR_clean sim_mean_30 ///
+        ln_recent_volumn_30 recent_sd_30 rating_last_5 ln_lag_volumn_acc ///
+        lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ///
+        ln_avg_com_RevPAR ln_lag_RevPAR_clean ///
+        if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+    est store h1_scope30
+
+    esttab h1_scope5 h1_scope10 h1_scope15 h1_scope20 h1_scope30 ///
+        using "`table_dir'/h1_scope_ars_robustness_260509.rtf", replace ///
+        order( ///
+            sim_mean_5 ///
+            sim_mean_10 ///
+            sim_mean_15 ///
+            sim_mean_20 ///
+            sim_mean_30 ///
+            ln_recent_volumn_5 ///
+            ln_recent_volumn_10 ///
+            ln_recent_volumn_15 ///
+            ln_recent_volumn_20 ///
+            ln_recent_volumn_30 ///
+            recent_sd_5 ///
+            recent_sd_10 ///
+            recent_sd_15 ///
+            recent_sd_20 ///
+            recent_sd_30 ///
+            ln_lag_volumn_acc ///
+            lag_avg_rating_acc ///
+            lag_sd_acc ///
+            rating_last_5 ///
+            lag_avg_rating_month ///
+            ln_avg_com_RevPAR ///
+            ln_lag_RevPAR_clean ///
+        ) ///
+        star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
+        cells(b(star fmt(3)) se(par fmt(3))) ///
+        stats(N r2_a, labels("Observations" "Adjusted R-squared")) ///
+        mtitles("5" "10" "15" "20" "30") ///
+        nogap compress
+
+    restore
+}
+
+
+*******************************************************
+************ 15. descriptive statistics tables ************
 *******************************************************
 
 * Table 3 covers all numeric variables used in this explicit do-file.
@@ -854,7 +961,7 @@ esttab using "`table_dir'/table4_correlation_matrix_mainvars_260501.rtf", replac
 
 
 *******************************************************
-************ 15. close log ************
+************ 16. close log ************
 *******************************************************
 
 log close
