@@ -108,6 +108,9 @@ if _rc {
     ssc install winsor2, replace
 }
 
+** adj
+keep if cs_sample_focus100 == 1
+
 capture drop ln_RevPAR_clean_w
 gen ln_RevPAR_clean_w = ln_RevPAR_clean
 winsor2 ln_RevPAR_clean_w if cs_sample_focus50 == 1, cut(2.5 97.5) replace
@@ -123,6 +126,14 @@ winsor2 ln_RevPAR_clean_w199, cut(1 99) replace
 gen ln_lag_RevPAR_clean_w199 = ln_lag_RevPAR_clean
 winsor2 ln_lag_RevPAR_clean_w199, cut(1 99) replace
 
+capture drop ln_RevPAR_clean_w195
+gen ln_RevPAR_clean_w195 = ln_RevPAR_clean
+winsor2 ln_RevPAR_clean_w195, cut(1 95) replace
+
+gen ln_lag_RevPAR_clean_w195 = ln_lag_RevPAR_clean
+winsor2 ln_lag_RevPAR_clean_w195, cut(1 95) replace
+
+** raw
 keep if cs_sample_focus100 == 1
 
 *******************************************************
@@ -299,23 +310,23 @@ esttab h2_low h2_high h2_interact using "h2-1_explicit_bdiff_fe_260501.rtf", rep
 	
 * lag_avg_rating_acc
 capture drop h2_med_lag_avg_rating_acc h2_low_lag_avg_rating_acc
-bysort CityID ym: egen h2_med_lag_avg_rating_acc = median(lag_avg_rating_acc)
+bysort City ym: egen h2_med_lag_avg_rating_acc = median(lag_avg_rating_acc)
 gen h2_low_lag_avg_rating_acc = .
 replace h2_low_lag_avg_rating_acc = 1 if lag_avg_rating_acc <= h2_med_lag_avg_rating_acc
 replace h2_low_lag_avg_rating_acc = 0 if lag_avg_rating_acc > h2_med_lag_avg_rating_acc
 ************ H2.2 low reputation group ************
-reghdfe ln_RevPAR_clean_w199 sim_mean ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean if h2_low_lag_avg_rating_acc == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+reghdfe ln_RevPAR_clean_w199 sim_mean ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w if h2_low_lag_avg_rating_acc == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store h2_low
 ************ H2.2 high reputation group 
-reghdfe ln_RevPAR_clean_w199 sim_mean ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean if h2_low_lag_avg_rating_acc == 0, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+reghdfe ln_RevPAR_clean_w199 sim_mean ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w if h2_low_lag_avg_rating_acc == 0, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store h2_high
 ************ H2.2 interaction model ************
 reghdfe ln_RevPAR_clean_w199 c.sim_mean##i.h2_low_lag_avg_rating_acc ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store h2_interact
 ************ H2.2 bdiff 不通过
-bdiff, group(h2_low_lag_avg_rating_acc) model (reghdfe ln_RevPAR_clean sim_mean ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean, absorb(hotel_id_num ym) cluster(hotel_id_num)) bs reps(500) seed(202503) first detail
+bdiff, group(h2_low_lag_avg_rating_acc) model (reghdfe ln_RevPAR_clean_w199 sim_mean ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w, absorb(hotel_id_num ym) cluster(hotel_id_num)) bs reps(500) seed(202503) first detail
 
-esttab h2_low h2_high h2_interact using "h2-2_explicit_bdiff_fe_260501.rtf", replace ///
+esttab h2_low h2_high h2_interact using "h2-acc_explicit_bdiff_fe_260501.rtf", replace ///
     order( ///
         sim_mean ///
         ln_recent_volumn ///
@@ -417,20 +428,20 @@ esttab h3_low h3_high h3_interact ///
 
 * ln_lag_volumn_acc
 capture drop h3_low_ln_lag_volumn_acc h3_med_ln_lag_volumn_acc
-bysort CityID ym:egen h3_med_ln_lag_volumn_acc = median(ln_lag_volumn_acc)
+bysort ym:egen h3_med_ln_lag_volumn_acc = median(ln_lag_volumn_acc)
 gen h3_low_ln_lag_volumn_acc = .
 replace h3_low_ln_lag_volumn_acc = 1 if ln_lag_volumn_acc < h3_med_ln_lag_volumn_acc
 replace h3_low_ln_lag_volumn_acc = 0 if ln_lag_volumn_acc >= h3_med_ln_lag_volumn_acc
 ************ H3.2 low popularity group ************
-reghdfe ln_RevPAR_clean_w sim_mean ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean if h3_low_ln_lag_volumn_acc == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
-est store h3_low_2
+reghdfe ln_RevPAR_clean_w sim_mean ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean  if h3_low_ln_lag_volumn_acc == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store h3_low
 ************ H3.2 high popularity group 
 reghdfe ln_RevPAR_clean_w sim_mean ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean if h3_low_ln_lag_volumn_acc == 0, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store h3_high
 ************ H3.2 bdiff 全样本通过
-bdiff, group(h3_low_ln_lag_volumn_acc) model(reghdfe ln_RevPAR_clean_w sim_mean ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean, absorb(hotel_id_num ym) cluster(hotel_id_num)) bs reps(500) seed(202503) first detail
+bdiff, group(h3_low_ln_lag_volumn_acc) model(reghdfe ln_RevPAR_clean_w sim_mean ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean, absorb(hotel_id_num ym) cluster(hotel_id_num)) bs reps(500) seed(202505) first detail
 
-esttab h3_low h3_high h3_interact using "h3-2_explicit_bdiff_fe_260501.rtf", replace ///
+esttab h3_low h3_high using "h3-acc_explicit_bdiff_fe_260501.rtf", replace ///
     order( ///
         sim_mean ///
         ln_recent_volumn ///
@@ -611,15 +622,15 @@ esttab h5_low h5_high h5_interact using "h5-1_explicit_bdiff_fe_260501.rtf", rep
 
 * lag_sd_acc
 capture drop h5_med_lag_sd_acc h5_low_lag_sd_acc
-bysort CityID ym: egen h5_med_lag_sd_acc = median(lag_sd_acc)
+bysort ym: egen h5_med_lag_sd_acc = median(lag_sd_acc)
 gen h5_low_lag_sd_acc = .
-replace h5_low_lag_sd_acc = 1 if lag_sd_acc < h5_med_lag_sd_acc
-replace h5_low_lag_sd_acc = 0 if lag_sd_acc >= h5_med_lag_sd_acc
+replace h5_low_lag_sd_acc = 1 if lag_sd_acc <= h5_med_lag_sd_acc
+replace h5_low_lag_sd_acc = 0 if lag_sd_acc > h5_med_lag_sd_acc
 ************ H5.2 low reputation group ************
-reghdfe ln_RevPAR_clean sim_mean ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean if h5_low_lag_sd_acc == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+reghdfe ln_RevPAR_clean_w sim_mean ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w if h5_low_lag_sd_acc == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store h5_low
 ************ H5.2 high reputation group ************
-reghdfe ln_RevPAR_clean sim_mean ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean if h5_low_lag_sd_acc == 0, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+reghdfe ln_RevPAR_clean_w sim_mean ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w if h5_low_lag_sd_acc == 0, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store h5_high
 ************ H5.2 interaction model ************
 reghdfe ln_RevPAR_clean_w c.sim_mean##i.h5_low_lag_sd_acc ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean if !missing(h5_low_lag_sd_acc), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
@@ -627,7 +638,7 @@ est store h5_interact
 ************ H5.2 bdiff ************
 bdiff, group(h5_low_lag_sd_acc) model (reghdfe ln_RevPAR_clean sim_mean ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean, absorb(hotel_id_num ym) cluster(hotel_id_num)) bs reps(100) seed(202505) first detail
 
-esttab h5_low h5_high h5_interact using "h5-2_explicit_bdiff_fe_260501.rtf", replace ///
+esttab h5_low h5_high using "h5-2_explicit_bdiff_fe_260501.rtf", replace ///
     order( ///
         sim_mean ///
         ln_recent_volumn ///
@@ -646,6 +657,95 @@ esttab h5_low h5_high h5_interact using "h5-2_explicit_bdiff_fe_260501.rtf", rep
     mtitles("H5 low-end" "H5 high-end" "H5 interaction") ///
     nogap compress
 
+
+*******************************************************
+************ 5.5. H6 chain vs independent heterogeneity ************
+*******************************************************
+* H6 main definition:
+* chain == 1: chain hotel.
+* chain == 0: independent/control hotel; unmatched hotels are coded as 0 in the R merge.
+* chain_raw keeps the original matched-only indicator, missing when HotelID is not found in chain/chainwjw.csv.
+
+capture confirm variable chain
+if _rc {
+    di as text "Skipping H6 chain heterogeneity. Run scripts/r/add_chain_to_core_panel_260514.R first."
+}
+else {
+    capture label variable chain "Chain hotel"
+    capture label variable independent "Independent/control hotel"
+    capture label variable chain_matched "Matched to chain source"
+    capture label variable chain_raw "Raw matched chain indicator"
+
+************ H6.1 independent/control group ************
+reghdfe ln_RevPAR_clean_w sim_mean ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean if chain == 0, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store h6_independent
+
+************ H6.1 chain group ************
+reghdfe ln_RevPAR_clean_w sim_mean ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean if chain == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store h6_chain
+
+************ H6.1 interaction model ************
+reghdfe ln_RevPAR_clean_w c.sim_mean##i.chain ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store h6_interact
+
+************ H6.1 bdiff: missing chain source coded as independent/control ************
+bdiff, group(chain) model (reghdfe ln_RevPAR_clean sim_mean ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean, absorb(hotel_id_num ym) cluster(hotel_id_num)) bs reps(500) seed(202505) first detail
+
+    esttab h6_independent h6_chain h6_interact using "h6_chain_explicit_bdiff_fe_260501.rtf", replace ///
+        order( ///
+            sim_mean ///
+            1.chain#c.sim_mean ///
+            ln_recent_volumn ///
+            recent_sd ///
+            ln_lag_volumn_acc ///
+            lag_avg_rating_acc ///
+            lag_sd_acc ///
+            rating_last_5 ///
+            lag_avg_rating_month ///
+            ln_avg_com_RevPAR ///
+            ln_lag_RevPAR_clean ///
+        ) ///
+        star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
+        cells(b(star fmt(3)) se(par fmt(3))) ///
+        stats(N r2, labels("Observations" "R-squared")) ///
+        mtitles("H6 independent/control" "H6 chain" "H6 interaction") ///
+        nogap compress
+
+************ H6.2 matched-only robustness ************
+keep if chain_matched == 1
+
+reghdfe ln_RevPAR_clean_w sim_mean ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean if chain_raw == 0, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store h6_raw_independent
+
+reghdfe ln_RevPAR_clean_w sim_mean ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean if chain_raw == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store h6_raw_chain
+
+reghdfe ln_RevPAR_clean_w c.sim_mean##i.chain_raw ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store h6_raw_interact
+
+bdiff, group(chain_raw) model (reghdfe ln_RevPAR_clean_w sim_mean ln_recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean, absorb(hotel_id_num ym) cluster(hotel_id_num)) bs reps(500) seed(202505) first detail
+
+esttab h6_raw_independent h6_raw_chain using "h6_chain_matchedonly_explicit_bdiff_fe_260501.rtf", replace ///
+            order( ///
+                sim_mean ///
+                1.chain_raw#c.sim_mean ///
+                ln_recent_volumn ///
+                recent_sd ///
+                ln_lag_volumn_acc ///
+                lag_avg_rating_acc ///
+                lag_sd_acc ///
+                rating_last_5 ///
+                lag_avg_rating_month ///
+                ln_avg_com_RevPAR ///
+                ln_lag_RevPAR_clean ///
+            ) ///
+            star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
+            cells(b(star fmt(3)) se(par fmt(3))) ///
+            stats(N r2, labels("Observations" "R-squared")) ///
+            mtitles("H6 raw independent" "H6 raw chain" "H6 raw interaction") ///
+            nogap compress
+    restore
+}
 
 
 	
@@ -886,8 +986,14 @@ capture label variable covid2020 "COVID shock: 2020"
 capture label variable covid2020_2022 "COVID pandemic: 2020-2022"
 capture label variable post2020 "Post-2020 period"
 capture label variable pre_covid "Pre-COVID period"
+capture label variable chain "Chain hotel"
+capture label variable independent "Independent/control hotel"
+capture label variable chain_raw "Raw matched chain hotel"
+capture label variable chain_matched "Matched to chain source"
+capture label variable chain_small "Chain hotel, unmatched as control"
+capture label variable chain3_small "Chain3 hotel, unmatched as control"
 
-local desc_candidates ln_RevPAR_clean ln_RevPAR_clean_w d_ln_RevPAR sim_mean ln_recent_volumn recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_volumn_acc lag_recent_volumn lag_avg_rating_acc lag_sd_acc lag_avg_rating_month lag_rating_last_5 ln_avg_com_RevPAR ln_lag_RevPAR_clean ln_lag_RevPAR_clean_w star_class h2_low_rating5_ym h2_low_lag_avg_rating_acc h2_low_lag_avg_rating_month h3_low_lag_recent_volumn h3_low_ln_lag_volumn_acc h4_low_star35 h4_low_star4 h5_low_recent_sd h5_low_lag_sd_acc covid2020 covid2020_2022 post2020 pre_covid cs_sample_full cs_sample_focus50 cs_sample_focus100 cs_sample_exclude2020 cs_sample_post2013
+local desc_candidates ln_RevPAR_clean ln_RevPAR_clean_w d_ln_RevPAR sim_mean ln_recent_volumn recent_volumn recent_sd rating_last_5 ln_lag_volumn_acc lag_volumn_acc lag_recent_volumn lag_avg_rating_acc lag_sd_acc lag_avg_rating_month lag_rating_last_5 ln_avg_com_RevPAR ln_lag_RevPAR_clean ln_lag_RevPAR_clean_w star_class h2_low_rating5_ym h2_low_lag_avg_rating_acc h2_low_lag_avg_rating_month h3_low_lag_recent_volumn h3_low_ln_lag_volumn_acc h4_low_star35 h4_low_star4 h5_low_recent_sd h5_low_lag_sd_acc chain independent chain_raw chain_matched chain_small chain3_small covid2020 covid2020_2022 post2020 pre_covid cs_sample_full cs_sample_focus50 cs_sample_focus100 cs_sample_exclude2020 cs_sample_post2013
 
 local desc_vars
 foreach v of local desc_candidates {
