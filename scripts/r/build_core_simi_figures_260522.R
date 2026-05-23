@@ -167,6 +167,9 @@ monthly <- d %>%
     sim_mean_avg = mean_na(sim_mean),
     rating_month_mean = mean_na(avg_rating_month),
     rating_last5_mean = mean_na(rating_last_5),
+    lag_rating_month_mean = mean_na(lag_avg_rating_month),
+    lag_rating_acc_mean = mean_na(lag_avg_rating_acc),
+    recent_rating_mean = mean_na(recent_rating),
     .groups = "drop"
   ) %>%
   arrange(date)
@@ -322,20 +325,35 @@ figures$similarity <- save_plot(
   "fig05_similarity_monthly_trend.png"
 )
 
+ratings_long <- monthly %>%
+  select(date, rating_last5_mean, lag_rating_month_mean, lag_rating_acc_mean) %>%
+  pivot_longer(cols = -date, names_to = "series", values_to = "rating") %>%
+  mutate(
+    series = recode(
+      series,
+      rating_last5_mean = "Last 5 reviews rating",
+      lag_rating_month_mean = "Lagged monthly rating",
+      lag_rating_acc_mean = "Lagged cumulative rating"
+    )
+  )
+
 figures$ratings <- save_plot(
-  ggplot(monthly, aes(x = date)) +
+  ggplot(ratings_long, aes(x = date, y = rating, color = series)) +
     covid_rect(alpha = 0.08, fill = "#54A24B") +
-    geom_line(aes(y = rating_month_mean, color = "Current month rating"), linewidth = 0.9, na.rm = TRUE) +
-    geom_line(aes(y = rating_last5_mean, color = "Last 5 reviews rating"), linewidth = 0.9, na.rm = TRUE) +
-    scale_color_manual(values = c("Current month rating" = "#4C78A8", "Last 5 reviews rating" = "#ECA82C")) +
-    coord_cartesian(ylim = c(3.5, 5)) +
+    geom_line(linewidth = 0.9, na.rm = TRUE) +
+    scale_color_manual(values = c(
+      "Last 5 reviews rating" = "#ECA82C",
+      "Lagged monthly rating" = "#4C78A8",
+      "Lagged cumulative rating" = "#B279A2"
+    )) +
+    scale_y_continuous(limits = c(1, 5), breaks = 1:5) +
     date_scale +
     labs(
-      title = "Rating trends over time",
-      subtitle = "Monthly average ratings used in controls and reputation splits.",
+      title = "Rating control trends over time",
+      subtitle = "Monthly means of rating variables used as controls or reputation moderators.",
       x = NULL,
       y = "Average rating",
-      caption = "Y-axis is narrowed to show movement in ratings."
+      caption = "Y-axis uses the full 1-5 rating scale; COVID shading starts in March 2020."
     ) +
     base_theme(),
   "fig06_rating_monthly_trend.png"
@@ -680,7 +698,7 @@ md_lines <- c(
   "",
   "### 6. Rating Trend",
   "",
-  "评分变量既是控制变量，也参与声誉异质性分组。这里展示月度评分走势。",
+  "评分变量既是控制变量，也参与声誉异质性分组。这里展示 `rating_last_5`、`lag_avg_rating_month` 和 `lag_avg_rating_acc` 的月度均值，y 轴使用完整 1-5 评分刻度。",
   "",
   paste0("![](", rel_fig(figures$ratings), ")"),
   "",

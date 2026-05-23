@@ -152,6 +152,33 @@ est store h1_ols_lag
 
 ************ H1 2WFE: v100 with lagged RevPAR************
 reghdfe ln_RevPAR_clean sim_mean rating_last_5 ln_recent_volumn recent_sd ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+
+corr sim_mean recent_volumn recent_temp_2 rating_last_5 recent_rating
+
+reghdfe sim_mean recent_volumn recent_sd recent_rating if cs_sample_focus100 == 1, absorb(hotel_id_num) vce(cluster hotel_id_num)
+
+
+reghdfe ln_RevPAR_clean_w c.sim_mean##c.ln_lag_volumn_acc rating_last_5 recent_sd lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean if cs_sample_focus100 == 1 & ln_lag_volumn_acc<5.8, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+
+reghdfe ln_RevPAR_clean_w c.sim_mean##c.recent_temp_2 rating_last_5 recent_sd lag_avg_rating_acc ln_lag_volumn_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+
+
+reghdfe ln_RevPAR_clean_w c.sim_mean##c.ln_lag_volumn_acc rating_last_5 recent_sd lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean if cs_sample_focus100 == 1 & ln_lag_volumn_acc>=5.8, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+
+hist lag_volumn_acc
+
+hist recent_rating_temp
+gen recent_temp_2 = recent_volumn-10
+gen recent_temp = ln(recent_volumn -10)
+reghdfe ln_RevPAR_clean_w c.sim_mean##c.rating_last_5 ln_recent_volumn recent_sd ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+
+recent_rating
+reghdfe ln_RevPAR_clean_w c.sim_mean##c.recent_rating ln_recent_volumn recent_sd ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+
+
+
+
+
 est store h1_fe_flag
 
 ************ H1 2WFE: Full with lagged RevPAR control ************
