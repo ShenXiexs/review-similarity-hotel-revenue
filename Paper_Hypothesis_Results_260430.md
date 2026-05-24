@@ -1,4 +1,4 @@
-# Hypothesis Results 260430
+# 我去阿事实上少时诵诗书是撒是撒是撒是撒是撒是撒是撒是撒是撒是撒是撒是撒是撒是撒是撒是撒是撒是撒是撒是撒是撒是撒是撒是撒是撒是撒	 Results 260430
 
 本文件记录扩展到 2022 年数据后，围绕 `outputs/paper/ref-results.pdf` 重建 H1-H4 的独立结果链。所有新增数据、scan、表格和 log 均写在 `outputs/hypothesis/` 内。
 
@@ -29,7 +29,7 @@ Rscript scripts/r/build_hypothesis_panel_260430.R
 
 H1 当前由三类模型同时支持。R 端选择的 OLS/FE 规格是全样本 `ln_RevPAR_clean ~ sim_mean + rich8_current controls`。
 
-- OLS：`sim_mean = -0.2339`, `p = 0.0325`, `N = 32,657`。
+- OLS：`sim_mean = -0.2339`, `p = 0.0325`, `N = 32,657`。，m
 - 双向固定效应：`sim_mean = -0.1931`, `p = 0.0047`, `N = 32,655`。
 - Sys-GMM：`sim_mean_std_hotel = -0.0332`, `p = 0.0041`, `N = 27,287`。
 - GMM 诊断：AR(1) p < 0.001，AR(2) p = 0.104，Hansen p = 0.114，instrument count = 24，hotel groups = 531。
