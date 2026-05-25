@@ -21,7 +21,7 @@ detect_project_dir <- function() {
 
   for (candidate in candidates) {
     if (
-      file.exists(file.path(candidate, "Paper_Results_260407.md")) &&
+      file.exists(file.path(candidate, "README.md")) &&
       dir.exists(file.path(candidate, "scripts")) &&
       dir.exists(file.path(candidate, "outputs"))
     ) {

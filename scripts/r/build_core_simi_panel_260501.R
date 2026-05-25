@@ -24,7 +24,7 @@ detect_project_dir <- function() {
     "/Users/samxie/Research/ReviewSimi_Sales/Code"
   ))
   for (candidate in candidates) {
-    if (file.exists(file.path(candidate, "Paper_Results_260407.md")) &&
+    if (file.exists(file.path(candidate, "README.md")) &&
         dir.exists(file.path(candidate, "scripts")) &&
         dir.exists(file.path(candidate, "outputs"))) {
       return(normalizePath(candidate, winslash = "/", mustWork = TRUE))

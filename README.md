@@ -1,11 +1,11 @@
 # Review_Simi_Sales
 
-这个仓库保留 `Paper_Results_260407.md` 对应的原结果复现链，并新增围绕核心 `sim_mean` 变量的 H1-H4 复现链。目标是把“主结果文稿、脚本、数据、扫描结果、回归表、原始 log”整理成清晰、可追溯的项目结构。
+这个仓库保留 `outputs/core_simi_260501/research/archive/Paper_Results_260407.md` 对应的原结果复现链，并新增围绕核心 `sim_mean` 变量的 H1-H4 复现链。目标是把“主结果文稿、脚本、数据、扫描结果、回归表、原始 log”整理成清晰、可追溯的项目结构。
 
 ## 目录结构
 
-- `Paper_Results_260407.md`
-  当前正式结果稿。所有保留文件都围绕这份文稿组织。
+- `outputs/core_simi_260501/research/`
+  研究文档统一放在这里，并按 `plans/`、`results/`、`archive/`、`reference/`、`figures/` 分类。
 
 - `scripts/r/Review_Simi_260325.Rmd`
   主数据处理管线。负责构建当前版本主样本，并输出后续 R / Stata 脚本使用的数据和摘要结果。
@@ -36,7 +36,7 @@
 
 推荐按下面顺序查看：
 
-1. 先看 `Paper_Results_260407.md`
+1. 先看 `outputs/core_simi_260501/research/archive/Paper_Results_260407.md`
    明确当前文稿实际采用了哪些样本、回归和补充检验。
 
 2. 再看 `scripts/r/Review_Simi_260325.Rmd`
@@ -65,22 +65,22 @@
 
 ## 当前保留原则
 
-- 只保留 `Paper_Results_260407.md` 实际引用或复现所需的文件。
+- 只保留归档结果文稿实际引用或复现所需的文件。
 - 删除旧版草稿、过时探索脚本、无关参考资料和重复输出。
 - 输出文件按照“数据 / 摘要结果 / 扫描结果 / 回归表 / 原始日志”分层保存。
 
 ## 关键入口
 
-- 结果文稿：`Paper_Results_260407.md`
+- 结果文稿：`outputs/core_simi_260501/research/archive/Paper_Results_260407.md`
 - 主数据处理：`scripts/r/Review_Simi_260325.Rmd`
 - 主回归输入数据：`outputs/data/valid_match_review_acc_260407_main.dta`
-- Core-simi 结果稿：`Paper_CoreSimi_Results_260501.md`
+- Core-simi 结果稿：`outputs/core_simi_260501/research/results/Paper_CoreSimi_Results_260501.md`
 - Core-simi R 构建脚本：`scripts/r/build_core_simi_panel_260501.R`
 - Core-simi Stata 回归脚本：`scripts/stata/run_core_simi_tables_260501.do`
 
 ## Hypothesis 结果链 260430
 
-新增的 `Paper_Hypothesis_Results_260430.md` 是围绕 `outputs/paper/ref-results.pdf` 重建 H1-H4 的独立结果链，不覆盖原 `260407` 输出。
+新增的 `outputs/core_simi_260501/research/archive/Paper_Hypothesis_Results_260430.md` 是围绕 `outputs/paper/ref-results.pdf` 重建 H1-H4 的独立结果链，不覆盖原 `260407` 输出。
 
 运行顺序：
 
@@ -102,11 +102,11 @@
 
 - H1 已由 OLS、双向固定效应和 Sys-GMM 同时支持。
 - H2/H3 在主要分组口径下有支持性结果。
-- H4 方向正确但当前结果链未达到显著复现标准，详见 `Paper_Hypothesis_Results_260430.md`。
+- H4 方向正确但当前结果链未达到显著复现标准，详见 `outputs/core_simi_260501/research/archive/Paper_Hypothesis_Results_260430.md`。
 
 ## Core-Simi 结果链 260501
 
-`Paper_CoreSimi_Results_260501.md` 是一条锁定核心 review similarity 变量 `sim_mean` 的独立搜索链。它只把 `outputs/data/valid_match_review_acc_260407_main.dta` 当作宽 panel 输入，允许搜索 performance、control-family、moderator、sample 和分组规则，但 H1-H4 的主解释变量始终是 `sim_mean`。
+`outputs/core_simi_260501/research/results/Paper_CoreSimi_Results_260501.md` 是一条锁定核心 review similarity 变量 `sim_mean` 的独立搜索链。它只把 `outputs/data/valid_match_review_acc_260407_main.dta` 当作宽 panel 输入，允许搜索 performance、control-family、moderator、sample 和分组规则，但 H1-H4 的主解释变量始终是 `sim_mean`。
 
 运行顺序：
 
@@ -127,6 +127,6 @@
 当前状态：
 
 - H1-H4 的 review similarity 主解释变量固定为 `sim_mean`。
-- H1 的 OLS、双向固定效应和 Sys-GMM 系数均为负且 p<0.05；但 Sys-GMM 的 Hansen p-value 过低，详见 `Paper_CoreSimi_Results_260501.md`。
+- H1 的 OLS、双向固定效应和 Sys-GMM 系数均为负且 p<0.05；但 Sys-GMM 的 Hansen p-value 过低，详见 `outputs/core_simi_260501/research/results/Paper_CoreSimi_Results_260501.md`。
 - H3 的异质性差异通过 `p < 0.10`。
 - H2/H4 方向正确，但当前 core-simi 约束下组间差异未显著通过。

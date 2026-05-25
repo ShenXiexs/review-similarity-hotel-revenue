@@ -22,7 +22,7 @@ detect_project_dir <- function() {
   ))
 
   for (candidate in candidates) {
-    if (file.exists(file.path(candidate, "CoreSimi_Variable_Profile_260501.md")) &&
+    if (file.exists(file.path(candidate, "README.md")) &&
         dir.exists(file.path(candidate, "outputs", "core_simi_260501"))) {
       return(normalizePath(candidate, winslash = "/", mustWork = TRUE))
     }
