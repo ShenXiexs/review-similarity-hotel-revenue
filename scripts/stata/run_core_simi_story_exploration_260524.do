@@ -31,7 +31,7 @@ local csv_dir "`out_root'/csv"
 local log_dir "`out_root'/logs"
 local run_id "260524"
 
-local data_main "`data_dir'/core_simi_panel_260501_with_mr_text_260524.dta"
+local data_main "`data_dir'/core_simi_panel_260501_with_mr_text_sentiment_260526.dta"
 local profile_csv "`project'/full-data/hotel_profile_TP.csv"
 
 cap mkdir "`table_dir'"
@@ -40,7 +40,7 @@ cap mkdir "`log_dir'"
 
 capture confirm file "`data_main'"
 if _rc {
-    di as error "Cannot find `data_main'. Run scripts/r/build_management_response_text_panel_260524.R first."
+    di as error "Cannot find `data_main'. Run scripts/r/build_review_sentiment_panel_260526.R first."
     exit 601
 }
 
@@ -105,7 +105,7 @@ preserve
 
     foreach v of varlist hotel_class hotel_price_low hotel_price_high hotel_room review_count ///
         hotel_avg_rating hotel_location_rating hotel_rooms_rating hotel_value_rating ///
-        hotel_cleanliness_rating hotel_service_rating hotel_sleep_quality_rating travelers_choice {
+        hotel_cleanliness_rating hotel_service_rating hotel_sleep_quality_rating {
         capture destring `v', replace ignore(",") force
     }
 
@@ -143,6 +143,14 @@ preserve
     gen byte amenity_pet = regexm(hotel_amenities_lc, "pet") if !missing(hotel_amenities_lc)
     gen byte amenity_business = regexm(hotel_amenities_lc, "business center|business") if !missing(hotel_amenities_lc)
     gen byte amenity_meeting = regexm(hotel_amenities_lc, "meeting") if !missing(hotel_amenities_lc)
+    gen byte amenity_spa = regexm(hotel_amenities_lc, "spa|hot tub|jacuzzi|sauna") if !missing(hotel_amenities_lc)
+    gen byte amenity_golf = regexm(hotel_amenities_lc, "golf") if !missing(hotel_amenities_lc)
+    gen byte amenity_parking = regexm(hotel_amenities_lc, "parking|park") if !missing(hotel_amenities_lc)
+    gen byte amenity_wifi = regexm(hotel_amenities_lc, "wifi|wi-fi|internet") if !missing(hotel_amenities_lc)
+    gen byte amenity_laundry = regexm(hotel_amenities_lc, "laundry|dry cleaning") if !missing(hotel_amenities_lc)
+    gen byte amenity_frontdesk = regexm(hotel_amenities_lc, "24-hour|front desk|concierge") if !missing(hotel_amenities_lc)
+    gen byte amenity_conference = regexm(hotel_amenities_lc, "conference|banquet") if !missing(hotel_amenities_lc)
+    gen byte amenity_workspace = regexm(hotel_amenities_lc, "workspace|desk|work area") if !missing(hotel_amenities_lc)
 
     capture drop style_business style_family style_budget style_luxury style_modern
     gen byte style_business = regexm(hotel_style_lc, "business") if !missing(hotel_style_lc)
@@ -152,12 +160,29 @@ preserve
     gen byte style_modern = regexm(hotel_style_lc, "modern|trendy") if !missing(hotel_style_lc)
 
     foreach v of varlist amenity_pool amenity_breakfast amenity_fitness amenity_pet amenity_business amenity_meeting ///
+        amenity_spa amenity_golf amenity_parking amenity_wifi amenity_laundry amenity_frontdesk amenity_conference amenity_workspace ///
         style_business style_family style_budget style_luxury style_modern {
         replace `v' = 0 if missing(`v')
     }
 
-    capture drop travelers_choice_flag
-    gen byte travelers_choice_flag = (!missing(travelers_choice) & travelers_choice != 0)
+    capture drop amen_rec_index amen_serv_index amen_bus_index style_business_family style_budget_value style_upscale
+    gen double amen_rec_index = amenity_pool + amenity_fitness + amenity_spa + amenity_golf
+    gen double amen_serv_index = amenity_breakfast + amenity_parking + amenity_wifi + amenity_laundry + amenity_frontdesk
+    gen double amen_bus_index = amenity_business + amenity_meeting + amenity_conference + amenity_workspace
+    gen byte style_business_family = (style_business == 1 | style_family == 1)
+    gen byte style_budget_value = style_budget
+    gen byte style_upscale = (style_luxury == 1 | style_modern == 1)
+
+    capture drop travelers_choice_text travelers_choice_flag travelers_choice_best_flag
+    gen strL travelers_choice_text = ustrlower(travelers_choice)
+    gen byte travelers_choice_flag = regexm(travelers_choice_text, "travelers' choice|best of the best") if !missing(travelers_choice_text)
+    replace travelers_choice_flag = 0 if missing(travelers_choice_flag)
+    gen byte travelers_choice_best_flag = regexm(travelers_choice_text, "best of the best") if !missing(travelers_choice_text)
+    replace travelers_choice_best_flag = 0 if missing(travelers_choice_best_flag)
+    quietly count if travelers_choice_flag == 1
+    local profile_choice_hotels = r(N)
+    quietly count if travelers_choice_best_flag == 1
+    local profile_choice_best_hotels = r(N)
 
     keep HotelID hotel_class_profile_raw hotel_price_low hotel_price_high tp_price_mid ln_tp_price_mid ///
         hotel_room ln_tp_room review_count ln_tp_review_count hotel_avg_rating hotel_location_rating ///
@@ -165,7 +190,8 @@ preserve
         hotel_sleep_quality_rating tp_quality_index tp_service_quality tp_rank_num tp_rank_total ///
         tp_rank_pct tp_amenity_count amenity_pool amenity_breakfast amenity_fitness amenity_pet ///
         amenity_business amenity_meeting style_business style_family style_budget style_luxury ///
-        style_modern travelers_choice_flag
+        style_modern amen_rec_index amen_serv_index amen_bus_index ///
+        style_business_family style_budget_value style_upscale travelers_choice_flag travelers_choice_best_flag
 
     save `hotel_profile', replace
 restore
@@ -220,6 +246,16 @@ di as text "  panel hotels matched to profile: `profile_match_hotels' / `panel_h
 di as text "  original star_class_raw missing rows: `star_missing_before'"
 di as text "  star_class rows fillable from profile: `star_fillable'"
 di as text "  final star_class_final_raw missing rows: `star_missing_after'"
+di as text "  profile Travelers' Choice hotels: `profile_choice_hotels'"
+di as text "  profile Best-of-the-Best hotels: `profile_choice_best_hotels'"
+
+quietly count if travelers_choice_flag == 1 & cs_sample_focus100 == 1
+local panel_choice_focus_rows = r(N)
+capture drop __tmp_choice_hotel
+bysort HotelID: gen byte __tmp_choice_hotel = (_n == 1)
+quietly count if travelers_choice_flag == 1 & cs_sample_focus100 == 1 & __tmp_choice_hotel == 1
+local panel_choice_focus_hotels = r(N)
+drop __tmp_choice_hotel
 
 preserve
     clear
@@ -233,6 +269,10 @@ preserve
     gen long star_missing_before = `star_missing_before'
     gen long star_fillable_from_profile = `star_fillable'
     gen long star_missing_after = `star_missing_after'
+    gen long profile_travelers_choice_hotels = `profile_choice_hotels'
+    gen long profile_best_of_best_hotels = `profile_choice_best_hotels'
+    gen long focus100_travelers_choice_rows = `panel_choice_focus_rows'
+    gen long focus100_travelers_choice_hotels = `panel_choice_focus_hotels'
     gen double row_match_rate = panel_rows_matched / panel_rows
     gen double hotel_match_rate = panel_hotels_matched / panel_hotels
     export delimited using "`csv_dir'/story_profile_merge_audit_260524.csv", replace
@@ -357,8 +397,31 @@ gen double ln_lag_mr_words = ln(lag_mr_text_words + 1)
 gen double ln_lag_mr_avg_words = ln(lag_mr_avg_text_words + 1)
 gen double ln_lag_mr_chars = ln(lag_mr_text_chars + 1)
 
+* Short aliases keep Stata variable names valid after adding the _centered suffix.
+capture drop sent_syuzhet100 sent_bing100 sent_afinn100 sent_nrc100 lag_sent_afinn100
+capture confirm variable sent_avg_per100w_syuzhet
+if !_rc {
+    gen double sent_syuzhet100 = sent_avg_per100w_syuzhet
+}
+capture confirm variable sent_avg_per100w_bing
+if !_rc {
+    gen double sent_bing100 = sent_avg_per100w_bing
+}
+capture confirm variable sent_avg_per100w_afinn
+if !_rc {
+    gen double sent_afinn100 = sent_avg_per100w_afinn
+}
+capture confirm variable sent_avg_per100w_nrc
+if !_rc {
+    gen double sent_nrc100 = sent_avg_per100w_nrc
+}
+capture confirm variable lag_sent_avg_per100w_afinn
+if !_rc {
+    gen double lag_sent_afinn100 = lag_sent_avg_per100w_afinn
+}
+
 * Centering keeps the original unit but makes main effects interpretable at the sample mean.
-foreach v of varlist sim_mean sim_mean_10 sim_mean_20 sim_mean_std_hotel ars_jsd_sim recent_sd rating_recent_gap rating_momentum ln_lag_avg_com_RevPAR price_gap ln_recent_volumn ln_recent_above10 recent_growth rel_ln_recent_volumn ln_lag_volumn_acc lagvol_over58 ln_words_acc ln_recent_volumn_sq ln_lag_mr_words ln_lag_mr_avg_words ln_lag_mr_chars lag_mr_rate lag_mr_count lag_mr_quick7_share lag_mr_apology_share lag_mr_invite_share lag_mr_recovery_share lag_mr_contact_share lag_mr_personal_share lag_mr_positive_share lag_mr_negtone_share lag_mr_template_share lag_mr_thanks_share lag_mr_mgr_share hotel_class_profile_raw star_class_final_raw ln_tp_price_mid ln_tp_room ln_tp_review_count tp_quality_index tp_service_quality tp_rank_pct tp_amenity_count {
+foreach v of varlist sim_mean sim_mean_10 sim_mean_20 sim_mean_std_hotel ars_jsd_sim recent_sd rating_recent_gap rating_momentum ln_lag_avg_com_RevPAR price_gap ln_recent_volumn ln_recent_above10 recent_growth rel_ln_recent_volumn ln_lag_volumn_acc lagvol_over58 ln_words_acc ln_recent_volumn_sq ln_lag_mr_words ln_lag_mr_avg_words ln_lag_mr_chars lag_mr_rate lag_mr_count lag_mr_quick7_share lag_mr_apology_share lag_mr_invite_share lag_mr_recovery_share lag_mr_contact_share lag_mr_personal_share lag_mr_positive_share lag_mr_negtone_share lag_mr_template_share lag_mr_thanks_share lag_mr_mgr_share hotel_class_profile_raw star_class_final_raw ln_tp_price_mid ln_tp_room ln_tp_review_count tp_quality_index tp_service_quality tp_rank_pct tp_amenity_count amen_rec_index amen_serv_index amen_bus_index sent_avg_syuzhet sent_avg_bing sent_avg_afinn sent_avg_nrc sent_med_syuzhet sent_med_bing sent_med_afinn sent_med_nrc sent_syuzhet100 sent_bing100 sent_afinn100 sent_nrc100 sent_sd_syuzhet sent_sd_bing sent_sd_afinn sent_sd_nrc sent_neg_share_bing sent_neg_share_afinn sent_pos_share_bing sent_pos_share_afinn sent_net_pos_bing sent_net_pos_afinn lag_sent_avg_syuzhet lag_sent_avg_bing lag_sent_avg_afinn lag_sent_avg_nrc lag_sent_net_pos_bing lag_sent_neg_share_bing lag_sent_afinn100 lag_mr_rep_count lag_mr_rep_low_share lag_mr_rep_neg_share {
     capture drop `v'_centered
     quietly summarize `v' if cs_sample_focus100 == 1 & !missing(`v')
     gen double `v'_centered = `v' - r(mean) if !missing(`v')
@@ -368,7 +431,7 @@ foreach v of varlist sim_mean sim_mean_10 sim_mean_20 sim_mean_std_hotel ars_jsd
 tempname sumhandle
 tempfile sumdata
 postfile `sumhandle' str40 variable double mean sd p25 p75 using `sumdata', replace
-foreach v of varlist sim_mean sim_mean_10 sim_mean_20 sim_mean_std_hotel ars_jsd_sim ln_recent_volumn ln_lag_volumn_acc ln_words_acc lagvol_over58 lag_mr_rate lag_mr_count ln_lag_mr_words ln_lag_mr_avg_words lag_mr_quick7_share lag_mr_invite_share lag_mr_recovery_share lag_mr_positive_share lag_mr_template_share hotel_class_profile_raw star_class_final_raw ln_tp_price_mid ln_tp_room ln_tp_review_count tp_quality_index tp_service_quality tp_rank_pct tp_amenity_count {
+foreach v of varlist sim_mean sim_mean_10 sim_mean_20 sim_mean_std_hotel ars_jsd_sim ln_recent_volumn ln_lag_volumn_acc ln_words_acc lagvol_over58 lag_mr_rate lag_mr_count ln_lag_mr_words ln_lag_mr_avg_words lag_mr_quick7_share lag_mr_invite_share lag_mr_recovery_share lag_mr_positive_share lag_mr_template_share hotel_class_profile_raw star_class_final_raw ln_tp_price_mid ln_tp_room ln_tp_review_count tp_quality_index tp_service_quality tp_rank_pct tp_amenity_count amen_rec_index amen_serv_index amen_bus_index sent_avg_syuzhet sent_avg_bing sent_avg_afinn sent_avg_nrc sent_med_bing sent_afinn100 sent_net_pos_bing sent_sd_syuzhet sent_sd_bing sent_sd_afinn sent_sd_nrc sent_neg_share_bing sent_neg_share_afinn lag_mr_rep_neg_share lag_mr_rep_low_share {
     quietly summarize `v' if cs_sample_focus100 == 1, detail
     post `sumhandle' ("`v'") (r(mean)) (r(sd)) (r(p25)) (r(p75))
 }
@@ -507,7 +570,45 @@ esttab ap_star_final ap_hotelclass ap_quality ap_service ap_price ap_room ap_ran
 esttab ap_star_final ap_hotelclass ap_quality ap_service ap_price ap_room ap_rank ap_amenity ap_choice using "`csv_dir'/story_table_a_profile_product_260524.csv", replace csv star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("star final" "TA class" "quality" "service" "price" "rooms" "rank pct" "amenities" "choice") nogap
 
 *******************************************************
-************ 2.3 Route A: profile flags ***************
+************ 2.3 Route A: profile composite flags *****
+*******************************************************
+
+estimates clear
+
+* A26. Recreation amenities combine pool, fitness, spa/hot tub/sauna, and golf.
+* Product main effects are absorbed by hotel FE; the interaction asks whether ARS has a different revenue slope for recreation-heavy hotels.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##c.amen_rec_index_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(amen_rec_index), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store ac_recreation
+
+* A27. Service amenities combine breakfast, parking, wifi, laundry, and front-desk/concierge signals.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##c.amen_serv_index_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(amen_serv_index), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store ac_serviceamen
+
+* A28. Business amenities combine business center, meeting, conference, and workspace signals.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##c.amen_bus_index_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(amen_bus_index), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store ac_businessamen
+
+* A29. Business/family positioning from profile style tags.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##i.style_business_family ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(style_business_family), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store ac_businessfamily
+
+* A30. Budget/value positioning from profile style tags.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##i.style_budget_value ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(style_budget_value), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store ac_budgetvalue
+
+* A31. Upscale positioning combines luxury, boutique, romantic, modern, and trendy style tags.
+reghdfe ln_RevPAR_clean_w195 c.sim_mean_centered##i.style_upscale ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(style_upscale), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store ac_upscale
+
+* A32. Travelers' Choice badge. This is now parsed from the original string field instead of destringing it.
+reghdfe ln_RevPAR_clean c.sim_mean_centered##i.travelers_choice_flag ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(travelers_choice_flag), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store ac_choice
+
+esttab ac_recreation ac_serviceamen ac_businessamen ac_businessfamily ac_budgetvalue ac_upscale ac_choice using "`table_dir'/story_table_a_profile_composite_260526.rtf", replace star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("recreation" "service" "business amenity" "business/family" "budget/value" "upscale" "choice") nogap compress
+esttab ac_recreation ac_serviceamen ac_businessamen ac_businessfamily ac_budgetvalue ac_upscale ac_choice using "`csv_dir'/story_table_a_profile_composite_260526.csv", replace csv star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("recreation" "service" "business amenity" "business/family" "budget/value" "upscale" "choice") nogap
+
+*******************************************************
+************ 2.3A Route A: single profile flags *******
 *******************************************************
 
 estimates clear
@@ -558,6 +659,101 @@ est store af_style_modern
 
 esttab af_pool af_breakfast af_fitness af_pet af_business af_meeting af_style_business af_style_family af_style_budget af_style_luxury af_style_modern using "`table_dir'/story_table_a_profile_flags_260524.rtf", replace star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("pool" "breakfast" "fitness" "pet" "business amenity" "meeting" "business style" "family style" "budget style" "luxury style" "modern style") nogap compress
 esttab af_pool af_breakfast af_fitness af_pet af_business af_meeting af_style_business af_style_family af_style_budget af_style_luxury af_style_modern using "`csv_dir'/story_table_a_profile_flags_260524.csv", replace csv star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("pool" "breakfast" "fitness" "pet" "business amenity" "meeting" "business style" "family style" "budget style" "luxury style" "modern style") nogap
+
+*******************************************************
+************ 2.4 Route D: review sentiment x ARS ******
+*******************************************************
+
+estimates clear
+
+* D1. DV: ARS. Syuzhet package default lexicon average sentiment from the same review text used to construct ARS.
+reghdfe sim_mean sent_avg_syuzhet_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & sent_any_text == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store ds_ars_syuzhet
+
+* D2. DV: ARS. Bing lexicon average sentiment.
+reghdfe sim_mean sent_avg_bing_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & sent_any_text == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store ds_ars_bing
+
+* D3. DV: ARS. AFINN lexicon average sentiment.
+reghdfe sim_mean sent_avg_afinn_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & sent_any_text == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store ds_ars_afinn
+
+* D4. DV: ARS. NRC lexicon average sentiment.
+reghdfe sim_mean sent_avg_nrc_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & sent_any_text == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store ds_ars_nrc
+
+* D5. Revenue boundary: ARS x Syuzhet sentiment. Core interaction tests whether ARS is more/less harmful when review tone is more positive.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##c.sent_avg_syuzhet_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & sent_any_text == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store ds_rev_syuzhet
+
+* D6. Revenue boundary: ARS x Bing sentiment.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##c.sent_avg_bing_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & sent_any_text == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store ds_rev_bing
+
+* D7. Revenue boundary: ARS x AFINN sentiment.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##c.sent_avg_afinn_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & sent_any_text == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store ds_rev_afinn
+
+* D8. Revenue boundary: ARS x NRC sentiment.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##c.sent_avg_nrc_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & sent_any_text == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store ds_rev_nrc
+
+* D9. Revenue boundary: ARS x negative-review tone share under Bing.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##c.sent_neg_share_bing_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & sent_any_text == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store ds_rev_negbing
+
+* D10. Revenue boundary: ARS x lagged Syuzhet sentiment. This is less mechanical than same-month sentiment because it uses prior review tone.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##c.lag_sent_avg_syuzhet_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store ds_rev_lagsyuzhet
+
+esttab ds_ars_syuzhet ds_ars_bing ds_ars_afinn ds_ars_nrc ds_rev_syuzhet ds_rev_bing ds_rev_afinn ds_rev_nrc ds_rev_negbing ds_rev_lagsyuzhet using "`table_dir'/story_table_d_review_sentiment_260526.rtf", replace star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("ARS syuzhet" "ARS bing" "ARS afinn" "ARS nrc" "Rev syuzhet" "Rev bing" "Rev afinn" "Rev nrc" "Rev neg bing" "Rev lag syuzhet") nogap compress
+esttab ds_ars_syuzhet ds_ars_bing ds_ars_afinn ds_ars_nrc ds_rev_syuzhet ds_rev_bing ds_rev_afinn ds_rev_nrc ds_rev_negbing ds_rev_lagsyuzhet using "`csv_dir'/story_table_d_review_sentiment_260526.csv", replace csv star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("ARS syuzhet" "ARS bing" "ARS afinn" "ARS nrc" "Rev syuzhet" "Rev bing" "Rev afinn" "Rev nrc" "Rev neg bing" "Rev lag syuzhet") nogap
+
+*******************************************************
+************ 2.5 Route D: refined sentiment ***********
+*******************************************************
+
+estimates clear
+
+* D11. Mechanism: net positive share from Bing lexicon -> ARS.
+* A 0.10 increase means 10 percentage points more positive than negative review share.
+reghdfe sim_mean sent_net_pos_bing_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & sent_any_text == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store dr_ars_netbing
+
+* D12. Mechanism: negative-review share -> ARS.
+reghdfe sim_mean sent_neg_share_bing_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & sent_any_text == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store dr_ars_negbing
+
+* D13. Mechanism: AFINN score normalized by review words -> ARS.
+reghdfe sim_mean sent_afinn100_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & sent_any_text == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store dr_ars_afinn100
+
+* D14. Revenue direct effect: current-month net positive sentiment.
+reghdfe ln_RevPAR_clean_w199 sent_net_pos_bing_centered sim_mean ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & sent_any_text == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store dr_rev_netbing
+
+* D15. Revenue moderation: ARS x net positive sentiment.
+reghdfe ln_RevPAR_clean c.sim_mean_centered##c.sent_net_pos_bing_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean if cs_sample_focus100 == 1 & sent_any_text == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store dr_rev_netbing_int
+
+* D16. Revenue moderation: ARS x negative sentiment share.
+reghdfe ln_RevPAR_clean c.sim_mean_centered##c.sent_neg_share_bing_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & sent_any_text == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store dr_rev_negbing_int
+
+* D17. Revenue moderation: ARS x normalized AFINN sentiment.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##c.sent_afinn100_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & sent_any_text == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store dr_rev_afinn100_int
+
+* D18. Revenue moderation: high sentiment month relative to low sentiment month.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##i.high_sent_bing ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & sent_any_text == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store dr_rev_high_int
+
+* D19. Revenue moderation: prior-month net positive sentiment.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##c.lag_sent_net_pos_bing_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store dr_rev_lagnet_int
+
+esttab dr_ars_netbing dr_ars_negbing dr_ars_afinn100 dr_rev_netbing dr_rev_netbing_int dr_rev_negbing_int dr_rev_afinn100_int dr_rev_high_int dr_rev_lagnet_int using "`table_dir'/story_table_d_review_sentiment_refined_260526.rtf", replace star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("ARS net bing" "ARS neg bing" "ARS afinn/100w" "Rev net bing" "Rev net x ARS" "Rev neg x ARS" "Rev afinn/100w x ARS" "Rev high x ARS" "Rev lag net x ARS") nogap compress
+esttab dr_ars_netbing dr_ars_negbing dr_ars_afinn100 dr_rev_netbing dr_rev_netbing_int dr_rev_negbing_int dr_rev_afinn100_int dr_rev_high_int dr_rev_lagnet_int using "`csv_dir'/story_table_d_review_sentiment_refined_260526.csv", replace csv star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("ARS net bing" "ARS neg bing" "ARS afinn/100w" "Rev net bing" "Rev net x ARS" "Rev neg x ARS" "Rev afinn/100w x ARS" "Rev high x ARS" "Rev lag net x ARS") nogap
 
 *******************************************************
 ************ 3. Route B: volume x ARS *****************
@@ -624,7 +820,7 @@ reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##i.lag_mr_any ln_recent_volumn 
 est store cr_any
 
 * C2. Reply rate. A 0.10 increase is a 10 percentage-point higher lagged reply rate.
-reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##c.lag_mr_rate_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 lag_mr_any if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##c.lag_mr_rate_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean lag_mr_any if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store cr_rate
 
 * C3. Reply count.
@@ -706,6 +902,44 @@ est store tc_triple_rec
 
 esttab tc_thanks tc_apology tc_contact tc_personal tc_negtone tc_template tc_triple_avgw tc_triple_quick tc_triple_pos tc_triple_rec using "`table_dir'/story_table_c_mr_text_260524.rtf", replace star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("thanks" "apology" "contact" "personal" "neg tone" "template" "triple avg words" "triple quick7" "triple positive" "triple recovery") nogap compress
 esttab tc_thanks tc_apology tc_contact tc_personal tc_negtone tc_template tc_triple_avgw tc_triple_quick tc_triple_pos tc_triple_rec using "`csv_dir'/story_table_c_mr_text_260524.csv", replace csv star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("thanks" "apology" "contact" "personal" "neg tone" "template" "triple avg words" "triple quick7" "triple positive" "triple recovery") nogap
+
+*******************************************************
+************ 4.2 Route C: replied reviews *************
+*******************************************************
+
+estimates clear
+
+* C20. Targeted response object: share of replied reviews with negative Bing sentiment.
+* This captures what type of reviews management engaged with, not only what management wrote.
+reghdfe ln_RevPAR_clean_w199 lag_mr_rep_neg_share sim_mean ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 lag_mr_any if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store c2_neg_direct
+
+* C21. Targeted response object: share of replied reviews with rating <= 2.
+reghdfe ln_RevPAR_clean_w199 lag_mr_rep_low_share sim_mean ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 lag_mr_any if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store c2_low_direct
+
+* C22. Revenue moderation: ARS x replied negative-sentiment share.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##c.lag_mr_rep_neg_share_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 lag_mr_any if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store c2_neg_ars
+
+* C23. Revenue moderation: ARS x replied low-rating share.
+reghdfe ln_RevPAR_clean c.sim_mean_centered##c.lag_mr_rep_low_share_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w195 lag_mr_any if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store c2_low_ars
+
+* C24. Three-way test: reply count x ARS x share of replied reviews that are negative.
+reghdfe ln_RevPAR_clean_w195 c.lag_mr_count_centered##c.sim_mean_centered##c.lag_mr_rep_neg_share_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w195 lag_mr_any if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store c2_triple_neg
+
+* C25. Mechanism DV: later review volume.
+reghdfe ln_recent_volumn lag_mr_rep_neg_share lag_mr_rep_low_share lag_mr_rep_service_share lag_mr_rep_room_share lag_mr_count recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store c2_mech_volume
+
+* C26. Mechanism DV: later ARS.
+reghdfe sim_mean lag_mr_rep_neg_share lag_mr_rep_low_share lag_mr_rep_service_share lag_mr_rep_room_share lag_mr_count ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store c2_mech_ars
+
+esttab c2_neg_direct c2_low_direct c2_neg_ars c2_low_ars c2_triple_neg c2_mech_volume c2_mech_ars using "`table_dir'/story_table_c2_replied_review_260526.rtf", replace star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("Rev neg replied" "Rev low replied" "Rev neg x ARS" "Rev low x ARS" "Rev triple neg" "DV volume" "DV ARS") nogap compress
+esttab c2_neg_direct c2_low_direct c2_neg_ars c2_low_ars c2_triple_neg c2_mech_volume c2_mech_ars using "`csv_dir'/story_table_c2_replied_review_260526.csv", replace csv star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("Rev neg replied" "Rev low replied" "Rev neg x ARS" "Rev low x ARS" "Rev triple neg" "DV volume" "DV ARS") nogap
 
 *******************************************************
 ************ 5. Route C: mechanisms *******************
