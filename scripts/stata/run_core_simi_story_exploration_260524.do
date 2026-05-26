@@ -32,6 +32,7 @@ local log_dir "`out_root'/logs"
 local run_id "260524"
 
 local data_main "`data_dir'/core_simi_panel_260501_with_mr_text_260524.dta"
+local profile_csv "`project'/full-data/hotel_profile_TP.csv"
 
 cap mkdir "`table_dir'"
 cap mkdir "`csv_dir'"
@@ -40,6 +41,12 @@ cap mkdir "`log_dir'"
 capture confirm file "`data_main'"
 if _rc {
     di as error "Cannot find `data_main'. Run scripts/r/build_management_response_text_panel_260524.R first."
+    exit 601
+}
+
+capture confirm file "`profile_csv'"
+if _rc {
+    di as error "Cannot find `profile_csv'."
     exit 601
 }
 
@@ -63,6 +70,175 @@ use "`data_main'", clear
 log using "`log_dir'/run_core_simi_story_exploration_260524.log", text replace
 
 di as text "Data source: `data_main'"
+di as text "Hotel profile source: `profile_csv'"
+
+*******************************************************
+************ 1.0 Hotel Profile merge ******************
+*******************************************************
+
+* TripAdvisor hotel profile adds product characteristics.
+* It is merged in memory only; the source panel .dta is not overwritten.
+tempfile hotel_profile
+preserve
+    import delimited using "`profile_csv'", varnames(1) clear bindquote(strict) encoding("UTF-8")
+    local profile_raw_n = _N
+
+    keep hotel_id_ta hotel_class hotel_price_low hotel_price_high hotel_room review_count ///
+        hotel_avg_rating hotel_location_rating hotel_rooms_rating hotel_value_rating ///
+        hotel_cleanliness_rating hotel_service_rating hotel_sleep_quality_rating ///
+        hotel_rank hotel_amenities hotel_style travelers_choice
+
+    rename hotel_id_ta HotelID
+    capture confirm string variable HotelID
+    if _rc {
+        tostring HotelID, replace format(%18.0f)
+    }
+    replace HotelID = strtrim(HotelID)
+
+    duplicates tag HotelID, gen(profile_dup)
+    quietly count if profile_dup > 0
+    local profile_dup_n = r(N)
+    if `profile_dup_n' > 0 {
+        duplicates drop HotelID, force
+    }
+    drop profile_dup
+
+    foreach v of varlist hotel_class hotel_price_low hotel_price_high hotel_room review_count ///
+        hotel_avg_rating hotel_location_rating hotel_rooms_rating hotel_value_rating ///
+        hotel_cleanliness_rating hotel_service_rating hotel_sleep_quality_rating travelers_choice {
+        capture destring `v', replace ignore(",") force
+    }
+
+    rename hotel_class hotel_class_profile_raw
+
+    capture drop tp_price_mid ln_tp_price_mid ln_tp_room ln_tp_review_count
+    gen double tp_price_mid = (hotel_price_low + hotel_price_high) / 2 if !missing(hotel_price_low, hotel_price_high)
+    gen double ln_tp_price_mid = ln(tp_price_mid) if tp_price_mid > 0
+    gen double ln_tp_room = ln(hotel_room + 1) if !missing(hotel_room)
+    gen double ln_tp_review_count = ln(review_count + 1) if !missing(review_count)
+
+    capture drop tp_quality_index tp_service_quality
+    egen double tp_quality_index = rowmean(hotel_avg_rating hotel_location_rating hotel_rooms_rating hotel_value_rating hotel_cleanliness_rating hotel_service_rating hotel_sleep_quality_rating)
+    egen double tp_service_quality = rowmean(hotel_cleanliness_rating hotel_service_rating hotel_rooms_rating)
+
+    capture drop tp_rank_num tp_rank_total tp_rank_pct
+    gen str244 hotel_rank_short = substr(hotel_rank, 1, 244)
+    replace hotel_rank_short = subinstr(hotel_rank_short, ",", "", .)
+    gen double tp_rank_num = .
+    gen double tp_rank_total = .
+    replace tp_rank_num = real(regexs(1)) if regexm(hotel_rank_short, "#([0-9]+) of ([0-9]+)")
+    replace tp_rank_total = real(regexs(2)) if regexm(hotel_rank_short, "#([0-9]+) of ([0-9]+)")
+    gen double tp_rank_pct = tp_rank_num / tp_rank_total if tp_rank_num > 0 & tp_rank_total > 0
+
+    capture drop hotel_amenities_lc hotel_style_lc tp_amenity_count
+    gen strL hotel_amenities_lc = ustrlower(hotel_amenities)
+    gen strL hotel_style_lc = ustrlower(hotel_style)
+    gen double tp_amenity_count = 0 if !missing(hotel_amenities)
+    replace tp_amenity_count = strlen(hotel_amenities) - strlen(subinstr(hotel_amenities, ",", "", .)) + 1 if !missing(hotel_amenities) & strtrim(hotel_amenities) != ""
+
+    capture drop amenity_pool amenity_breakfast amenity_fitness amenity_pet amenity_business amenity_meeting
+    gen byte amenity_pool = regexm(hotel_amenities_lc, "pool") if !missing(hotel_amenities_lc)
+    gen byte amenity_breakfast = regexm(hotel_amenities_lc, "breakfast") if !missing(hotel_amenities_lc)
+    gen byte amenity_fitness = regexm(hotel_amenities_lc, "fitness|gym|workout") if !missing(hotel_amenities_lc)
+    gen byte amenity_pet = regexm(hotel_amenities_lc, "pet") if !missing(hotel_amenities_lc)
+    gen byte amenity_business = regexm(hotel_amenities_lc, "business center|business") if !missing(hotel_amenities_lc)
+    gen byte amenity_meeting = regexm(hotel_amenities_lc, "meeting") if !missing(hotel_amenities_lc)
+
+    capture drop style_business style_family style_budget style_luxury style_modern
+    gen byte style_business = regexm(hotel_style_lc, "business") if !missing(hotel_style_lc)
+    gen byte style_family = regexm(hotel_style_lc, "family") if !missing(hotel_style_lc)
+    gen byte style_budget = regexm(hotel_style_lc, "budget|value") if !missing(hotel_style_lc)
+    gen byte style_luxury = regexm(hotel_style_lc, "luxury|romantic|boutique") if !missing(hotel_style_lc)
+    gen byte style_modern = regexm(hotel_style_lc, "modern|trendy") if !missing(hotel_style_lc)
+
+    foreach v of varlist amenity_pool amenity_breakfast amenity_fitness amenity_pet amenity_business amenity_meeting ///
+        style_business style_family style_budget style_luxury style_modern {
+        replace `v' = 0 if missing(`v')
+    }
+
+    capture drop travelers_choice_flag
+    gen byte travelers_choice_flag = (!missing(travelers_choice) & travelers_choice != 0)
+
+    keep HotelID hotel_class_profile_raw hotel_price_low hotel_price_high tp_price_mid ln_tp_price_mid ///
+        hotel_room ln_tp_room review_count ln_tp_review_count hotel_avg_rating hotel_location_rating ///
+        hotel_rooms_rating hotel_value_rating hotel_cleanliness_rating hotel_service_rating ///
+        hotel_sleep_quality_rating tp_quality_index tp_service_quality tp_rank_num tp_rank_total ///
+        tp_rank_pct tp_amenity_count amenity_pool amenity_breakfast amenity_fitness amenity_pet ///
+        amenity_business amenity_meeting style_business style_family style_budget style_luxury ///
+        style_modern travelers_choice_flag
+
+    save `hotel_profile', replace
+restore
+
+quietly count
+local panel_raw_n = r(N)
+preserve
+    keep HotelID
+    duplicates drop
+    local panel_hotel_n = _N
+restore
+
+merge m:1 HotelID using `hotel_profile', keep(master match) gen(profile_merge)
+quietly count if profile_merge == 3
+local profile_match_rows = r(N)
+capture drop __profile_first_hotel
+bysort HotelID: gen byte __profile_first_hotel = (_n == 1)
+quietly count if __profile_first_hotel == 1 & profile_merge == 3
+local profile_match_hotels = r(N)
+drop __profile_first_hotel
+
+capture confirm variable star_class_raw
+if _rc {
+    gen double star_class_raw = .
+    capture confirm numeric variable star_class
+    if !_rc {
+        replace star_class_raw = star_class
+    }
+}
+
+quietly count if missing(star_class_raw)
+local star_missing_before = r(N)
+quietly count if missing(star_class_raw) & !missing(hotel_class_profile_raw)
+local star_fillable = r(N)
+
+capture drop star_class_final_raw star_class_final
+gen double star_class_final_raw = star_class_raw
+replace star_class_final_raw = hotel_class_profile_raw if missing(star_class_final_raw) & !missing(hotel_class_profile_raw)
+egen star_class_final = group(star_class_final_raw), label
+replace star_class_final = . if missing(star_class_final_raw)
+label variable star_class_final_raw "Original panel star class filled by TA profile hotel_class"
+label variable star_class_final "Star class factor filled by TA profile"
+
+quietly count if missing(star_class_final_raw)
+local star_missing_after = r(N)
+
+di as text "Hotel profile audit:"
+di as text "  profile rows imported: `profile_raw_n'"
+di as text "  duplicate profile HotelID rows before dropping: `profile_dup_n'"
+di as text "  panel rows matched to profile: `profile_match_rows' / `panel_raw_n'"
+di as text "  panel hotels matched to profile: `profile_match_hotels' / `panel_hotel_n'"
+di as text "  original star_class_raw missing rows: `star_missing_before'"
+di as text "  star_class rows fillable from profile: `star_fillable'"
+di as text "  final star_class_final_raw missing rows: `star_missing_after'"
+
+preserve
+    clear
+    set obs 1
+    gen long profile_rows = `profile_raw_n'
+    gen long profile_duplicate_id_rows = `profile_dup_n'
+    gen long panel_rows = `panel_raw_n'
+    gen long panel_rows_matched = `profile_match_rows'
+    gen long panel_hotels = `panel_hotel_n'
+    gen long panel_hotels_matched = `profile_match_hotels'
+    gen long star_missing_before = `star_missing_before'
+    gen long star_fillable_from_profile = `star_fillable'
+    gen long star_missing_after = `star_missing_after'
+    gen double row_match_rate = panel_rows_matched / panel_rows
+    gen double hotel_match_rate = panel_hotels_matched / panel_hotels
+    export delimited using "`csv_dir'/story_profile_merge_audit_260524.csv", replace
+restore
+
+drop profile_merge
 
 * Create numeric hotel id for FE, panel setting, and clustering.
 capture drop hotel_id_num
@@ -182,7 +358,7 @@ gen double ln_lag_mr_avg_words = ln(lag_mr_avg_text_words + 1)
 gen double ln_lag_mr_chars = ln(lag_mr_text_chars + 1)
 
 * Centering keeps the original unit but makes main effects interpretable at the sample mean.
-foreach v of varlist sim_mean sim_mean_10 sim_mean_20 sim_mean_std_hotel ars_jsd_sim recent_sd rating_recent_gap rating_momentum ln_lag_avg_com_RevPAR price_gap ln_recent_volumn ln_recent_above10 recent_growth rel_ln_recent_volumn ln_lag_volumn_acc lagvol_over58 ln_words_acc ln_recent_volumn_sq ln_lag_mr_words ln_lag_mr_avg_words ln_lag_mr_chars lag_mr_rate lag_mr_count lag_mr_quick7_share lag_mr_apology_share lag_mr_invite_share lag_mr_recovery_share lag_mr_contact_share lag_mr_personal_share lag_mr_positive_share lag_mr_negtone_share lag_mr_template_share lag_mr_thanks_share lag_mr_mgr_share {
+foreach v of varlist sim_mean sim_mean_10 sim_mean_20 sim_mean_std_hotel ars_jsd_sim recent_sd rating_recent_gap rating_momentum ln_lag_avg_com_RevPAR price_gap ln_recent_volumn ln_recent_above10 recent_growth rel_ln_recent_volumn ln_lag_volumn_acc lagvol_over58 ln_words_acc ln_recent_volumn_sq ln_lag_mr_words ln_lag_mr_avg_words ln_lag_mr_chars lag_mr_rate lag_mr_count lag_mr_quick7_share lag_mr_apology_share lag_mr_invite_share lag_mr_recovery_share lag_mr_contact_share lag_mr_personal_share lag_mr_positive_share lag_mr_negtone_share lag_mr_template_share lag_mr_thanks_share lag_mr_mgr_share hotel_class_profile_raw star_class_final_raw ln_tp_price_mid ln_tp_room ln_tp_review_count tp_quality_index tp_service_quality tp_rank_pct tp_amenity_count {
     capture drop `v'_centered
     quietly summarize `v' if cs_sample_focus100 == 1 & !missing(`v')
     gen double `v'_centered = `v' - r(mean) if !missing(`v')
@@ -192,7 +368,7 @@ foreach v of varlist sim_mean sim_mean_10 sim_mean_20 sim_mean_std_hotel ars_jsd
 tempname sumhandle
 tempfile sumdata
 postfile `sumhandle' str40 variable double mean sd p25 p75 using `sumdata', replace
-foreach v of varlist sim_mean sim_mean_10 sim_mean_20 sim_mean_std_hotel ars_jsd_sim ln_recent_volumn ln_lag_volumn_acc ln_words_acc lagvol_over58 lag_mr_rate lag_mr_count ln_lag_mr_words ln_lag_mr_avg_words lag_mr_quick7_share lag_mr_invite_share lag_mr_recovery_share lag_mr_positive_share lag_mr_template_share {
+foreach v of varlist sim_mean sim_mean_10 sim_mean_20 sim_mean_std_hotel ars_jsd_sim ln_recent_volumn ln_lag_volumn_acc ln_words_acc lagvol_over58 lag_mr_rate lag_mr_count ln_lag_mr_words ln_lag_mr_avg_words lag_mr_quick7_share lag_mr_invite_share lag_mr_recovery_share lag_mr_positive_share lag_mr_template_share hotel_class_profile_raw star_class_final_raw ln_tp_price_mid ln_tp_room ln_tp_review_count tp_quality_index tp_service_quality tp_rank_pct tp_amenity_count {
     quietly summarize `v' if cs_sample_focus100 == 1, detail
     post `sumhandle' ("`v'") (r(mean)) (r(sd)) (r(p25)) (r(p75))
 }
@@ -270,8 +446,8 @@ est store am_compete
 reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##c.price_gap_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store am_pricegap
 
-* A14. Product quality group: star_class is a factor. Missing star_class remains missing.
-reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##i.star_class ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(star_class), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+* A14. Product quality group: star_class_final is filled from TripAdvisor profile when the panel star is missing.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean##i.star_class_final ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(star_class_final), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store am_star
 
 * A15. Chain product type.
@@ -286,6 +462,104 @@ esttab am_sd am_ratinggap am_ratingmom am_compete am_pricegap am_star am_chain a
 esttab am_sd am_ratinggap am_ratingmom am_compete am_pricegap am_star am_chain am_covid using "`csv_dir'/story_table_a_moderators_260524.csv", replace csv star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("rating sd" "rating gap" "rating mom" "competition" "price gap" "star" "chain" "COVID") nogap
 
 *******************************************************
+************ 2.2 Route A: profile product features ****
+*******************************************************
+
+estimates clear
+
+* A17. Filled star class factor. Product main effects are absorbed by hotel FE; interactions test ARS heterogeneity.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##i.star_class_final ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(star_class_final), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store ap_star_final
+
+* A18. Raw TripAdvisor hotel class. A one-unit change is roughly one star.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##c.hotel_class_profile_raw_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(hotel_class_profile_raw), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store ap_hotelclass
+
+* A19. Overall profile quality index: average TripAdvisor total and sub-rating scores.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##c.tp_quality_index_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(tp_quality_index), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store ap_quality
+
+* A20. Service-quality index: cleanliness, service, and room ratings.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##c.tp_service_quality_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(tp_service_quality), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store ap_service
+
+* A21. Price positioning. Product main effect is absorbed; the interaction asks whether ARS matters differently for higher-price hotels.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##c.ln_tp_price_mid_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(ln_tp_price_mid), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store ap_price
+
+* A22. Hotel scale: number of rooms.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##c.ln_tp_room_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(ln_tp_room), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store ap_room
+
+* A23. TripAdvisor rank percentile within destination/type list. Lower values mean better profile rank.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##c.tp_rank_pct_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(tp_rank_pct), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store ap_rank
+
+* A24. Amenity breadth from profile amenities text.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##c.tp_amenity_count_centered ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(tp_amenity_count), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store ap_amenity
+
+* A25. Travelers' Choice badge. Missing badge field is coded as no badge in the profile.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##i.travelers_choice_flag ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(travelers_choice_flag), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store ap_choice
+
+esttab ap_star_final ap_hotelclass ap_quality ap_service ap_price ap_room ap_rank ap_amenity ap_choice using "`table_dir'/story_table_a_profile_product_260524.rtf", replace star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("star final" "TA class" "quality" "service" "price" "rooms" "rank pct" "amenities" "choice") nogap compress
+esttab ap_star_final ap_hotelclass ap_quality ap_service ap_price ap_room ap_rank ap_amenity ap_choice using "`csv_dir'/story_table_a_profile_product_260524.csv", replace csv star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("star final" "TA class" "quality" "service" "price" "rooms" "rank pct" "amenities" "choice") nogap
+
+*******************************************************
+************ 2.3 Route A: profile flags ***************
+*******************************************************
+
+estimates clear
+
+* A26. Pool amenity boundary.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##i.amenity_pool ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(amenity_pool), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store af_pool
+
+* A27. Breakfast amenity boundary.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##i.amenity_breakfast ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(amenity_breakfast), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store af_breakfast
+
+* A28. Fitness amenity boundary.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##i.amenity_fitness ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(amenity_fitness), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store af_fitness
+
+* A29. Pet-friendly amenity boundary.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##i.amenity_pet ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(amenity_pet), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store af_pet
+
+* A30. Business-center amenity boundary.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##i.amenity_business ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(amenity_business), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store af_business
+
+* A31. Meeting-room amenity boundary.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##i.amenity_meeting ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(amenity_meeting), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store af_meeting
+
+* A32. Business-style profile boundary.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##i.style_business ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(style_business), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store af_style_business
+
+* A33. Family-style profile boundary.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##i.style_family ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(style_family), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store af_style_family
+
+* A34. Budget-style profile boundary.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##i.style_budget ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(style_budget), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store af_style_budget
+
+* A35. Luxury/romantic/boutique-style profile boundary.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##i.style_luxury ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(style_luxury), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store af_style_luxury
+
+* A36. Modern/trendy-style profile boundary.
+reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##i.style_modern ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1 & !missing(style_modern), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store af_style_modern
+
+esttab af_pool af_breakfast af_fitness af_pet af_business af_meeting af_style_business af_style_family af_style_budget af_style_luxury af_style_modern using "`table_dir'/story_table_a_profile_flags_260524.rtf", replace star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("pool" "breakfast" "fitness" "pet" "business amenity" "meeting" "business style" "family style" "budget style" "luxury style" "modern style") nogap compress
+esttab af_pool af_breakfast af_fitness af_pet af_business af_meeting af_style_business af_style_family af_style_budget af_style_luxury af_style_modern using "`csv_dir'/story_table_a_profile_flags_260524.csv", replace csv star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("pool" "breakfast" "fitness" "pet" "business amenity" "meeting" "business style" "family style" "budget style" "luxury style" "modern style") nogap
+
+*******************************************************
 ************ 3. Route B: volume x ARS *****************
 *******************************************************
 
@@ -293,7 +567,7 @@ estimates clear
 
 * B1. Recent review flow. Core interaction: recent monthly volume x ARS.
 * A doubling of recent volume is ln(2); ARS is interpreted in 0.01 raw-unit increments.
-reghdfe ln_RevPAR_clean_w199 c.ln_recent_volumn_centered##c.sim_mean_centered recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+reghdfe ln_RevPAR_clean c.ln_recent_volumn_centered##c.sim_mean_centered recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store tb_recent
 
 * B2. Recent review pressure above 10 reviews in the month.
@@ -301,7 +575,7 @@ reghdfe ln_RevPAR_clean_w199 c.ln_recent_above10_centered##c.sim_mean_centered r
 est store tb_recent10
 
 * B3. Review growth from last month.
-reghdfe ln_RevPAR_clean_w199 c.recent_growth_centered##c.sim_mean_centered recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+reghdfe ln_RevPAR_clean_w195 c.recent_growth_centered##c.sim_mean_centered recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store tb_growth
 
 * B4. Recent review flow relative to city-month competitors.
@@ -309,7 +583,7 @@ reghdfe ln_RevPAR_clean_w199 c.rel_ln_recent_volumn_centered##c.sim_mean_centere
 est store tb_relrecent
 
 * B5. Accumulated review stock. Treat this as an alternative volume-stock measure rather than controlling for another volume stock.
-reghdfe ln_RevPAR_clean_w199 c.ln_lag_volumn_acc_centered##c.sim_mean_centered recent_sd recent_rating lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+reghdfe ln_RevPAR_clean_w199 c.ln_lag_volumn_acc##c.sim_mean_centered recent_sd recent_rating lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store tb_cum
 
 * B6. Accumulated review stock with within-hotel ARS. This checks whether the volume story survives an alternative ARS measure.
@@ -407,7 +681,7 @@ reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##c.lag_mr_personal_share_center
 est store tc_personal
 
 * C14. Negative-problem wording.
-reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##c.lag_mr_negtone_share_centered recent_sd recent_rating ln_recent_volumn ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 lag_mr_any if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+reghdfe ln_RevPAR_clean_w199 c.sim_mean##c.lag_mr_negtone_share recent_sd recent_rating ln_recent_volumn ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 lag_mr_any if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store tc_negtone
 
 * C15. Template-like wording.
@@ -415,11 +689,11 @@ reghdfe ln_RevPAR_clean_w199 c.sim_mean_centered##c.lag_mr_template_share_center
 est store tc_template
 
 * C16. Three-way test: volume x ARS x average reply length.
-reghdfe ln_RevPAR_clean_w199 c.ln_recent_volumn_centered##c.sim_mean_centered##c.ln_lag_mr_avg_words_centered recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 lag_mr_any if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+reghdfe ln_RevPAR_clean_w199 c.ln_recent_volumn_centered##c.sim_mean##c.ln_lag_mr_avg_words_centered recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 lag_mr_any if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store tc_triple_avgw
 
 * C17. Three-way test: volume x ARS x quick reply.
-reghdfe ln_RevPAR_clean_w199 c.ln_recent_volumn_centered##c.sim_mean_centered##c.lag_mr_quick7_share_centered recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 lag_mr_any if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+reghdfe ln_RevPAR_clean_w199 c.ln_recent_volumn_centered##c.sim_mean_centered##c.lag_mr_quick7_share_centered recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean lag_mr_any if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store tc_triple_quick
 
 * C18. Three-way test: volume x ARS x positive reply wording.
@@ -427,7 +701,7 @@ reghdfe ln_RevPAR_clean_w199 c.ln_recent_volumn_centered##c.sim_mean_centered##c
 est store tc_triple_pos
 
 * C19. Three-way test: volume x ARS x recovery wording.
-reghdfe ln_RevPAR_clean_w199 c.ln_recent_volumn_centered##c.sim_mean_centered##c.lag_mr_recovery_share_centered recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 lag_mr_any if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+reghdfe ln_RevPAR_clean c.ln_recent_volumn_centered##c.sim_mean_centered##c.lag_mr_recovery_share_centered recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 lag_mr_any if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store tc_triple_rec
 
 esttab tc_thanks tc_apology tc_contact tc_personal tc_negtone tc_template tc_triple_avgw tc_triple_quick tc_triple_pos tc_triple_rec using "`table_dir'/story_table_c_mr_text_260524.rtf", replace star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("thanks" "apology" "contact" "personal" "neg tone" "template" "triple avg words" "triple quick7" "triple positive" "triple recovery") nogap compress

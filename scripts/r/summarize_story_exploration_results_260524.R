@@ -19,9 +19,24 @@ detect_project_dir <- function() {
   stop("Cannot locate project root.")
 }
 
-fmt_num <- function(x, digits = 4) ifelse(is.na(x), "", formatC(x, format = "f", digits = digits))
-fmt_pct <- function(x, digits = 2) ifelse(is.na(x), "", paste0(formatC(x, format = "f", digits = digits), "%"))
-fmt_p <- function(x) fifelse(is.na(x), "", fifelse(x < 0.001, "<0.001", formatC(x, format = "f", digits = 3)))
+fmt_num <- function(x, digits = 4) {
+  out <- rep("", length(x))
+  ok <- !is.na(x) & is.finite(x)
+  out[ok] <- formatC(x[ok], format = "f", digits = digits)
+  out
+}
+fmt_pct <- function(x, digits = 2) {
+  out <- rep("", length(x))
+  ok <- !is.na(x) & is.finite(x)
+  out[ok] <- paste0(formatC(x[ok], format = "f", digits = digits), "%")
+  out
+}
+fmt_p <- function(x) {
+  out <- rep("", length(x))
+  ok <- !is.na(x) & is.finite(x)
+  out[ok] <- ifelse(x[ok] < 0.001, "<0.001", formatC(x[ok], format = "f", digits = 3))
+  out
+}
 
 parse_est <- function(x) {
   x <- gsub("\"", "", x, fixed = TRUE)
@@ -102,14 +117,17 @@ dir.create(results_dir, recursive = TRUE, showWarnings = FALSE)
 path_md <- file.path(results_dir, sprintf("core_simi_story_exploration_results_%s.md", RUN_ID))
 path_summary <- file.path(csv_dir, sprintf("story_exploration_rawscale_summary_%s.csv", RUN_ID))
 path_varsum <- file.path(csv_dir, sprintf("story_variable_summary_%s.csv", RUN_ID))
+path_profile_audit <- file.path(csv_dir, sprintf("story_profile_merge_audit_%s.csv", RUN_ID))
 
 table_files <- list(
   "表1_RouteA_ARS主效应" = file.path(csv_dir, "story_table_a_ars_main_260524.csv"),
   "表2_RouteA_边界条件" = file.path(csv_dir, "story_table_a_moderators_260524.csv"),
-  "表3_RouteB_评论量与ARS调节" = file.path(csv_dir, "story_table_b_volume_ars_260524.csv"),
-  "表4_RouteC_回复对Revenue与ARS调节" = file.path(csv_dir, "story_table_c_reply_revenue_260524.csv"),
-  "表5_RouteC_文本特征与三重交互" = file.path(csv_dir, "story_table_c_mr_text_260524.csv"),
-  "表6_RouteC_机制模型" = file.path(csv_dir, "story_table_c_mr_mechanisms_260524.csv")
+  "表3_RouteA_Profile产品边界" = file.path(csv_dir, "story_table_a_profile_product_260524.csv"),
+  "表4_RouteA_Profile设施风格边界" = file.path(csv_dir, "story_table_a_profile_flags_260524.csv"),
+  "表5_RouteB_评论量与ARS调节" = file.path(csv_dir, "story_table_b_volume_ars_260524.csv"),
+  "表6_RouteC_回复对Revenue与ARS调节" = file.path(csv_dir, "story_table_c_reply_revenue_260524.csv"),
+  "表7_RouteC_文本特征与三重交互" = file.path(csv_dir, "story_table_c_mr_text_260524.csv"),
+  "表8_RouteC_机制模型" = file.path(csv_dir, "story_table_c_mr_mechanisms_260524.csv")
 )
 
 missing_tables <- names(table_files)[!file.exists(unlist(table_files))]
@@ -123,25 +141,57 @@ if (nrow(varsum)) {
   varsum_show <- data.table()
 }
 
+profile_audit <- if (file.exists(path_profile_audit)) fread(path_profile_audit) else data.table()
+if (nrow(profile_audit)) {
+  profile_audit_show <- data.table(
+    指标 = c("profile 原始酒店数", "profile 重复 HotelID 行", "panel 行匹配", "panel 酒店匹配", "原 star_class_raw 缺失行", "可由 profile 补星级行", "补完后 star_class_final_raw 缺失行"),
+    数值 = c(
+      formatC(profile_audit$profile_rows, format = "d", big.mark = ","),
+      formatC(profile_audit$profile_duplicate_id_rows, format = "d", big.mark = ","),
+      paste0(formatC(profile_audit$panel_rows_matched, format = "d", big.mark = ","), " / ", formatC(profile_audit$panel_rows, format = "d", big.mark = ","), " (", fmt_pct(100 * profile_audit$row_match_rate), ")"),
+      paste0(formatC(profile_audit$panel_hotels_matched, format = "d", big.mark = ","), " / ", formatC(profile_audit$panel_hotels, format = "d", big.mark = ","), " (", fmt_pct(100 * profile_audit$hotel_match_rate), ")"),
+      formatC(profile_audit$star_missing_before, format = "d", big.mark = ","),
+      formatC(profile_audit$star_fillable_from_profile, format = "d", big.mark = ","),
+      formatC(profile_audit$star_missing_after, format = "d", big.mark = ",")
+    )
+  )
+} else {
+  profile_audit_show <- data.table()
+}
+
 econ <- rbindlist(list(
   add_effect(tables, "表1_RouteA_ARS主效应", "w199", "sim_mean", "ARS 主效应", 0.01, "ARS 原始值增加 0.01"),
   add_effect(tables, "表1_RouteA_ARS主效应", "w195", "sim_mean", "ARS 主效应稳健性", 0.01, "ARS 原始值增加 0.01"),
   add_effect(tables, "表1_RouteA_ARS主效应", "hotel std", "sim_mean_std_hotel", "酒店内 ARS", 1, "酒店内 ARS 高 1 单位"),
   add_effect(tables, "表1_RouteA_ARS主效应", "COVID", "1.covid2020_2022#c.sim_mean_centered", "COVID 期 ARS 斜率变化", 0.01, "疫情期相对非疫情期，ARS 增加 0.01 的额外效应"),
-  add_effect(tables, "表3_RouteB_评论量与ARS调节", "recent", "c.ln_recent_volumn_centered#c.sim_mean_centered", "近期评论量 x ARS", log(2) * 0.01, "评论量翻倍且 ARS 高 0.01"),
-  add_effect(tables, "表3_RouteB_评论量与ARS调节", "growth", "c.recent_growth_centered#c.sim_mean_centered", "评论增长 x ARS", 0.01, "评论增长高 1 log 点且 ARS 高 0.01"),
-  add_effect(tables, "表3_RouteB_评论量与ARS调节", "cumulative", "c.ln_lag_volumn_acc_centered#c.sim_mean_centered", "累计评论量 x ARS", log(2) * 0.01, "累计评论量翻倍且 ARS 高 0.01"),
-  add_effect(tables, "表3_RouteB_评论量与ARS调节", "cum hstd", "c.ln_lag_volumn_acc_centered#c.sim_mean_std_hotel_centered", "累计评论量 x 酒店内 ARS", log(2), "累计评论量翻倍且酒店内 ARS 高 1 单位"),
-  add_effect(tables, "表3_RouteB_评论量与ARS调节", "text volume", "c.ln_words_acc_centered#c.sim_mean_centered", "文本评论存量 x ARS", log(2) * 0.01, "文本存量翻倍且 ARS 高 0.01"),
-  add_effect(tables, "表3_RouteB_评论量与ARS调节", "text hstd", "c.ln_words_acc_centered#c.sim_mean_std_hotel_centered", "文本评论存量 x 酒店内 ARS", log(2), "文本存量翻倍且酒店内 ARS 高 1 单位"),
-  add_effect(tables, "表4_RouteC_回复对Revenue与ARS调节", "any reply", "1.lag_mr_any", "上月是否有回复", 1, "有回复相对无回复"),
-  add_effect(tables, "表4_RouteC_回复对Revenue与ARS调节", "reply count", "lag_mr_count_centered", "回复数量直接效应", 1, "上月回复数量多 1 条"),
-  add_effect(tables, "表4_RouteC_回复对Revenue与ARS调节", "invite", "c.sim_mean_centered#c.lag_mr_invite_share_centered", "邀请再来 x ARS", 0.10 * 0.01, "邀请语气高 10 个百分点且 ARS 高 0.01"),
-  add_effect(tables, "表5_RouteC_文本特征与三重交互", "thanks", "lag_mr_thanks_share_centered", "感谢语气直接效应", 0.10, "感谢语气高 10 个百分点"),
-  add_effect(tables, "表5_RouteC_文本特征与三重交互", "triple avg words", "c.ln_recent_volumn_centered#c.sim_mean_centered#c.ln_lag_mr_avg_words_centered", "近期评论量 x ARS x 平均回复长度", log(2) * 0.01 * log(2), "评论量翻倍、ARS 高 0.01、平均回复长度翻倍"),
-  add_effect(tables, "表5_RouteC_文本特征与三重交互", "triple positive", "c.ln_recent_volumn_centered#c.sim_mean_centered#c.lag_mr_positive_share_centered", "近期评论量 x ARS x 积极回复", log(2) * 0.01 * 0.10, "评论量翻倍、ARS 高 0.01、积极回复占比高 10 个百分点"),
-  add_effect(tables, "表6_RouteC_机制模型", "DV: volume", "ln_lag_mr_words", "MR 文本投入 -> 后续评论量", log(2), "上月回复总字数翻倍"),
-  add_effect(tables, "表6_RouteC_机制模型", "DV: ARS", "ln_lag_mr_words", "MR 文本投入 -> 后续 ARS", log(2), "上月回复总字数翻倍；DV 是 ARS 原始值", effect_type = "raw")
+  add_effect(tables, "表3_RouteA_Profile产品边界", "TA class", "c.sim_mean_centered#c.hotel_class_profile_raw_centered", "TA 星级 x ARS", 0.01, "TA 星级高 1 星且 ARS 高 0.01"),
+  add_effect(tables, "表3_RouteA_Profile产品边界", "quality", "c.sim_mean_centered#c.tp_quality_index_centered", "Profile 质量 x ARS", 0.01, "Profile 质量评分高 1 分且 ARS 高 0.01"),
+  add_effect(tables, "表3_RouteA_Profile产品边界", "service", "c.sim_mean_centered#c.tp_service_quality_centered", "服务质量 x ARS", 0.01, "服务质量评分高 1 分且 ARS 高 0.01"),
+  add_effect(tables, "表3_RouteA_Profile产品边界", "price", "c.sim_mean_centered#c.ln_tp_price_mid_centered", "价格定位 x ARS", log(2) * 0.01, "Profile 价格翻倍且 ARS 高 0.01"),
+  add_effect(tables, "表3_RouteA_Profile产品边界", "rooms", "c.sim_mean_centered#c.ln_tp_room_centered", "酒店规模 x ARS", log(2) * 0.01, "房间数翻倍且 ARS 高 0.01"),
+  add_effect(tables, "表3_RouteA_Profile产品边界", "rank pct", "c.sim_mean_centered#c.tp_rank_pct_centered", "TA 排名百分位 x ARS", 0.10 * 0.01, "排名百分位高 10 个百分点且 ARS 高 0.01"),
+  add_effect(tables, "表3_RouteA_Profile产品边界", "amenities", "c.sim_mean_centered#c.tp_amenity_count_centered", "Amenities 数量 x ARS", 10 * 0.01, "Amenities 多 10 项且 ARS 高 0.01"),
+  add_effect(tables, "表3_RouteA_Profile产品边界", "choice", "1.travelers_choice_flag#c.sim_mean_centered", "Travelers Choice x ARS", 0.01, "有 Travelers Choice 且 ARS 高 0.01"),
+  add_effect(tables, "表4_RouteA_Profile设施风格边界", "pool", "1.amenity_pool#c.sim_mean_centered", "Pool x ARS", 0.01, "有泳池且 ARS 高 0.01"),
+  add_effect(tables, "表4_RouteA_Profile设施风格边界", "breakfast", "1.amenity_breakfast#c.sim_mean_centered", "Breakfast x ARS", 0.01, "有早餐且 ARS 高 0.01"),
+  add_effect(tables, "表4_RouteA_Profile设施风格边界", "fitness", "1.amenity_fitness#c.sim_mean_centered", "Fitness x ARS", 0.01, "有健身设施且 ARS 高 0.01"),
+  add_effect(tables, "表4_RouteA_Profile设施风格边界", "pet", "1.amenity_pet#c.sim_mean_centered", "Pet-friendly x ARS", 0.01, "宠物友好且 ARS 高 0.01"),
+  add_effect(tables, "表4_RouteA_Profile设施风格边界", "luxury style", "1.style_luxury#c.sim_mean_centered", "Luxury style x ARS", 0.01, "豪华/精品/浪漫风格且 ARS 高 0.01"),
+  add_effect(tables, "表4_RouteA_Profile设施风格边界", "modern style", "1.style_modern#c.sim_mean_centered", "Modern style x ARS", 0.01, "现代/潮流风格且 ARS 高 0.01"),
+  add_effect(tables, "表5_RouteB_评论量与ARS调节", "recent", "c.ln_recent_volumn_centered#c.sim_mean_centered", "近期评论量 x ARS", log(2) * 0.01, "评论量翻倍且 ARS 高 0.01"),
+  add_effect(tables, "表5_RouteB_评论量与ARS调节", "growth", "c.recent_growth_centered#c.sim_mean_centered", "评论增长 x ARS", 0.01, "评论增长高 1 log 点且 ARS 高 0.01"),
+  add_effect(tables, "表5_RouteB_评论量与ARS调节", "cumulative", "c.ln_lag_volumn_acc_centered#c.sim_mean_centered", "累计评论量 x ARS", log(2) * 0.01, "累计评论量翻倍且 ARS 高 0.01"),
+  add_effect(tables, "表5_RouteB_评论量与ARS调节", "cum hstd", "c.ln_lag_volumn_acc_centered#c.sim_mean_std_hotel_centered", "累计评论量 x 酒店内 ARS", log(2), "累计评论量翻倍且酒店内 ARS 高 1 单位"),
+  add_effect(tables, "表5_RouteB_评论量与ARS调节", "text volume", "c.ln_words_acc_centered#c.sim_mean_centered", "文本评论存量 x ARS", log(2) * 0.01, "文本存量翻倍且 ARS 高 0.01"),
+  add_effect(tables, "表5_RouteB_评论量与ARS调节", "text hstd", "c.ln_words_acc_centered#c.sim_mean_std_hotel_centered", "文本评论存量 x 酒店内 ARS", log(2), "文本存量翻倍且酒店内 ARS 高 1 单位"),
+  add_effect(tables, "表6_RouteC_回复对Revenue与ARS调节", "any reply", "1.lag_mr_any", "上月是否有回复", 1, "有回复相对无回复"),
+  add_effect(tables, "表6_RouteC_回复对Revenue与ARS调节", "reply count", "lag_mr_count_centered", "回复数量直接效应", 1, "上月回复数量多 1 条"),
+  add_effect(tables, "表6_RouteC_回复对Revenue与ARS调节", "invite", "c.sim_mean_centered#c.lag_mr_invite_share_centered", "邀请再来 x ARS", 0.10 * 0.01, "邀请语气高 10 个百分点且 ARS 高 0.01"),
+  add_effect(tables, "表7_RouteC_文本特征与三重交互", "thanks", "lag_mr_thanks_share_centered", "感谢语气直接效应", 0.10, "感谢语气高 10 个百分点"),
+  add_effect(tables, "表7_RouteC_文本特征与三重交互", "triple avg words", "c.ln_recent_volumn_centered#c.sim_mean_centered#c.ln_lag_mr_avg_words_centered", "近期评论量 x ARS x 平均回复长度", log(2) * 0.01 * log(2), "评论量翻倍、ARS 高 0.01、平均回复长度翻倍"),
+  add_effect(tables, "表7_RouteC_文本特征与三重交互", "triple positive", "c.ln_recent_volumn_centered#c.sim_mean_centered#c.lag_mr_positive_share_centered", "近期评论量 x ARS x 积极回复", log(2) * 0.01 * 0.10, "评论量翻倍、ARS 高 0.01、积极回复占比高 10 个百分点"),
+  add_effect(tables, "表8_RouteC_机制模型", "DV: volume", "ln_lag_mr_words", "MR 文本投入 -> 后续评论量", log(2), "上月回复总字数翻倍"),
+  add_effect(tables, "表8_RouteC_机制模型", "DV: ARS", "ln_lag_mr_words", "MR 文本投入 -> 后续 ARS", log(2), "上月回复总字数翻倍；DV 是 ARS 原始值", effect_type = "raw")
 ), fill = TRUE)
 
 fwrite(econ, path_summary)
@@ -152,10 +202,12 @@ for (nm in names(tables)) {
     nm,
     "表1_RouteA_ARS主效应" = "表 1：Route A - ARS 主效应、winsor 与 ARS 替代口径",
     "表2_RouteA_边界条件" = "表 2：Route A - 时间、市场、产品与评分边界",
-    "表3_RouteB_评论量与ARS调节" = "表 3：Route B - 评论量/solicitation 与 ARS 调节",
-    "表4_RouteC_回复对Revenue与ARS调节" = "表 4：Route C - 回复是否影响 Revenue，并是否被 ARS 调节",
-    "表5_RouteC_文本特征与三重交互" = "表 5：Route C - 回复文本特征与三重交互",
-    "表6_RouteC_机制模型" = "表 6：Route C - Management Response 机制模型",
+    "表3_RouteA_Profile产品边界" = "表 3：Route A - Hotel Profile 产品特征边界",
+    "表4_RouteA_Profile设施风格边界" = "表 4：Route A - Hotel Profile 设施与风格边界",
+    "表5_RouteB_评论量与ARS调节" = "表 5：Route B - 评论量/solicitation 与 ARS 调节",
+    "表6_RouteC_回复对Revenue与ARS调节" = "表 6：Route C - 回复是否影响 Revenue，并是否被 ARS 调节",
+    "表7_RouteC_文本特征与三重交互" = "表 7：Route C - 回复文本特征与三重交互",
+    "表8_RouteC_机制模型" = "表 8：Route C - Management Response 机制模型",
     nm
   )
   table_md <- c(table_md, paste0("### ", title), "", md_table(tables[[nm]]), "")
@@ -166,30 +218,34 @@ lines <- c(
   "",
   "日期：2026-05-25",
   "",
-  "本版结果只使用显式回归表，不再沿用旧的标准化候选 scan。Stata do 文件已经改成原始尺度、log 尺度、阈值变量和均值中心化交互项。`_centered` 表示变量减去主样本均值，单位没有变化，目的是让交互模型中的主效应可以解释为“在平均水平下”的效应。",
+  "本版结果只使用显式回归表，不再沿用旧的标准化候选 scan。Stata do 文件已经改成原始尺度、log 尺度、阈值变量和均值中心化交互项。`_centered` 表示变量减去主样本均值，单位没有变化，目的是让交互模型中的主效应可以解释为“在平均水平下”的效应。本版新增 `hotel_profile_TP.csv` 的 TripAdvisor 产品特征，并在内存里把 `star_class` 缺失值用 profile 的 `hotel_class` 补成 `star_class_final`，不覆盖原 `.dta`。",
   "",
   "所有 revenue 主表均以 `ln(RevPAR)` 为因变量，控制 hotel fixed effects 和 year-month fixed effects，并在 hotel 层面聚类。系数可以近似换算为 `100 × (exp(beta × delta) - 1)%` 的 RevPAR 变化；交互项则按两个或三个变量的联合变化换算。",
   "",
   "## 一、结论速读",
   "",
-  "- **Route A 可以作为主故事。** ARS 主效应在不同 winsor、scope 和 JSD 口径下稳定为负；`sim_mean` 增加 0.01，对应 RevPAR 约下降 0.18%-0.19%。COVID 交互为正，说明疫情期 ARS 的负向斜率被明显削弱。",
+  "- **Route A 可以作为主故事。** ARS 主效应在不同 winsor、scope 和 JSD 口径下稳定为负；`sim_mean` 增加 0.01，对应 RevPAR 约下降 0.18%-0.19%。COVID 交互为正，说明疫情期 ARS 的负向斜率被明显削弱。Hotel Profile 补充后，产品边界可以看 `star_class_final`、TA 星级、价格定位、酒店规模、质量评分、rank、amenities、设施和风格标签的 ARS 异质性。",
   "- **Route B 现在可以成立，但要写成“评论资产的边际价值取决于 ARS”。** 近期评论流和评论增长的 ARS 调节是负向、10% 水平附近；累计评论量、超过阈值的累计评论量、累计文本量与 ARS 的交互显著为正。",
   "- **Route C 是机制/扩展，不宜写成强因果。** 是否有回复本身不稳，但回复文本质量有 revenue 信息：感谢语气直接正向，邀请再来语气显著削弱 ARS 的负向 revenue 关系；平均回复长度、快速回复、积极回复的三重交互为负，支持“管理触达后的新增评论可能更同质化”的解释。",
   "",
-  "## 二、Raw-scale 变量分布",
+  "## 二、Hotel Profile 合并 Audit",
+  "",
+  md_table(profile_audit_show),
+  "",
+  "## 三、Raw-scale 变量分布",
   "",
   md_table(varsum_show),
   "",
-  "## 三、核心系数与经济效应",
+  "## 四、核心系数与经济效应",
   "",
   md_table(econ),
   "",
-  "## 四、完整回归结果",
+  "## 五、完整回归结果",
   "",
   table_md,
-  "## 五、写作建议",
+  "## 六、写作建议",
   "",
-  "- 主文建议以 Route A 为主：ARS 负向主效应 + COVID 边界条件，结果最稳。",
+  "- 主文建议以 Route A 为主：ARS 负向主效应 + COVID 边界条件，结果最稳；产品特征作为边界条件写，强调 profile 产品变量是 time-invariant，所以在 hotel FE 下只能解释 `ARS × product feature` 的异质性。",
   "- Route B 可作为第二条主线：不要说“评论量越多越差”，而是写“短期评论流和长期评论资产的 ARS 含义不同”。",
   "- Route C 放在机制或扩展：reply 不是直接等同 solicitation，而是 observable management engagement proxy；重点写文本质量和三重交互。"
 )
