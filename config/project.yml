@@ -1,0 +1,13 @@
+project_name: Review_Simi_Sales
+status: phase1_reorganization
+active_chains:
+  - baseline
+  - core_simi
+  - mechanism
+artifact_root: artifacts
+legacy_output_root: outputs
+legacy_code_root: scripts
+future_code_root: src
+notes:
+  - outputs directory exists and remains active for legacy scripts
+  - historical scripts still reference legacy absolute paths
