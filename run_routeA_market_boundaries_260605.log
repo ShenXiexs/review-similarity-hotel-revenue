@@ -1,0 +1,780 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: Single-user 2-core  perpetual
+Serial number: 501806366047
+  Licensed to: Sam Xie
+               samxie
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 5,000; see help set_maxvar.
+
+
+Running /Applications/Stata/profile.do ...
+command window is unrecognized
+r(199);
+
+. do scripts/stata/run_routeA_market_boundaries_260605.do 
+
+. *******************************************************
+. * run_routeA_market_boundaries_260605.do
+. * Route A extension: ARS as the main effect, with market
+. * structure and competitive-position boundaries.
+. *
+. * Style rules:
+. * - No regression wrapper program.
+. * - Every regression writes the DV, focal variables,
+. *   controls, FE, and clustering explicitly.
+. * - Comments explain the research question before each
+. *   model block.
+. *******************************************************
+. 
+. version 17.0
+
+. clear all
+
+. set more off
+
+. set linesize 255
+
+. mata: mata set matafavor speed
+
+. capture log close
+
+. 
+. *******************************************************
+. ************ 0. paths and required packages ************
+. *******************************************************
+. 
+. local project "/Users/samxie/Research/ReviewSimi_Sales/Code"
+
+. local out_root "`project'/outputs/core_simi_260501"
+
+. local data_dir "`out_root'/data"
+
+. local table_dir "`out_root'/tables_explicit"
+
+. local csv_dir "`out_root'/csv"
+
+. local log_dir "`out_root'/logs"
+
+. local run_id "260605"
+
+. 
+. local data_main "`data_dir'/core_simi_panel_260501_with_mr_text_sentiment_260526.dta"
+
+. 
+. cap mkdir "`table_dir'"
+
+. cap mkdir "`csv_dir'"
+
+. cap mkdir "`log_dir'"
+
+. 
+. capture confirm file "`data_main'"
+
+. if _rc {
+.     di as error "Cannot find `data_main'."
+.     exit 601
+. }
+
+. 
+. capture which reghdfe
+
+. if _rc {
+.     di as error "reghdfe not found. Install it first: ssc install reghdfe, replace"
+.     exit 199
+. }
+
+. 
+. capture which esttab
+
+. if _rc {
+.     di as error "esttab not found. Install it first: ssc install estout, replace"
+.     exit 199
+. }
+
+. 
+. *******************************************************
+. ************ 1. load data and prepare variables ********
+. *******************************************************
+. 
+. use "`data_main'", clear
+
+. log using "`log_dir'/run_routeA_market_boundaries_`run_id'.log", text replace
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/logs/run_routeA_market_boundaries_260605.log
+  log type:  text
+ opened on:   5 Jun 2026, 12:12:12
+
+. 
+. di as text "Data source: `data_main'"
+Data source: /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/data/core_simi_panel_260501_with_mr_text_sentiment_260526.dta
+
+. 
+. capture drop hotel_id_num
+
+. capture confirm numeric variable HotelID
+
+. if _rc {
+.     encode HotelID, gen(hotel_id_num)
+. }
+
+. else {
+.     gen long hotel_id_num = HotelID
+. }
+
+. 
+. capture drop ym
+
+. gen ym = monthly(year_month, "YM")
+
+. format ym %tm
+
+. xtset hotel_id_num ym
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+. sort hotel_id_num ym
+
+. 
+. capture drop ln_RevPAR_clean_w199 ln_lag_RevPAR_clean_w199
+
+. gen double ln_RevPAR_clean_w199 = ln_RevPAR_clean
+(714 missing values generated)
+
+. gen double ln_lag_RevPAR_clean_w199 = ln_lag_RevPAR_clean
+(1,680 missing values generated)
+
+. 
+. quietly _pctile ln_RevPAR_clean if cs_sample_focus100 == 1, p(1 99)
+
+. local y_p1 = r(r1)
+
+. local y_p99 = r(r2)
+
+. quietly _pctile ln_lag_RevPAR_clean if cs_sample_focus100 == 1, p(1 99)
+
+. local ly_p1 = r(r1)
+
+. local ly_p99 = r(r2)
+
+. 
+. replace ln_RevPAR_clean_w199 = `y_p1' if ln_RevPAR_clean_w199 < `y_p1' & !missing(ln_RevPAR_clean_w199)
+(430 real changes made)
+
+. replace ln_RevPAR_clean_w199 = `y_p99' if ln_RevPAR_clean_w199 > `y_p99' & !missing(ln_RevPAR_clean_w199)
+(410 real changes made)
+
+. replace ln_lag_RevPAR_clean_w199 = `ly_p1' if ln_lag_RevPAR_clean_w199 < `ly_p1' & !missing(ln_lag_RevPAR_clean_w199)
+(419 real changes made)
+
+. replace ln_lag_RevPAR_clean_w199 = `ly_p99' if ln_lag_RevPAR_clean_w199 > `ly_p99' & !missing(ln_lag_RevPAR_clean_w199)
+(397 real changes made)
+
+. 
+. * Center variables so lower-order coefficients are interpretable at the focus100 sample mean.
+. capture drop sim_mean_c zip_n_full_c city_n_full_c zip_n_review_c city_n_review_c
+
+. capture drop ln_comp_zip_full_c ln_comp_city_full_c gap_zip_full_c gap_city_full_c
+
+. capture drop gap_zip_review_c gap_city_review_c price_gap_c
+
+. 
+. quietly summarize sim_mean if cs_sample_focus100 == 1 & !missing(sim_mean)
+
+. gen double sim_mean_c = sim_mean - r(mean) if !missing(sim_mean)
+(223 missing values generated)
+
+. 
+. quietly summarize zip_n_full if cs_sample_focus100 == 1 & !missing(zip_n_full)
+
+. gen double zip_n_full_c = zip_n_full - r(mean) if !missing(zip_n_full)
+(808 missing values generated)
+
+. 
+. quietly summarize city_n_full if cs_sample_focus100 == 1 & !missing(city_n_full)
+
+. gen double city_n_full_c = city_n_full - r(mean) if !missing(city_n_full)
+(808 missing values generated)
+
+. 
+. quietly summarize zip_n_review if cs_sample_focus100 == 1 & !missing(zip_n_review)
+
+. gen double zip_n_review_c = zip_n_review - r(mean) if !missing(zip_n_review)
+(4,850 missing values generated)
+
+. 
+. quietly summarize city_n_review if cs_sample_focus100 == 1 & !missing(city_n_review)
+
+. gen double city_n_review_c = city_n_review - r(mean) if !missing(city_n_review)
+(4,850 missing values generated)
+
+. 
+. quietly summarize ln_comp_zip_mean_excl_full if cs_sample_focus100 == 1 & !missing(ln_comp_zip_mean_excl_full)
+
+. gen double ln_comp_zip_full_c = ln_comp_zip_mean_excl_full - r(mean) if !missing(ln_comp_zip_mean_excl_full)
+(2,078 missing values generated)
+
+. 
+. quietly summarize ln_comp_city_mean_excl_full if cs_sample_focus100 == 1 & !missing(ln_comp_city_mean_excl_full)
+
+. gen double ln_comp_city_full_c = ln_comp_city_mean_excl_full - r(mean) if !missing(ln_comp_city_mean_excl_full)
+(808 missing values generated)
+
+. 
+. quietly summarize gap_zip_mean_full if cs_sample_focus100 == 1 & !missing(gap_zip_mean_full)
+
+. gen double gap_zip_full_c = gap_zip_mean_full - r(mean) if !missing(gap_zip_mean_full)
+(2,078 missing values generated)
+
+. 
+. quietly summarize gap_city_mean_full if cs_sample_focus100 == 1 & !missing(gap_city_mean_full)
+
+. gen double gap_city_full_c = gap_city_mean_full - r(mean) if !missing(gap_city_mean_full)
+(808 missing values generated)
+
+. 
+. quietly summarize gap_zip_mean_review if cs_sample_focus100 == 1 & !missing(gap_zip_mean_review)
+
+. gen double gap_zip_review_c = gap_zip_mean_review - r(mean) if !missing(gap_zip_mean_review)
+(8,395 missing values generated)
+
+. 
+. quietly summarize gap_city_mean_review if cs_sample_focus100 == 1 & !missing(gap_city_mean_review)
+
+. gen double gap_city_review_c = gap_city_mean_review - r(mean) if !missing(gap_city_mean_review)
+(4,850 missing values generated)
+
+. 
+. quietly summarize price_gap if cs_sample_focus100 == 1 & !missing(price_gap)
+
+. gen double price_gap_c = price_gap - r(mean) if !missing(price_gap)
+(1,680 missing values generated)
+
+. 
+. *******************************************************
+. ************ 2. Route A: market boundaries ************
+. *******************************************************
+. 
+. estimates clear
+
+. 
+. * M1. High-competition ZIP boundary.
+. * This tests whether the ARS slope differs in ZIP markets flagged as highly competitive.
+. reghdfe ln_RevPAR_clean_w199 c.sim_mean_c##i.high_comp_zip_full ///
+>     ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc ///
+>     lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 ///
+>     if cs_sample_focus100 == 1 & !missing(high_comp_zip_full), ///
+>     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 2 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     33,474
+Absorbing 2 HDFE groups                           F(  12,    557) =     103.45
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8794
+                                                  Adj R-squared   =     0.8768
+                                                  Within R-sq.    =     0.2920
+Number of clusters (hotel_id_num) =        558    Root MSE        =     0.2256
+
+                                            (Std. err. adjusted for 558 clusters in hotel_id_num)
+-------------------------------------------------------------------------------------------------
+                                |               Robust
+           ln_RevPAR_clean_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+--------------------------------+----------------------------------------------------------------
+                     sim_mean_c |  -.1399574   .1015415    -1.38   0.169    -.3394085    .0594937
+           1.high_comp_zip_full |   .0024975   .0144156     0.17   0.863     -.025818     .030813
+                                |
+high_comp_zip_full#c.sim_mean_c |
+                             1  |  -.0221652   .1143087    -0.19   0.846     -.246694    .2023637
+                                |
+               ln_recent_volumn |   .0836267    .008969     9.32   0.000     .0660094    .1012439
+                      recent_sd |  -.0022324   .0075333    -0.30   0.767    -.0170296    .0125647
+                  recent_rating |   .0165288   .0062472     2.65   0.008     .0042578    .0287998
+              ln_lag_volumn_acc |   .0304858   .0072771     4.19   0.000     .0161919    .0447797
+             lag_avg_rating_acc |   .0076204   .0267099     0.29   0.776    -.0448439    .0600848
+                     lag_sd_acc |  -.0085106   .0346812    -0.25   0.806    -.0766326    .0596114
+           lag_avg_rating_month |    .003224   .0016674     1.93   0.054    -.0000511    .0064991
+              ln_avg_com_RevPAR |     .12216   .0121444    10.06   0.000     .0983057    .1460144
+       ln_lag_RevPAR_clean_w199 |   .4192221   .0170564    24.58   0.000     .3857194    .4527248
+                          _cons |   1.465445   .1504556     9.74   0.000     1.169915    1.760975
+-------------------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       558         558           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. est store rm_zip_highcomp
+
+. 
+. * M2. High-competition city boundary.
+. * This asks whether city-level competition intensity changes the ARS revenue slope.
+. reghdfe ln_RevPAR_clean_w199 c.sim_mean_c##i.high_comp_city_full ///
+>     ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc ///
+>     lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 ///
+>     if cs_sample_focus100 == 1 & !missing(high_comp_city_full), ///
+>     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 2 singleton observations)
+(MWFE estimator converged in 7 iterations)
+note: 1bn.high_comp_city_full is probably collinear with the fixed effects (all partialled-out values are close to zero; tol = 1.0e-09)
+note: 1.high_comp_city_full omitted because of collinearity
+
+HDFE Linear regression                            Number of obs   =     33,474
+Absorbing 2 HDFE groups                           F(  10,    557) =     123.71
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8794
+                                                  Adj R-squared   =     0.8768
+                                                  Within R-sq.    =     0.2920
+Number of clusters (hotel_id_num) =        558    Root MSE        =     0.2256
+
+                                             (Std. err. adjusted for 558 clusters in hotel_id_num)
+--------------------------------------------------------------------------------------------------
+                                 |               Robust
+            ln_RevPAR_clean_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------------------+----------------------------------------------------------------
+                      sim_mean_c |  -.1576175   .0575283    -2.74   0.006    -.2706164   -.0446187
+           1.high_comp_city_full |          0  (omitted)
+                                 |
+high_comp_city_full#c.sim_mean_c |
+                              1  |          0  (omitted)
+                                 |
+                ln_recent_volumn |   .0836395   .0089404     9.36   0.000     .0660785    .1012005
+                       recent_sd |  -.0022458   .0075539    -0.30   0.766    -.0170833    .0125918
+                   recent_rating |   .0164918   .0062532     2.64   0.009      .004209    .0287745
+               ln_lag_volumn_acc |   .0305557   .0073046     4.18   0.000     .0162079    .0449036
+              lag_avg_rating_acc |   .0074324   .0266238     0.28   0.780     -.044863    .0597278
+                      lag_sd_acc |  -.0087019    .034597    -0.25   0.802    -.0766584    .0592546
+            lag_avg_rating_month |   .0032216    .001668     1.93   0.054    -.0000547    .0064978
+               ln_avg_com_RevPAR |   .1221519   .0121668    10.04   0.000     .0982535    .1460504
+        ln_lag_RevPAR_clean_w199 |   .4192105   .0170541    24.58   0.000     .3857124    .4527086
+                           _cons |   1.468201   .1485067     9.89   0.000     1.176499    1.759903
+--------------------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       558         558           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. est store rm_city_highcomp
+
+. 
+. * M3. ZIP market thickness.
+. * More same-ZIP hotels may make ARS more or less useful as a differentiation signal.
+. reghdfe ln_RevPAR_clean_w199 c.sim_mean_c##c.zip_n_full_c ///
+>     ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc ///
+>     lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 ///
+>     if cs_sample_focus100 == 1 & !missing(zip_n_full), ///
+>     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 2 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     33,474
+Absorbing 2 HDFE groups                           F(  12,    557) =     103.78
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8794
+                                                  Adj R-squared   =     0.8768
+                                                  Within R-sq.    =     0.2921
+Number of clusters (hotel_id_num) =        558    Root MSE        =     0.2256
+
+                                        (Std. err. adjusted for 558 clusters in hotel_id_num)
+---------------------------------------------------------------------------------------------
+                            |               Robust
+       ln_RevPAR_clean_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+----------------------------+----------------------------------------------------------------
+                 sim_mean_c |  -.1590132   .0573363    -2.77   0.006     -.271635   -.0463914
+               zip_n_full_c |  -.0009248    .001143    -0.81   0.419      -.00317    .0013203
+                            |
+c.sim_mean_c#c.zip_n_full_c |   .0029694   .0060364     0.49   0.623    -.0088876    .0148263
+                            |
+           ln_recent_volumn |   .0830859   .0088493     9.39   0.000     .0657037    .1004681
+                  recent_sd |  -.0019688   .0075511    -0.26   0.794    -.0168008    .0128632
+              recent_rating |   .0165944   .0062349     2.66   0.008     .0043477    .0288412
+          ln_lag_volumn_acc |   .0305283   .0072995     4.18   0.000     .0161905    .0448661
+         lag_avg_rating_acc |   .0084871   .0265553     0.32   0.749    -.0436736    .0606478
+                 lag_sd_acc |  -.0086556   .0344417    -0.25   0.802    -.0763071    .0589958
+       lag_avg_rating_month |   .0032222   .0016673     1.93   0.054    -.0000528    .0064971
+          ln_avg_com_RevPAR |   .1221362   .0121462    10.06   0.000     .0982781    .1459942
+   ln_lag_RevPAR_clean_w199 |   .4190225   .0170432    24.59   0.000     .3855458    .4524992
+                      _cons |   1.465832   .1481708     9.89   0.000      1.17479    1.756873
+---------------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       558         558           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. est store rm_zip_n
+
+. 
+. * M4. City market thickness.
+. * This uses the broader city choice set to test whether ARS matters differently in thicker city markets.
+. reghdfe ln_RevPAR_clean_w199 c.sim_mean_c##c.city_n_full_c ///
+>     ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc ///
+>     lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 ///
+>     if cs_sample_focus100 == 1 & !missing(city_n_full), ///
+>     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 2 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     33,474
+Absorbing 2 HDFE groups                           F(  12,    557) =     126.83
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8800
+                                                  Adj R-squared   =     0.8775
+                                                  Within R-sq.    =     0.2957
+Number of clusters (hotel_id_num) =        558    Root MSE        =     0.2250
+
+                                         (Std. err. adjusted for 558 clusters in hotel_id_num)
+----------------------------------------------------------------------------------------------
+                             |               Robust
+        ln_RevPAR_clean_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-----------------------------+----------------------------------------------------------------
+                  sim_mean_c |  -.1599461   .0570332    -2.80   0.005    -.2719725   -.0479197
+               city_n_full_c |  -.0007263   .0001405    -5.17   0.000    -.0010022   -.0004504
+                             |
+c.sim_mean_c#c.city_n_full_c |   .0006996   .0004768     1.47   0.143    -.0002369    .0016361
+                             |
+            ln_recent_volumn |   .0868173   .0089413     9.71   0.000     .0692545    .1043801
+                   recent_sd |   .0012593   .0076006     0.17   0.868      -.01367    .0161887
+               recent_rating |   .0177066   .0062346     2.84   0.005     .0054604    .0299527
+           ln_lag_volumn_acc |   .0322976    .007084     4.56   0.000     .0183831    .0462122
+          lag_avg_rating_acc |   .0042283   .0245959     0.17   0.864    -.0440838    .0525404
+                  lag_sd_acc |  -.0079894   .0327031    -0.24   0.807    -.0722259    .0562471
+        lag_avg_rating_month |   .0030336   .0016685     1.82   0.070    -.0002436    .0063109
+           ln_avg_com_RevPAR |   .1160411    .012193     9.52   0.000     .0920912     .139991
+    ln_lag_RevPAR_clean_w199 |    .412261   .0178422    23.11   0.000     .3772149    .4473071
+                       _cons |   1.510068   .1441844    10.47   0.000     1.226857     1.79328
+----------------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       558         558           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. est store rm_city_n
+
+. 
+. * M5. ZIP competitor performance.
+. * Local competitor RevPAR in the same ZIP may alter how strongly consumers rely on review-similarity information.
+. reghdfe ln_RevPAR_clean_w199 c.sim_mean_c##c.ln_comp_zip_full_c ///
+>     ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc ///
+>     lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 ///
+>     if cs_sample_focus100 == 1 & !missing(ln_comp_zip_mean_excl_full), ///
+>     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 2 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     32,392
+Absorbing 2 HDFE groups                           F(  12,    550) =     114.20
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8842
+                                                  Adj R-squared   =     0.8816
+                                                  Within R-sq.    =     0.3168
+Number of clusters (hotel_id_num) =        551    Root MSE        =     0.2221
+
+                                              (Std. err. adjusted for 551 clusters in hotel_id_num)
+---------------------------------------------------------------------------------------------------
+                                  |               Robust
+             ln_RevPAR_clean_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+----------------------------------+----------------------------------------------------------------
+                       sim_mean_c |  -.1596106    .058469    -2.73   0.007    -.2744605   -.0447607
+               ln_comp_zip_full_c |   .1474972   .0200608     7.35   0.000      .108092    .1869024
+                                  |
+c.sim_mean_c#c.ln_comp_zip_full_c |   -.159704   .1227295    -1.30   0.194    -.4007799     .081372
+                                  |
+                 ln_recent_volumn |   .0767964   .0094844     8.10   0.000     .0581663    .0954265
+                        recent_sd |  -.0014705   .0078482    -0.19   0.851    -.0168867    .0139456
+                    recent_rating |   .0190657   .0063668     2.99   0.003     .0065594    .0315719
+                ln_lag_volumn_acc |   .0304017   .0075544     4.02   0.000     .0155627    .0452407
+               lag_avg_rating_acc |   .0074564      .0279     0.27   0.789    -.0473472      .06226
+                       lag_sd_acc |  -.0170396   .0351274    -0.49   0.628    -.0860398    .0519607
+             lag_avg_rating_month |   .0030046   .0016965     1.77   0.077    -.0003277     .006337
+                ln_avg_com_RevPAR |   .0618875   .0145672     4.25   0.000     .0332733    .0905017
+         ln_lag_RevPAR_clean_w199 |   .4070414   .0180377    22.57   0.000     .3716103    .4424726
+                            _cons |   1.796807   .1773081    10.13   0.000     1.448523    2.145091
+---------------------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       551         551           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. est store rm_zip_compperf
+
+. 
+. * M6. City competitor performance.
+. * This repeats the same logic at the city level rather than ZIP level.
+. reghdfe ln_RevPAR_clean_w199 c.sim_mean_c##c.ln_comp_city_full_c ///
+>     ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc ///
+>     lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 ///
+>     if cs_sample_focus100 == 1 & !missing(ln_comp_city_mean_excl_full), ///
+>     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 2 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     33,474
+Absorbing 2 HDFE groups                           F(  12,    557) =     183.67
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8848
+                                                  Adj R-squared   =     0.8823
+                                                  Within R-sq.    =     0.3234
+Number of clusters (hotel_id_num) =        558    Root MSE        =     0.2205
+
+                                               (Std. err. adjusted for 558 clusters in hotel_id_num)
+----------------------------------------------------------------------------------------------------
+                                   |               Robust
+              ln_RevPAR_clean_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-----------------------------------+----------------------------------------------------------------
+                        sim_mean_c |  -.1389427   .0568917    -2.44   0.015    -.2506912   -.0271943
+               ln_comp_city_full_c |    .321178   .0220904    14.54   0.000     .2777873    .3645687
+                                   |
+c.sim_mean_c#c.ln_comp_city_full_c |  -.2475522     .18299    -1.35   0.177     -.606987    .1118827
+                                   |
+                  ln_recent_volumn |   .0847807   .0088572     9.57   0.000     .0673832    .1021782
+                         recent_sd |   .0000253   .0075753     0.00   0.997    -.0148543    .0149049
+                     recent_rating |   .0208028   .0062281     3.34   0.001     .0085693    .0330363
+                 ln_lag_volumn_acc |    .035187   .0075909     4.64   0.000     .0202767    .0500973
+                lag_avg_rating_acc |  -.0034822   .0286477    -0.12   0.903    -.0597529    .0527884
+                        lag_sd_acc |   -.008331   .0375747    -0.22   0.825    -.0821364    .0654743
+              lag_avg_rating_month |   .0030327   .0016524     1.84   0.067     -.000213    .0062784
+                 ln_avg_com_RevPAR |   .0921494   .0123143     7.48   0.000     .0679613    .1163375
+          ln_lag_RevPAR_clean_w199 |   .4018892   .0186726    21.52   0.000      .365212    .4385665
+                             _cons |   1.665679   .1664435    10.01   0.000     1.338745    1.992612
+----------------------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       558         558           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. est store rm_city_compperf
+
+. 
+. * M7. Relative ZIP positioning gap.
+. * Larger positive gaps indicate different positioning versus same-ZIP peers; the interaction tests whether ARS matters more for out-of-line products.
+. reghdfe ln_RevPAR_clean_w199 c.sim_mean_c##c.gap_zip_full_c ///
+>     ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc ///
+>     lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 ///
+>     if cs_sample_focus100 == 1 & !missing(gap_zip_mean_full), ///
+>     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 2 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     32,392
+Absorbing 2 HDFE groups                           F(  12,    550) =     180.61
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.9158
+                                                  Adj R-squared   =     0.9140
+                                                  Within R-sq.    =     0.5035
+Number of clusters (hotel_id_num) =        551    Root MSE        =     0.1893
+
+                                          (Std. err. adjusted for 551 clusters in hotel_id_num)
+-----------------------------------------------------------------------------------------------
+                              |               Robust
+         ln_RevPAR_clean_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------------------+----------------------------------------------------------------
+                   sim_mean_c |  -.1525831   .0631602    -2.42   0.016    -.2766478   -.0285183
+               gap_zip_full_c |   .3137543   .0423947     7.40   0.000     .2304789    .3970297
+                              |
+c.sim_mean_c#c.gap_zip_full_c |   .0768628   .3016526     0.25   0.799    -.5156694    .6693949
+                              |
+             ln_recent_volumn |   .0723981   .0097124     7.45   0.000     .0533201    .0914761
+                    recent_sd |  -.0006182   .0072419    -0.09   0.932    -.0148434    .0136071
+                recent_rating |   .0086934   .0065837     1.32   0.187    -.0042388    .0216257
+            ln_lag_volumn_acc |   .0302178   .0079286     3.81   0.000     .0146437    .0457919
+           lag_avg_rating_acc |  -.0330941   .0263105    -1.26   0.209    -.0847755    .0185873
+                   lag_sd_acc |   -.068742   .0367115    -1.87   0.062    -.1408538    .0033698
+         lag_avg_rating_month |   .0020036   .0013497     1.48   0.138    -.0006476    .0046547
+            ln_avg_com_RevPAR |   .2302225    .023705     9.71   0.000     .1836591    .2767859
+     ln_lag_RevPAR_clean_w199 |   .2962982   .0168035    17.63   0.000     .2632912    .3293051
+                        _cons |   1.817087   .1398078    13.00   0.000     1.542465     2.09171
+-----------------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       551         551           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. est store rm_zip_gap
+
+. 
+. * M8. Relative city positioning gap.
+. * This uses the city benchmark instead of the ZIP benchmark.
+. reghdfe ln_RevPAR_clean_w199 c.sim_mean_c##c.gap_city_full_c ///
+>     ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc ///
+>     lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 ///
+>     if cs_sample_focus100 == 1 & !missing(gap_city_mean_full), ///
+>     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 2 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     33,474
+Absorbing 2 HDFE groups                           F(  12,    557) =     257.52
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.9355
+                                                  Adj R-squared   =     0.9341
+                                                  Within R-sq.    =     0.6212
+Number of clusters (hotel_id_num) =        558    Root MSE        =     0.1650
+
+                                           (Std. err. adjusted for 558 clusters in hotel_id_num)
+------------------------------------------------------------------------------------------------
+                               |               Robust
+          ln_RevPAR_clean_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------------------------+----------------------------------------------------------------
+                    sim_mean_c |  -.1662561    .058711    -2.83   0.005    -.2815782   -.0509341
+               gap_city_full_c |    .468685   .0816421     5.74   0.000     .3083209    .6290491
+                               |
+c.sim_mean_c#c.gap_city_full_c |    .706032   .4518965     1.56   0.119    -.1815977    1.593662
+                               |
+              ln_recent_volumn |   .0464004   .0093369     4.97   0.000     .0280606    .0647402
+                     recent_sd |  -.0043315   .0060114    -0.72   0.471    -.0161393    .0074763
+                 recent_rating |  -.0005753   .0050542    -0.11   0.909     -.010503    .0093523
+             ln_lag_volumn_acc |   .0091192   .0068884     1.32   0.186    -.0044113    .0226497
+            lag_avg_rating_acc |    .019375   .0202052     0.96   0.338    -.0203127    .0590626
+                    lag_sd_acc |  -.0028885   .0245757    -0.12   0.906     -.051161    .0453839
+          lag_avg_rating_month |   .0018179   .0012177     1.49   0.136    -.0005739    .0042097
+             ln_avg_com_RevPAR |   .1038003    .009631    10.78   0.000     .0848829    .1227178
+      ln_lag_RevPAR_clean_w199 |   .2221495   .0260303     8.53   0.000       .17102    .2732791
+                         _cons |    2.62497   .2107893    12.45   0.000     2.210931    3.039009
+------------------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       558         558           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. est store rm_city_gap
+
+. 
+. * M9. Price-position gap relative to local market.
+. * This asks whether ARS hurts revenue more when a hotel is priced away from its local market reference.
+. reghdfe ln_RevPAR_clean_w199 c.sim_mean_c##c.price_gap_c ///
+>     ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc ///
+>     lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 ///
+>     if cs_sample_focus100 == 1 & !missing(price_gap), ///
+>     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 2 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     33,546
+Absorbing 2 HDFE groups                           F(  12,    557) =     110.65
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8806
+                                                  Adj R-squared   =     0.8781
+                                                  Within R-sq.    =     0.3249
+Number of clusters (hotel_id_num) =        558    Root MSE        =     0.2264
+
+                                       (Std. err. adjusted for 558 clusters in hotel_id_num)
+--------------------------------------------------------------------------------------------
+                           |               Robust
+      ln_RevPAR_clean_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------------+----------------------------------------------------------------
+                sim_mean_c |  -.1623819   .0553327    -2.93   0.003    -.2710682   -.0536956
+               price_gap_c |   .1377571   .0164132     8.39   0.000     .1055177    .1699965
+                           |
+c.sim_mean_c#c.price_gap_c |  -.1256845   .0934749    -1.34   0.179    -.3092909     .057922
+                           |
+          ln_recent_volumn |   .0807927   .0084326     9.58   0.000     .0642291    .0973563
+                 recent_sd |   -.001421   .0072383    -0.20   0.844    -.0156387    .0127967
+             recent_rating |   .0169972   .0059716     2.85   0.005     .0052677    .0287268
+         ln_lag_volumn_acc |   .0269813   .0068637     3.93   0.000     .0134994    .0404631
+        lag_avg_rating_acc |  -.0020089     .02674    -0.08   0.940    -.0545324    .0505146
+                lag_sd_acc |  -.0212926   .0327466    -0.65   0.516    -.0856145    .0430294
+      lag_avg_rating_month |     .00303   .0017312     1.75   0.081    -.0003704    .0064304
+         ln_avg_com_RevPAR |   .2162358   .0179086    12.07   0.000     .1810591    .2514125
+  ln_lag_RevPAR_clean_w199 |   .3299078   .0187657    17.58   0.000     .2930475    .3667681
+                     _cons |   1.519505   .1451695    10.47   0.000     1.234359    1.804652
+--------------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       558         558           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. est store rm_price_gap
+
+. 
+. esttab rm_zip_highcomp rm_city_highcomp rm_zip_n rm_city_n rm_zip_compperf rm_city_compperf rm_zip_gap rm_city_gap rm_price_gap ///
+>     using "`table_dir'/routeA_market_boundaries_`run_id'.rtf", replace ///
+>     star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
+>     cells(b(star fmt(4)) se(par fmt(4))) ///
+>     stats(N r2_a, labels("Observations" "Adjusted R-squared")) ///
+>     mtitles("zip high comp" "city high comp" "zip n" "city n" "zip comp RevPAR" "city comp RevPAR" "zip gap" "city gap" "price gap") ///
+>     nogap compress
+(file /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/tables_explicit/routeA_market_boundaries_260605.rtf not found)
+(output written to /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/tables_explicit/routeA_market_boundaries_260605.rtf)
+
+. 
+. esttab rm_zip_highcomp rm_city_highcomp rm_zip_n rm_city_n rm_zip_compperf rm_city_compperf rm_zip_gap rm_city_gap rm_price_gap ///
+>     using "`csv_dir'/routeA_market_boundaries_`run_id'.csv", replace csv ///
+>     star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
+>     cells(b(star fmt(4)) se(par fmt(4))) ///
+>     stats(N r2_a, labels("Observations" "Adjusted R-squared")) ///
+>     mtitles("zip high comp" "city high comp" "zip n" "city n" "zip comp RevPAR" "city comp RevPAR" "zip gap" "city gap" "price gap") ///
+>     nogap
+(file /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/csv/routeA_market_boundaries_260605.csv not found)
+(output written to /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/csv/routeA_market_boundaries_260605.csv)
+
+. 
+. log close
+      name:  <unnamed>
+       log:  /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/logs/run_routeA_market_boundaries_260605.log
+  log type:  text
+ closed on:   5 Jun 2026, 12:12:14
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+. 
+end of do-file

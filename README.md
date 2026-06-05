@@ -71,6 +71,7 @@ artifacts/<chain>/
 
 - Read `docs/project_map.md` for the repository map.
 - Read `docs/result_index.md` for the intended deliverable structure.
+- Read `docs/research_ars_routes_map.md` for the current research-layer map, route inventory, and data boundaries.
 - Use `scripts/r/` and `scripts/stata/` as the temporary source of truth for runnable code until the staged migration into `src/` is complete.
 - Treat `outputs/` as a legacy-but-real output area until the migration is complete; do not invent new root-level result destinations outside `artifacts/`.
 
