@@ -46,6 +46,15 @@ assert_inside_project <- function(paths, project_dir) {
 safe_median <- function(x) if (all(is.na(x))) NA_real_ else median(x, na.rm = TRUE)
 safe_quantile <- function(x, p) if (all(is.na(x))) NA_real_ else as.numeric(quantile(x, p, na.rm = TRUE, names = FALSE))
 
+split_high_by_median <- function(x, idx = rep(TRUE, length(x))) {
+  out <- rep(NA_integer_, length(x))
+  keep <- idx & !is.na(x)
+  if (sum(keep) == 0) return(out)
+  cutoff <- median(x[keep], na.rm = TRUE)
+  out[keep] <- as.integer(x[keep] > cutoff)
+  out
+}
+
 extract_term <- function(model, pattern) {
   if (is.null(model)) {
     return(tibble(term = NA_character_, estimate = NA_real_, std_error = NA_real_, p_value = NA_real_))
@@ -393,6 +402,21 @@ panel <- panel %>%
   group_by(CityID) %>%
   mutate(star_dm_city = star_class - mean(star_class, na.rm = TRUE)) %>%
   ungroup()
+
+if ("high_comp_zip_full" %in% names(panel)) {
+  panel <- panel %>% mutate(high_comp_zip_full_legacy = high_comp_zip_full)
+}
+if ("high_comp_city_full" %in% names(panel)) {
+  panel <- panel %>% mutate(high_comp_city_full_legacy = high_comp_city_full)
+}
+
+panel <- panel %>%
+  mutate(
+    high_comp_zip_full = split_high_by_median(zip_n_full),
+    high_comp_city_full = split_high_by_median(city_n_full),
+    high_comp_zip_focus100 = split_high_by_median(zip_n_full, cs_sample_focus100 == 1),
+    high_comp_city_focus100 = split_high_by_median(city_n_full, cs_sample_focus100 == 1)
+  )
 
 sample_audit <- tibble(sample = sample_names) %>%
   mutate(
