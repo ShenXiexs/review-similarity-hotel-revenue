@@ -120,6 +120,75 @@
 - 这轮 Route A 市场边界的第一结论不是“哪条边界显著通过”，而是“ARS 的负向主效应对不同市场结构度量都比较稳”。
 - 如果后续还要继续做市场边界，优先把这一块写成 robustness / boundary exploration，而不是主文的强异质性证据。
 
+### 2026-06-05 快速结果：产品边界系统化
+
+对应脚本：`scripts/stata/run_routeA_product_systematics_260605.do`
+
+- vertical quality 这组没有打出强交互：
+  - `star_class_final_raw × ARS` 不显著
+  - `tp_quality_index × ARS` 不显著
+  - `tp_service_quality × ARS` 不显著
+  - `tp_rank_pct × ARS` 不显著
+- horizontal differentiation 这组也基本没有差异：
+  - `tp_amenity_count × ARS` 不显著
+  - `amen_rec_index × ARS` 不显著
+  - `amen_serv_index × ARS` 不显著
+  - `amen_bus_index × ARS` 不显著
+  - `style_upscale × ARS` 不显著
+  - `travelers_choice_flag × ARS` 不显著
+- price / scale 这组同样没有明显边界：
+  - `ln_tp_price_mid × ARS` 不显著
+  - `ln_tp_room × ARS` 不显著
+  - `ln_tp_review_count × ARS` 不显著
+- 但 `ARS` 主效应本身很稳：
+  - 各规格里的 `sim_mean` 基本都保持显著负向，系数大致在 `-0.139` 到 `-0.188`
+
+当前解释：
+
+- 产品画像变量更适合当作样本描述和补充边界，不适合现在就写成强异质性主结果。
+- 这轮结果支持“ARS 负效应并不主要依赖某一个特定 hotel profile 维度”。
+
+### 2026-06-05 快速结果：评论环境边界
+
+对应脚本：`scripts/stata/run_routeA_review_environment_260605.do`
+
+- `ARS` 主效应在 9 个评论环境规格里都保持负向，且大多数显著，系数大致在 `-0.169` 到 `-0.188`
+- 当前没有哪条环境交互真正打出来：
+  - `recent_sd × ARS` 不显著
+  - `sd_acc × ARS` 不显著
+  - `rating_momentum × ARS` 不显著
+  - `review_freshness × ARS` 不显著
+  - `sent_avg_bing × ARS` 不显著
+  - `sent_net_pos_bing × ARS` 不显著
+  - `sent_neg_share_bing × ARS` 不显著
+  - `lag_sent_net_pos_bing × ARS` 不显著
+  - `sent_sd_bing × ARS` 不显著
+- 其中只有 level effect 有一点信息：
+  - `rating_momentum` 本身弱正向
+  - `sent_sd_bing` 本身正向，但它并没有改变 `ARS` 的 slope
+
+当前解释：
+
+- 这组更像“评论环境控制下 ARS 负效应仍稳”，而不是“评论环境塑造了 ARS 的边际作用”。
+- 如果后续继续写这一块，更适合当 robustness layer，而不是核心 story。
+
+### 2026-06-05 快速结果：经营组织边界
+
+对应脚本：`scripts/stata/run_routeA_organization_boundaries_260605.do`
+
+- `independent` 规格里的 `ARS` 主效应显著负向，系数约 `-0.211`
+- `chain`、`chain_small`、`chain3_small` 规格里的 `ARS` 主效应方向也仍然负，但显著性较弱
+- 关键是组间差异没有正式打出来：
+  - `chain × ARS` 不显著
+  - `independent × ARS` 只是镜像写法，本质上也没有额外差异
+  - `chain_small × ARS` 不显著
+  - `chain3_small × ARS` 不显著
+
+当前解释：
+
+- 现在可以保留一个描述性判断：`ARS` 的负效应在 independent 酒店上看起来更清楚。
+- 但还不能写成“组织形态显著调节 ARS 作用”的正式结论。
+
 ## Route 2: ARS As Moderator
 
 ### 已经有的内容
@@ -209,6 +278,51 @@
   - 部分情况下的后续 sentiment
 - 因此这条更适合继续往“management response 改变后续评论生产环境”去写，而不是直接写成“management response 改变当期 ARS 对 revenue 的边际效应”。
 
+### 2026-06-05 快速结果：engagement style
+
+对应脚本：`scripts/stata/run_routeB_engagement_style_260605.do`
+
+- revenue moderation 这组里，`ARS` 主效应非常稳：
+  - 17 个规格里 `sim_mean` 都保持显著负向，系数大致在 `-0.181` 到 `-0.208`
+- 真正打出交互的主要是两条：
+  - `invite share × ARS` 显著正向，系数约 `0.498`
+  - `negative-tone share × ARS` 边际显著负向，系数约 `-0.320`
+- 其他 interaction 目前都没有打出来：
+  - `reply rate × ARS` 不显著
+  - `reply count × ARS` 不显著
+  - `reply words × ARS` 不显著
+  - `quick reply × ARS` 不显著
+  - `thanks / apology / recovery / positive / personal / template / manager × ARS` 都不显著
+
+当前解释：
+
+- `invite` 类 wording 更像是在削弱 `ARS` 的负效应，可能对应一种主动引导、继续互动的管理信号。
+- `negative/problem tone` 更像是在放大 `ARS` 的负效应，说明回复文本如果更像 complaint handling，本身未必能缓和高相似评论环境。
+- 所以 engagement style 里最值得继续深化的，不是“回复强度”，而是“回复话术和管理语气”。
+
+mechanism 这组也有比较清楚的方向：
+
+- 覆盖率 / 强度不是单方向的：
+  - `lag_mr_rate` 降低后续评论量
+  - `lag_mr_count` 提高后续评论量
+  - `ln_lag_mr_words` 提高后续评论量和后续 `ARS`
+  - `ln_lag_mr_avg_words` 降低后续评论量和后续 `ARS`
+- 速度变量有一点机制信号：
+  - `lag_mr_quick7_share` 提高后续评论量
+  - `lag_mr_avg_resp_days` 降低后续评论量
+- 语气 / 风格变量对后续环境更敏感：
+  - `lag_mr_thanks_share` 降低后续 `ARS`
+  - `lag_mr_apology_share` 让后续 sentiment 更负，且弱提升后续评论量
+  - `lag_mr_invite_share` 让后续 sentiment 更负
+  - `lag_mr_recovery_share` 让后续 sentiment 更负，且弱提升后续评论量
+  - `lag_mr_personal_share` 降低后续评论量，但提高后续 `ARS`
+  - `lag_mr_mgr_share` 弱提高后续评论量
+
+当前解释：
+
+- 这组已经开始接近一条真正的机制链：management response 不只是“回没回”，而是在改变后续评论生产的数量、结构和氛围。
+- 下一步最值得延伸的是把 `invite`、`negative tone`、`personalization` 三组变量拉出来，和回复对象策略合并成一条更完整的 MR story。
+
 ## Data Boundaries
 
 ### 已确认可继续利用的来源
@@ -255,6 +369,10 @@
 本轮新增的研究脚本：
 
 - `scripts/stata/run_routeA_market_boundaries_260605.do`
+- `scripts/stata/run_routeA_product_systematics_260605.do`
+- `scripts/stata/run_routeA_review_environment_260605.do`
+- `scripts/stata/run_routeA_organization_boundaries_260605.do`
 - `scripts/stata/run_routeB_mr_targeting_260605.do`
+- `scripts/stata/run_routeB_engagement_style_260605.do`
 
-二者都按“显式回归 + 注释解释”的风格撰写。
+这些脚本都按“显式回归 + 注释解释”的风格撰写。
