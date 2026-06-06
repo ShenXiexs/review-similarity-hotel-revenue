@@ -24,7 +24,7 @@ local out_root "`project'/outputs/core_simi_260501"
 local data_dir "`out_root'/data"
 local table_dir "`out_root'/tables_explicit"
 local csv_dir "`out_root'/csv"
-local log_dir "`out_root'/stata-log"
+local log_dir "`project'/stata-log"
 local run_id "260605"
 local data_main "`data_dir'/core_simi_panel_260501_with_mr_text_sentiment_260526.dta"
 
@@ -57,13 +57,22 @@ format ym %tm
 xtset hotel_id_num ym
 sort hotel_id_num ym
 
-winsor2 ln_RevPAR_clean, cuts(1 99) suffix(_w199)
-winsor2 ln_lag_RevPAR_clean, cuts(1 99) suffix(_w199)
-
 capture drop ln_lag_mr_words
 capture drop ln_lag_mr_avg_words
 gen double ln_lag_mr_words = ln(lag_mr_text_words + 1) if !missing(lag_mr_text_words)
 gen double ln_lag_mr_avg_words = ln(lag_mr_avg_text_words + 1) if !missing(lag_mr_avg_text_words)
+
+
+winsor2 ln_RevPAR_clean, cuts(1 99) suffix(_w199)
+winsor2 ln_RevPAR_clean, cuts(5 95) suffix(_w595)
+winsor2 ln_lag_RevPAR_clean, cuts(1 99) suffix(_w199)
+winsor2 ln_lag_RevPAR_clean, cuts(5 95) suffix(_w595)
+
+
+winsor2 ln_RevPAR_clean, cuts(1 99) suffix(_w199_cym) by(City ym)
+winsor2 ln_RevPAR_clean, cuts(5 95) suffix(_w595_cym) by(City ym)
+winsor2 ln_lag_RevPAR_clean, cuts(1 99) suffix(_w199_cym) by(City ym)
+winsor2 ln_lag_RevPAR_clean, cuts(5 95) suffix(_w595_cym) by(City ym)
 
 estimates clear
 
@@ -74,17 +83,21 @@ reghdfe ln_RevPAR_clean_w199 c.sim_mean##i.lag_mr_any ///
     if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store gr_any
 
+reghdfe sim_mean i.lag_mr_any lag_sim_mean ///
+    ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc  ///
+    if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+
 * G1a-G1b. Grouped any-reply regressions.
 * Estimate the ARS slope separately when the hotel had no lagged reply activity and when it had any lagged reply activity.
-reghdfe ln_RevPAR_clean_w199 sim_mean ///
+reghdfe ln_RevPAR_clean sim_mean ///
     ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean ///
     if cs_sample_focus100 == 1 & lag_mr_any == 0, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store gr_any_0
 
-reghdfe ln_RevPAR_clean_w199 sim_mean ///
+reghdfe ln_RevPAR_clean sim_mean ///
     ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean ///
     if cs_sample_focus100 == 1 & lag_mr_any == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store gr_any_1
 
@@ -100,7 +113,7 @@ est store gr_rate
 capture drop med_lag_mr_rate
 capture drop g_hi_rate
 bysort Zip ym: egen med_lag_mr_rate = median(lag_mr_rate)
-generate g_hi_rate = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_rate) & lag_mr_rate >= med_lag_mr_rate
+generate g_hi_rate = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_rate) & lag_mr_rate > med_lag_mr_rate
 replace g_hi_rate = 0 if cs_sample_focus100 == 1 & !missing(lag_mr_rate) & lag_mr_rate < med_lag_mr_rate
 
 reghdfe ln_RevPAR_clean_w199 sim_mean ///
@@ -127,7 +140,7 @@ est store gr_count
 capture drop med_lag_mr_count
 capture drop g_hi_count
 bysort Zip ym: egen med_lag_mr_count = median(lag_mr_count)
-generate g_hi_count = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_count) & lag_mr_count >= med_lag_mr_count
+generate g_hi_count = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_count) & lag_mr_count > med_lag_mr_count
 replace g_hi_count = 0 if cs_sample_focus100 == 1 & !missing(lag_mr_count) & lag_mr_count < med_lag_mr_count
 
 reghdfe ln_RevPAR_clean_w199 sim_mean ///
@@ -154,7 +167,7 @@ est store gr_words
 capture drop med_ln_lag_mr_words
 capture drop g_hi_words
 bysort Zip ym: egen med_ln_lag_mr_words = median(ln_lag_mr_words)
-generate g_hi_words = 1 if cs_sample_focus100 == 1 & !missing(ln_lag_mr_words) & ln_lag_mr_words >= med_ln_lag_mr_words
+generate g_hi_words = 1 if cs_sample_focus100 == 1 & !missing(ln_lag_mr_words) & ln_lag_mr_words > med_ln_lag_mr_words
 replace g_hi_words = 0 if cs_sample_focus100 == 1 & !missing(ln_lag_mr_words) & ln_lag_mr_words < med_ln_lag_mr_words
 
 reghdfe ln_RevPAR_clean_w199 sim_mean ///
@@ -181,7 +194,7 @@ est store gr_avgwords
 capture drop med_ln_lag_mr_avg_words
 capture drop g_hi_avgw
 bysort Zip ym: egen med_ln_lag_mr_avg_words = median(ln_lag_mr_avg_words)
-generate g_hi_avgw = 1 if cs_sample_focus100 == 1 & !missing(ln_lag_mr_avg_words) & ln_lag_mr_avg_words >= med_ln_lag_mr_avg_words
+generate g_hi_avgw = 1 if cs_sample_focus100 == 1 & !missing(ln_lag_mr_avg_words) & ln_lag_mr_avg_words > med_ln_lag_mr_avg_words
 replace g_hi_avgw = 0 if cs_sample_focus100 == 1 & !missing(ln_lag_mr_avg_words) & ln_lag_mr_avg_words < med_ln_lag_mr_avg_words
 
 reghdfe ln_RevPAR_clean_w199 sim_mean ///
@@ -208,7 +221,7 @@ est store gr_quick7
 capture drop med_lag_mr_quick7_share
 capture drop g_hi_quick7
 bysort Zip ym: egen med_lag_mr_quick7_share = median(lag_mr_quick7_share)
-generate g_hi_quick7 = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_quick7_share) & lag_mr_quick7_share >= med_lag_mr_quick7_share
+generate g_hi_quick7 = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_quick7_share) & lag_mr_quick7_share > med_lag_mr_quick7_share
 replace g_hi_quick7 = 0 if cs_sample_focus100 == 1 & !missing(lag_mr_quick7_share) & lag_mr_quick7_share < med_lag_mr_quick7_share
 
 reghdfe ln_RevPAR_clean_w199 sim_mean ///
@@ -235,7 +248,7 @@ est store gr_quick30
 capture drop med_lag_mr_quick30_share
 capture drop g_hi_quick30
 bysort Zip ym: egen med_lag_mr_quick30_share = median(lag_mr_quick30_share)
-generate g_hi_quick30 = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_quick30_share) & lag_mr_quick30_share >= med_lag_mr_quick30_share
+generate g_hi_quick30 = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_quick30_share) & lag_mr_quick30_share > med_lag_mr_quick30_share
 replace g_hi_quick30 = 0 if cs_sample_focus100 == 1 & !missing(lag_mr_quick30_share) & lag_mr_quick30_share < med_lag_mr_quick30_share
 
 reghdfe ln_RevPAR_clean_w199 sim_mean ///
@@ -262,7 +275,7 @@ est store gr_respdays
 capture drop med_lag_mr_avg_resp_days
 capture drop g_hi_respdays
 bysort Zip ym: egen med_lag_mr_avg_resp_days = median(lag_mr_avg_resp_days)
-generate g_hi_respdays = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_avg_resp_days) & lag_mr_avg_resp_days >= med_lag_mr_avg_resp_days
+generate g_hi_respdays = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_avg_resp_days) & lag_mr_avg_resp_days > med_lag_mr_avg_resp_days
 replace g_hi_respdays = 0 if cs_sample_focus100 == 1 & !missing(lag_mr_avg_resp_days) & lag_mr_avg_resp_days < med_lag_mr_avg_resp_days
 
 reghdfe ln_RevPAR_clean_w199 sim_mean ///
@@ -289,7 +302,7 @@ est store gr_thanks
 capture drop med_lag_mr_thanks_share
 capture drop g_hi_thanks
 bysort Zip ym: egen med_lag_mr_thanks_share = median(lag_mr_thanks_share)
-generate g_hi_thanks = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_thanks_share) & lag_mr_thanks_share >= med_lag_mr_thanks_share
+generate g_hi_thanks = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_thanks_share) & lag_mr_thanks_share > med_lag_mr_thanks_share
 replace g_hi_thanks = 0 if cs_sample_focus100 == 1 & !missing(lag_mr_thanks_share) & lag_mr_thanks_share < med_lag_mr_thanks_share
 
 reghdfe ln_RevPAR_clean_w199 sim_mean ///
@@ -316,18 +329,18 @@ est store gr_apology
 capture drop med_lag_mr_apology_share
 capture drop g_hi_apology
 bysort Zip ym: egen med_lag_mr_apology_share = median(lag_mr_apology_share)
-generate g_hi_apology = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_apology_share) & lag_mr_apology_share >= med_lag_mr_apology_share
+generate g_hi_apology = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_apology_share) & lag_mr_apology_share > med_lag_mr_apology_share
 replace g_hi_apology = 0 if cs_sample_focus100 == 1 & !missing(lag_mr_apology_share) & lag_mr_apology_share < med_lag_mr_apology_share
 
-reghdfe ln_RevPAR_clean_w199 sim_mean ///
+reghdfe ln_RevPAR_clean sim_mean ///
     ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 lag_mr_any ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean lag_mr_any ///
     if cs_sample_focus100 == 1 & g_hi_apology == 0, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store gr_apology_low
 
-reghdfe ln_RevPAR_clean_w199 sim_mean ///
+reghdfe ln_RevPAR_clean sim_mean ///
     ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 lag_mr_any ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean lag_mr_any ///
     if cs_sample_focus100 == 1 & g_hi_apology == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store gr_apology_high
 
@@ -343,18 +356,18 @@ est store gr_invite
 capture drop med_lag_mr_invite_share
 capture drop g_hi_invite
 bysort Zip ym: egen med_lag_mr_invite_share = median(lag_mr_invite_share)
-generate g_hi_invite = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_invite_share) & lag_mr_invite_share >= med_lag_mr_invite_share
+generate g_hi_invite = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_invite_share) & lag_mr_invite_share > med_lag_mr_invite_share
 replace g_hi_invite = 0 if cs_sample_focus100 == 1 & !missing(lag_mr_invite_share) & lag_mr_invite_share < med_lag_mr_invite_share
 
-reghdfe ln_RevPAR_clean_w199 sim_mean ///
+reghdfe ln_RevPAR_clean sim_mean ///
     ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 lag_mr_any ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean lag_mr_any ///
     if cs_sample_focus100 == 1 & g_hi_invite == 0, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store gr_invite_low
 
-reghdfe ln_RevPAR_clean_w199 sim_mean ///
+reghdfe ln_RevPAR_clean sim_mean ///
     ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 lag_mr_any ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean lag_mr_any ///
     if cs_sample_focus100 == 1 & g_hi_invite == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store gr_invite_high
 
@@ -370,7 +383,7 @@ est store gr_recovery
 capture drop med_lag_mr_recovery_share
 capture drop g_hi_recovery
 bysort Zip ym: egen med_lag_mr_recovery_share = median(lag_mr_recovery_share)
-generate g_hi_recovery = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_recovery_share) & lag_mr_recovery_share >= med_lag_mr_recovery_share
+generate g_hi_recovery = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_recovery_share) & lag_mr_recovery_share > med_lag_mr_recovery_share
 replace g_hi_recovery = 0 if cs_sample_focus100 == 1 & !missing(lag_mr_recovery_share) & lag_mr_recovery_share < med_lag_mr_recovery_share
 
 reghdfe ln_RevPAR_clean_w199 sim_mean ///
@@ -386,9 +399,9 @@ reghdfe ln_RevPAR_clean_w199 sim_mean ///
 est store gr_recovery_high
 
 * G13. Tone: positive wording.
-reghdfe ln_RevPAR_clean_w199 c.sim_mean##c.lag_mr_positive_share ///
+reghdfe ln_RevPAR_clean c.sim_mean##c.lag_mr_positive_share ///
     ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 lag_mr_any ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean lag_mr_any ///
     if cs_sample_focus100 == 1 & !missing(lag_mr_positive_share), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store gr_positive
 
@@ -397,7 +410,7 @@ est store gr_positive
 capture drop med_lag_mr_positive_share
 capture drop g_hi_positive
 bysort Zip ym: egen med_lag_mr_positive_share = median(lag_mr_positive_share)
-generate g_hi_positive = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_positive_share) & lag_mr_positive_share >= med_lag_mr_positive_share
+generate g_hi_positive = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_positive_share) & lag_mr_positive_share > med_lag_mr_positive_share
 replace g_hi_positive = 0 if cs_sample_focus100 == 1 & !missing(lag_mr_positive_share) & lag_mr_positive_share < med_lag_mr_positive_share
 
 reghdfe ln_RevPAR_clean_w199 sim_mean ///
@@ -413,9 +426,9 @@ reghdfe ln_RevPAR_clean_w199 sim_mean ///
 est store gr_positive_high
 
 * G14. Tone: problem/negative wording.
-reghdfe ln_RevPAR_clean_w199 c.sim_mean##c.lag_mr_negtone_share ///
+reghdfe ln_RevPAR_clean c.sim_mean##c.lag_mr_negtone_share ///
     ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 lag_mr_any ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean lag_mr_any ///
     if cs_sample_focus100 == 1 & !missing(lag_mr_negtone_share), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store gr_negtone
 
@@ -424,18 +437,18 @@ est store gr_negtone
 capture drop med_lag_mr_negtone_share
 capture drop g_hi_negtone
 bysort Zip ym: egen med_lag_mr_negtone_share = median(lag_mr_negtone_share)
-generate g_hi_negtone = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_negtone_share) & lag_mr_negtone_share >= med_lag_mr_negtone_share
+generate g_hi_negtone = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_negtone_share) & lag_mr_negtone_share > med_lag_mr_negtone_share
 replace g_hi_negtone = 0 if cs_sample_focus100 == 1 & !missing(lag_mr_negtone_share) & lag_mr_negtone_share < med_lag_mr_negtone_share
 
-reghdfe ln_RevPAR_clean_w199 sim_mean ///
+reghdfe ln_RevPAR_clean_w595 sim_mean ///
     ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 lag_mr_any ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 lag_mr_any ///
     if cs_sample_focus100 == 1 & g_hi_negtone == 0, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store gr_negtone_low
 
-reghdfe ln_RevPAR_clean_w199 sim_mean ///
+reghdfe ln_RevPAR_clean_w595 sim_mean ///
     ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 lag_mr_any ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 lag_mr_any ///
     if cs_sample_focus100 == 1 & g_hi_negtone == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store gr_negtone_high
 
@@ -451,7 +464,7 @@ est store gr_personal
 capture drop med_lag_mr_personal_share
 capture drop g_hi_personal
 bysort Zip ym: egen med_lag_mr_personal_share = median(lag_mr_personal_share)
-generate g_hi_personal = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_personal_share) & lag_mr_personal_share >= med_lag_mr_personal_share
+generate g_hi_personal = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_personal_share) & lag_mr_personal_share > med_lag_mr_personal_share
 replace g_hi_personal = 0 if cs_sample_focus100 == 1 & !missing(lag_mr_personal_share) & lag_mr_personal_share < med_lag_mr_personal_share
 
 reghdfe ln_RevPAR_clean_w199 sim_mean ///
@@ -466,46 +479,19 @@ reghdfe ln_RevPAR_clean_w199 sim_mean ///
     if cs_sample_focus100 == 1 & g_hi_personal == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store gr_personal_high
 
-* G16. Standardized template wording.
-reghdfe ln_RevPAR_clean_w199 c.sim_mean##c.lag_mr_template_share ///
-    ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 lag_mr_any ///
-    if cs_sample_focus100 == 1 & !missing(lag_mr_template_share), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
-est store gr_template
-
-* G16a-G16b. Grouped template-wording regressions.
-* Split hotels into lower- and higher-template-wording cells within each Zip-month.
-capture drop med_lag_mr_template_share
-capture drop g_hi_template
-bysort Zip ym: egen med_lag_mr_template_share = median(lag_mr_template_share)
-generate g_hi_template = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_template_share) & lag_mr_template_share >= med_lag_mr_template_share
-replace g_hi_template = 0 if cs_sample_focus100 == 1 & !missing(lag_mr_template_share) & lag_mr_template_share < med_lag_mr_template_share
-
-reghdfe ln_RevPAR_clean_w199 sim_mean ///
-    ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 lag_mr_any ///
-    if cs_sample_focus100 == 1 & g_hi_template == 0, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
-est store gr_template_low
-
-reghdfe ln_RevPAR_clean_w199 sim_mean ///
-    ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 lag_mr_any ///
-    if cs_sample_focus100 == 1 & g_hi_template == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
-est store gr_template_high
-
-* G17. Manager-signed wording.
+* G16. Manager-signed wording.
 reghdfe ln_RevPAR_clean_w199 c.sim_mean##c.lag_mr_mgr_share ///
     ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
     ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 lag_mr_any ///
     if cs_sample_focus100 == 1 & !missing(lag_mr_mgr_share), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store gr_mgr
 
-* G17a-G17b. Grouped manager-signoff regressions.
+* G16a-G16b. Grouped manager-signoff regressions.
 * Split hotels into lower- and higher-manager-signoff cells within each Zip-month.
 capture drop med_lag_mr_mgr_share
 capture drop g_hi_mgr
 bysort Zip ym: egen med_lag_mr_mgr_share = median(lag_mr_mgr_share)
-generate g_hi_mgr = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_mgr_share) & lag_mr_mgr_share >= med_lag_mr_mgr_share
+generate g_hi_mgr = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_mgr_share) & lag_mr_mgr_share > med_lag_mr_mgr_share
 replace g_hi_mgr = 0 if cs_sample_focus100 == 1 & !missing(lag_mr_mgr_share) & lag_mr_mgr_share < med_lag_mr_mgr_share
 
 reghdfe ln_RevPAR_clean_w199 sim_mean ///
@@ -520,36 +506,36 @@ reghdfe ln_RevPAR_clean_w199 sim_mean ///
     if cs_sample_focus100 == 1 & g_hi_mgr == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store gr_mgr_high
 
-esttab gr_any gr_rate gr_count gr_words gr_avgwords gr_quick7 gr_quick30 gr_respdays gr_thanks gr_apology gr_invite gr_recovery gr_positive gr_negtone gr_personal gr_template gr_mgr ///
+esttab gr_any gr_rate gr_count gr_words gr_avgwords gr_quick7 gr_quick30 gr_respdays gr_thanks gr_apology gr_invite gr_recovery gr_positive gr_negtone gr_personal gr_mgr ///
     using "`table_dir'/routeB_engagement_style_revenue_`run_id'.rtf", replace ///
     star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
     cells(b(star fmt(4)) se(par fmt(4))) ///
     stats(N r2_a, labels("Observations" "Adjusted R-squared")) ///
-    mtitles("any" "rate" "count" "words" "avg words" "quick7" "quick30" "days" "thanks" "apology" "invite" "recovery" "positive" "neg tone" "personal" "template" "manager") ///
+    mtitles("any" "rate" "count" "words" "avg words" "quick7" "quick30" "days" "thanks" "apology" "invite" "recovery" "positive" "neg tone" "personal" "manager") ///
     nogap compress
 
-esttab gr_any gr_rate gr_count gr_words gr_avgwords gr_quick7 gr_quick30 gr_respdays gr_thanks gr_apology gr_invite gr_recovery gr_positive gr_negtone gr_personal gr_template gr_mgr ///
+esttab gr_any gr_rate gr_count gr_words gr_avgwords gr_quick7 gr_quick30 gr_respdays gr_thanks gr_apology gr_invite gr_recovery gr_positive gr_negtone gr_personal gr_mgr ///
     using "`csv_dir'/routeB_engagement_style_revenue_`run_id'.csv", replace csv ///
     star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
     cells(b(star fmt(4)) se(par fmt(4))) ///
     stats(N r2_a, labels("Observations" "Adjusted R-squared")) ///
-    mtitles("any" "rate" "count" "words" "avg words" "quick7" "quick30" "days" "thanks" "apology" "invite" "recovery" "positive" "neg tone" "personal" "template" "manager") ///
+    mtitles("any" "rate" "count" "words" "avg words" "quick7" "quick30" "days" "thanks" "apology" "invite" "recovery" "positive" "neg tone" "personal" "manager") ///
     nogap
 
-esttab gr_any_0 gr_any_1 gr_rate_low gr_rate_high gr_count_low gr_count_high gr_words_low gr_words_high gr_avgwords_low gr_avgwords_high gr_quick7_low gr_quick7_high gr_quick30_low gr_quick30_high gr_respdays_low gr_respdays_high gr_thanks_low gr_thanks_high gr_apology_low gr_apology_high gr_invite_low gr_invite_high gr_recovery_low gr_recovery_high gr_positive_low gr_positive_high gr_negtone_low gr_negtone_high gr_personal_low gr_personal_high gr_template_low gr_template_high gr_mgr_low gr_mgr_high ///
+esttab gr_any_0 gr_any_1 gr_rate_low gr_rate_high gr_count_low gr_count_high gr_words_low gr_words_high gr_avgwords_low gr_avgwords_high gr_quick7_low gr_quick7_high gr_quick30_low gr_quick30_high gr_respdays_low gr_respdays_high gr_thanks_low gr_thanks_high gr_apology_low gr_apology_high gr_invite_low gr_invite_high gr_recovery_low gr_recovery_high gr_positive_low gr_positive_high gr_negtone_low gr_negtone_high gr_personal_low gr_personal_high gr_mgr_low gr_mgr_high ///
     using "`table_dir'/routeB_engagement_style_revenue_grouped_`run_id'.rtf", replace ///
     star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
     cells(b(star fmt(4)) se(par fmt(4))) ///
     stats(N r2_a, labels("Observations" "Adjusted R-squared")) ///
-    mtitles("any=0" "any=1" "rate low" "rate high" "count low" "count high" "words low" "words high" "avg words low" "avg words high" "quick7 low" "quick7 high" "quick30 low" "quick30 high" "days low" "days high" "thanks low" "thanks high" "apology low" "apology high" "invite low" "invite high" "recovery low" "recovery high" "positive low" "positive high" "neg tone low" "neg tone high" "personal low" "personal high" "template low" "template high" "manager low" "manager high") ///
+    mtitles("any=0" "any=1" "rate low" "rate high" "count low" "count high" "words low" "words high" "avg words low" "avg words high" "quick7 low" "quick7 high" "quick30 low" "quick30 high" "days low" "days high" "thanks low" "thanks high" "apology low" "apology high" "invite low" "invite high" "recovery low" "recovery high" "positive low" "positive high" "neg tone low" "neg tone high" "personal low" "personal high" "manager low" "manager high") ///
     nogap compress
 
-esttab gr_any_0 gr_any_1 gr_rate_low gr_rate_high gr_count_low gr_count_high gr_words_low gr_words_high gr_avgwords_low gr_avgwords_high gr_quick7_low gr_quick7_high gr_quick30_low gr_quick30_high gr_respdays_low gr_respdays_high gr_thanks_low gr_thanks_high gr_apology_low gr_apology_high gr_invite_low gr_invite_high gr_recovery_low gr_recovery_high gr_positive_low gr_positive_high gr_negtone_low gr_negtone_high gr_personal_low gr_personal_high gr_template_low gr_template_high gr_mgr_low gr_mgr_high ///
+esttab gr_any_0 gr_any_1 gr_rate_low gr_rate_high gr_count_low gr_count_high gr_words_low gr_words_high gr_avgwords_low gr_avgwords_high gr_quick7_low gr_quick7_high gr_quick30_low gr_quick30_high gr_respdays_low gr_respdays_high gr_thanks_low gr_thanks_high gr_apology_low gr_apology_high gr_invite_low gr_invite_high gr_recovery_low gr_recovery_high gr_positive_low gr_positive_high gr_negtone_low gr_negtone_high gr_personal_low gr_personal_high gr_mgr_low gr_mgr_high ///
     using "`csv_dir'/routeB_engagement_style_revenue_grouped_`run_id'.csv", replace csv ///
     star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
     cells(b(star fmt(4)) se(par fmt(4))) ///
     stats(N r2_a, labels("Observations" "Adjusted R-squared")) ///
-    mtitles("any=0" "any=1" "rate low" "rate high" "count low" "count high" "words low" "words high" "avg words low" "avg words high" "quick7 low" "quick7 high" "quick30 low" "quick30 high" "days low" "days high" "thanks low" "thanks high" "apology low" "apology high" "invite low" "invite high" "recovery low" "recovery high" "positive low" "positive high" "neg tone low" "neg tone high" "personal low" "personal high" "template low" "template high" "manager low" "manager high") ///
+    mtitles("any=0" "any=1" "rate low" "rate high" "count low" "count high" "words low" "words high" "avg words low" "avg words high" "quick7 low" "quick7 high" "quick30 low" "quick30 high" "days low" "days high" "thanks low" "thanks high" "apology low" "apology high" "invite low" "invite high" "recovery low" "recovery high" "positive low" "positive high" "neg tone low" "neg tone high" "personal low" "personal high" "manager low" "manager high") ///
     nogap
 
 estimates clear

@@ -25,7 +25,7 @@ local out_root "`project'/outputs/core_simi_260501"
 local data_dir "`out_root'/data"
 local table_dir "`out_root'/tables_explicit"
 local csv_dir "`out_root'/csv"
-local log_dir "`out_root'/logs"
+local log_dir "`project'/stata-log"
 local run_id "260605"
 
 local data_main "`data_dir'/core_simi_panel_260501_with_mr_text_sentiment_260526.dta"
@@ -70,70 +70,24 @@ else {
     gen long hotel_id_num = HotelID
 }
 
+keep if cs_sample_focus100 == 1
+
 capture drop ym
 gen ym = monthly(year_month, "YM")
 format ym %tm
 xtset hotel_id_num ym
 sort hotel_id_num ym
 
-capture drop ln_RevPAR_clean_w199 ln_lag_RevPAR_clean_w199
-gen double ln_RevPAR_clean_w199 = ln_RevPAR_clean
-gen double ln_lag_RevPAR_clean_w199 = ln_lag_RevPAR_clean
-
-quietly _pctile ln_RevPAR_clean if cs_sample_focus100 == 1, p(1 99)
-local y_p1 = r(r1)
-local y_p99 = r(r2)
-quietly _pctile ln_lag_RevPAR_clean if cs_sample_focus100 == 1, p(1 99)
-local ly_p1 = r(r1)
-local ly_p99 = r(r2)
-
-replace ln_RevPAR_clean_w199 = `y_p1' if ln_RevPAR_clean_w199 < `y_p1' & !missing(ln_RevPAR_clean_w199)
-replace ln_RevPAR_clean_w199 = `y_p99' if ln_RevPAR_clean_w199 > `y_p99' & !missing(ln_RevPAR_clean_w199)
-replace ln_lag_RevPAR_clean_w199 = `ly_p1' if ln_lag_RevPAR_clean_w199 < `ly_p1' & !missing(ln_lag_RevPAR_clean_w199)
-replace ln_lag_RevPAR_clean_w199 = `ly_p99' if ln_lag_RevPAR_clean_w199 > `ly_p99' & !missing(ln_lag_RevPAR_clean_w199)
+winsor2 ln_RevPAR_clean, cuts(1 99) suffix(_w199)
+winsor2 ln_RevPAR_clean, cuts(5 95) suffix(_w595)
+winsor2 ln_lag_RevPAR_clean, cuts(1 99) suffix(_w199)
+winsor2 ln_lag_RevPAR_clean, cuts(5 95) suffix(_w595)
 
 capture confirm variable ln_lag_mr_words
 if _rc {
     capture drop ln_lag_mr_words
     gen double ln_lag_mr_words = ln(lag_mr_text_words + 1)
 }
-
-capture drop sim_mean_c lag_mr_rate_c lag_mr_count_c ln_lag_mr_words_c
-capture drop mr_rep_complaint_c mr_rep_service_c mr_rep_room_c mr_rep_clean_c
-capture drop mr_rep_value_c mr_rep_neg_c mr_rep_low_c
-
-quietly summarize sim_mean if cs_sample_focus100 == 1 & !missing(sim_mean)
-gen double sim_mean_c = sim_mean - r(mean) if !missing(sim_mean)
-
-quietly summarize lag_mr_rate if cs_sample_focus100 == 1 & !missing(lag_mr_rate)
-gen double lag_mr_rate_c = lag_mr_rate - r(mean) if !missing(lag_mr_rate)
-
-quietly summarize lag_mr_count if cs_sample_focus100 == 1 & !missing(lag_mr_count)
-gen double lag_mr_count_c = lag_mr_count - r(mean) if !missing(lag_mr_count)
-
-quietly summarize ln_lag_mr_words if cs_sample_focus100 == 1 & !missing(ln_lag_mr_words)
-gen double ln_lag_mr_words_c = ln_lag_mr_words - r(mean) if !missing(ln_lag_mr_words)
-
-quietly summarize lag_mr_rep_complaint_share if cs_sample_focus100 == 1 & !missing(lag_mr_rep_complaint_share)
-gen double mr_rep_complaint_c = lag_mr_rep_complaint_share - r(mean) if !missing(lag_mr_rep_complaint_share)
-
-quietly summarize lag_mr_rep_service_share if cs_sample_focus100 == 1 & !missing(lag_mr_rep_service_share)
-gen double mr_rep_service_c = lag_mr_rep_service_share - r(mean) if !missing(lag_mr_rep_service_share)
-
-quietly summarize lag_mr_rep_room_share if cs_sample_focus100 == 1 & !missing(lag_mr_rep_room_share)
-gen double mr_rep_room_c = lag_mr_rep_room_share - r(mean) if !missing(lag_mr_rep_room_share)
-
-quietly summarize lag_mr_rep_clean_share if cs_sample_focus100 == 1 & !missing(lag_mr_rep_clean_share)
-gen double mr_rep_clean_c = lag_mr_rep_clean_share - r(mean) if !missing(lag_mr_rep_clean_share)
-
-quietly summarize lag_mr_rep_value_share if cs_sample_focus100 == 1 & !missing(lag_mr_rep_value_share)
-gen double mr_rep_value_c = lag_mr_rep_value_share - r(mean) if !missing(lag_mr_rep_value_share)
-
-quietly summarize lag_mr_rep_neg_share if cs_sample_focus100 == 1 & !missing(lag_mr_rep_neg_share)
-gen double mr_rep_neg_c = lag_mr_rep_neg_share - r(mean) if !missing(lag_mr_rep_neg_share)
-
-quietly summarize lag_mr_rep_low_share if cs_sample_focus100 == 1 & !missing(lag_mr_rep_low_share)
-gen double mr_rep_low_c = lag_mr_rep_low_share - r(mean) if !missing(lag_mr_rep_low_share)
 
 *******************************************************
 ************ 2. revenue moderation by targeting ********
@@ -143,72 +97,127 @@ estimates clear
 
 * T1. Complaint-heavy reply targeting.
 * This asks whether ARS matters differently when management focuses replies on complaint-heavy reviews.
-reghdfe ln_RevPAR_clean_w199 c.sim_mean_c##c.mr_rep_complaint_c ///
+reghdfe ln_RevPAR_clean_w199 c.sim_mean##c.lag_mr_rep_complaint_share ///
     ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc ///
     lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 ///
     lag_mr_any lag_mr_rate lag_mr_count ///
     if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store rt_complaint
 
+* T1a-T1b. Grouped complaint-targeting regressions.
+* Split hotels into lower- and higher-complaint-targeting cells within each Zip-month.
+capture drop med_lag_mr_rep_complaint_share
+capture drop t_hi_complaint
+bysort Zip ym: egen med_lag_mr_rep_complaint_share = median(lag_mr_rep_complaint_share)
+generate t_hi_complaint = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_rep_complaint_share) & lag_mr_rep_complaint_share > med_lag_mr_rep_complaint_share
+replace t_hi_complaint = 0 if cs_sample_focus100 == 1 & !missing(lag_mr_rep_complaint_share) & lag_mr_rep_complaint_share < med_lag_mr_rep_complaint_share
+
+reghdfe ln_RevPAR_clean_w199 sim_mean ///
+    ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc ///
+    lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 ///
+    lag_mr_any lag_mr_rate lag_mr_count ///
+    if cs_sample_focus100 == 1 & t_hi_complaint == 0, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store rt_complaint_low
+
+reghdfe ln_RevPAR_clean_w199 sim_mean ///
+    ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc ///
+    lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 ///
+    lag_mr_any lag_mr_rate lag_mr_count ///
+    if cs_sample_focus100 == 1 & t_hi_complaint == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store rt_complaint_high
+
 * T2. Service-issue targeting.
 * Here the interaction tests whether reply focus on service complaints changes the ARS revenue slope.
-reghdfe ln_RevPAR_clean_w199 c.sim_mean_c##c.mr_rep_service_c ///
+reghdfe ln_RevPAR_clean_w199 c.sim_mean##c.lag_mr_rep_service_share ///
     ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc ///
     lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 ///
     lag_mr_any lag_mr_rate lag_mr_count ///
     if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store rt_service
 
+* T2a-T2b. Grouped service-targeting regressions.
+* Split hotels into lower- and higher-service-targeting cells within each Zip-month.
+capture drop med_lag_mr_rep_service_share
+capture drop t_hi_service
+bysort Zip ym: egen med_lag_mr_rep_service_share = median(lag_mr_rep_service_share)
+generate t_hi_service = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_rep_service_share) & lag_mr_rep_service_share > med_lag_mr_rep_service_share
+replace t_hi_service = 0 if cs_sample_focus100 == 1 & !missing(lag_mr_rep_service_share) & lag_mr_rep_service_share < med_lag_mr_rep_service_share
+
+reghdfe ln_RevPAR_clean_w595 sim_mean ///
+    ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc ///
+    lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 ///
+    lag_mr_any lag_mr_rate lag_mr_count ///
+    if cs_sample_focus100 == 1 & t_hi_service == 0, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store rt_service_low
+
+reghdfe ln_RevPAR_clean_w595 sim_mean ///
+    ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc ///
+    lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 ///
+    lag_mr_any lag_mr_rate lag_mr_count ///
+    if cs_sample_focus100 == 1 & t_hi_service == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store rt_service_high
+
 * T3. Room-issue targeting.
 * This asks whether room-complaint engagement changes the value of review similarity.
-reghdfe ln_RevPAR_clean_w199 c.sim_mean_c##c.mr_rep_room_c ///
+reghdfe ln_RevPAR_clean_w199 c.sim_mean##c.lag_mr_rep_room_share ///
     ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc ///
     lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 ///
     lag_mr_any lag_mr_rate lag_mr_count ///
     if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store rt_room
 
-* T4. Cleanliness-issue targeting.
-* The question is whether management attention to cleanliness complaints amplifies or dampens the ARS slope.
-reghdfe ln_RevPAR_clean_w199 c.sim_mean_c##c.mr_rep_clean_c ///
+* T3a-T3b. Grouped room-targeting regressions.
+* Split hotels into lower- and higher-room-targeting cells within each Zip-month.
+capture drop med_lag_mr_rep_room_share
+capture drop t_hi_room
+bysort Zip ym: egen med_lag_mr_rep_room_share = median(lag_mr_rep_room_share)
+generate t_hi_room = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_rep_room_share) & lag_mr_rep_room_share > med_lag_mr_rep_room_share
+replace t_hi_room = 0 if cs_sample_focus100 == 1 & !missing(lag_mr_rep_room_share) & lag_mr_rep_room_share < med_lag_mr_rep_room_share
+
+reghdfe ln_RevPAR_clean_w199 sim_mean ///
     ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc ///
     lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 ///
     lag_mr_any lag_mr_rate lag_mr_count ///
-    if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
-est store rt_clean
+    if cs_sample_focus100 == 1 & t_hi_room == 0, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store rt_room_low
 
-* T5. Value-issue targeting.
-* This uses replies to value-for-money complaints as the focal targeting strategy.
-reghdfe ln_RevPAR_clean_w199 c.sim_mean_c##c.mr_rep_value_c ///
+reghdfe ln_RevPAR_clean_w199 sim_mean ///
     ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc ///
     lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 ///
     lag_mr_any lag_mr_rate lag_mr_count ///
-    if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
-est store rt_value
+    if cs_sample_focus100 == 1 & t_hi_room == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store rt_room_high
 
-* T6. Triple interaction for complaint targeting intensity.
-* This checks whether complaint-heavy targeting changes how reply rate and ARS jointly shape revenue.
-reghdfe ln_RevPAR_clean_w199 c.lag_mr_rate_c##c.sim_mean_c##c.mr_rep_complaint_c ///
-    ln_recent_volumn recent_sd recent_rating ln_lag_volumn_acc lag_avg_rating_acc ///
-    lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 ///
-    lag_mr_any lag_mr_count ///
-    if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
-est store rt_triple_complaint
-
-esttab rt_complaint rt_service rt_room rt_clean rt_value rt_triple_complaint ///
+esttab rt_complaint rt_service rt_room ///
     using "`table_dir'/routeB_mr_targeting_revenue_`run_id'.rtf", replace ///
     star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
     cells(b(star fmt(4)) se(par fmt(4))) ///
     stats(N r2_a, labels("Observations" "Adjusted R-squared")) ///
-    mtitles("complaint" "service" "room" "clean" "value" "triple complaint") ///
+    mtitles("complaint" "service" "room") ///
     nogap compress
 
-esttab rt_complaint rt_service rt_room rt_clean rt_value rt_triple_complaint ///
+esttab rt_complaint rt_service rt_room ///
     using "`csv_dir'/routeB_mr_targeting_revenue_`run_id'.csv", replace csv ///
     star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
     cells(b(star fmt(4)) se(par fmt(4))) ///
     stats(N r2_a, labels("Observations" "Adjusted R-squared")) ///
-    mtitles("complaint" "service" "room" "clean" "value" "triple complaint") ///
+    mtitles("complaint" "service" "room") ///
+    nogap
+
+esttab rt_complaint_low rt_complaint_high rt_service_low rt_service_high rt_room_low rt_room_high ///
+    using "`table_dir'/routeB_mr_targeting_revenue_grouped_`run_id'.rtf", replace ///
+    star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
+    cells(b(star fmt(4)) se(par fmt(4))) ///
+    stats(N r2_a, labels("Observations" "Adjusted R-squared")) ///
+    mtitles("complaint low" "complaint high" "service low" "service high" "room low" "room high") ///
+    nogap compress
+
+esttab rt_complaint_low rt_complaint_high rt_service_low rt_service_high rt_room_low rt_room_high ///
+    using "`csv_dir'/routeB_mr_targeting_revenue_grouped_`run_id'.csv", replace csv ///
+    star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
+    cells(b(star fmt(4)) se(par fmt(4))) ///
+    stats(N r2_a, labels("Observations" "Adjusted R-squared")) ///
+    mtitles("complaint low" "complaint high" "service low" "service high" "room low" "room high") ///
     nogap
 
 *******************************************************
@@ -217,7 +226,7 @@ esttab rt_complaint rt_service rt_room rt_clean rt_value rt_triple_complaint ///
 
 estimates clear
 
-* T7. Next-month review volume.
+* T4. Next-month review volume.
 * This asks whether targeting complaint-heavy or category-specific reviews predicts more later review inflow.
 reghdfe ln_recent_volumn ///
     lag_mr_rep_complaint_share lag_mr_rep_service_share lag_mr_rep_room_share ///
@@ -227,7 +236,7 @@ reghdfe ln_recent_volumn ///
     if cs_sample_focus100 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store tm_volume
 
-* T8. Next-month ARS.
+* T5. Next-month ARS.
 * This tests whether reply targeting changes the similarity structure of later reviews.
 reghdfe sim_mean ///
     lag_mr_rep_complaint_share lag_mr_rep_service_share lag_mr_rep_room_share ///
@@ -238,7 +247,7 @@ reghdfe sim_mean ///
     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store tm_ars
 
-* T9. Next-month review sentiment.
+* T6. Next-month review sentiment.
 * This asks whether reply targeting affects the tone of later review text.
 reghdfe sent_net_pos_bing ///
     lag_mr_rep_complaint_share lag_mr_rep_service_share lag_mr_rep_room_share ///
