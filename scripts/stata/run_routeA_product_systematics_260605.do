@@ -508,10 +508,10 @@ reghdfe ln_RevPAR_clean_w199 sim_mean ///
 est store ps_price_high
 
 
-esttab ps_price ps_room ps_reviews using "`table_dir'/routeA_product_pricescale_`run_id'.rtf", replace star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("price" "rooms" "profile reviews") nogap compress
-esttab ps_price ps_room ps_reviews using "`csv_dir'/routeA_product_pricescale_`run_id'.csv", replace csv star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("price" "rooms" "profile reviews") nogap
+esttab ps_price using "`table_dir'/routeA_product_pricescale_`run_id'.rtf", replace star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("price") nogap compress
+esttab ps_price using "`csv_dir'/routeA_product_pricescale_`run_id'.csv", replace csv star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("price") nogap
 
-esttab ps_price_low ps_price_high ps_room_low ps_room_high ps_reviews_low ps_reviews_high using "`table_dir'/routeA_product_pricescale_grouped_`run_id'.rtf", replace star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("price low" "price high" "rooms low" "rooms high" "reviews low" "reviews high") nogap compress
-esttab ps_price_low ps_price_high ps_room_low ps_room_high ps_reviews_low ps_reviews_high using "`csv_dir'/routeA_product_pricescale_grouped_`run_id'.csv", replace csv star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("price low" "price high" "rooms low" "rooms high" "reviews low" "reviews high") nogap
+esttab ps_price_low ps_price_high using "`table_dir'/routeA_product_pricescale_grouped_`run_id'.rtf", replace star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("price low" "price high") nogap compress
+esttab ps_price_low ps_price_high using "`csv_dir'/routeA_product_pricescale_grouped_`run_id'.csv", replace csv star(* 0.10 ** 0.05 *** 0.01 **** 0.001) cells(b(star fmt(4)) se(par fmt(4))) stats(N r2_a, labels("Observations" "Adjusted R-squared")) mtitles("price low" "price high") nogap
 
 log close

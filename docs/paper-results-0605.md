@@ -221,10 +221,52 @@ Price1 ln_tp_price_mid
 * Yes：`sim_mean = -.2696573`, `p = 0.006`
 * 同一个Zip下同一个ym，在其他条件控制的前提下，高价酒店期望更高也更需要降低不确定性
 
-Price1 ln_tp_price_mid
+Price ln_tp_price_mid
 
 * 交互项为正不显著
 * 分组Zip ym，组间差异通过
 * No：`sim_mean = -.0615404`, `p = 0.535`
 * Yes：`sim_mean = -.2696573`, `p = 0.006`
 * 同一个Zip下同一个ym，在其他条件控制的前提下，高价酒店期望更高也更需要降低不确定性
+
+### Review探索
+
+E1 recent_sd
+
+* 交互项为正不显著
+* 分组Zip ym，组间差异通过
+* 低SD：`sim_mean = -.2966674 `, `p = 0.003`
+* 高SD：`sim_mean = -.1367903`, `p = 0.228`
+* 同一个Zip下同一个ym，在其他条件控制的前提下，高价酒店期望更高也更需要降低不确定性
+
+E2 sd_acc
+
+* 交互项为正不显著
+* 分组Zip ym，组间差异通过
+* 低SD：`sim_mean = -.0687084 `, `p = 0.494`
+* 高SD：`sim_mean = -.1367903`, `p = 0.029`
+* 同一个Zip下同一个ym，在其他条件控制的前提下，高价酒店期望更高也更需要降低不确定性
+
+E3 sent_net_pos_bing
+
+* **Bing 文本情感的净正向指标**，越高正面文本明显多于负面文本，评论语气更净正向
+* 交互项不显著
+* 组间差异在0.1水平显著
+* 低：`sim_mean =  -.2444491 `, `p = 0.009`
+* 高：`sim_mean = -.0669176`, `p = 0.480`
+
+E4 prevvis_sent_avg_bing
+
+* Previous-visible-month average-Bing
+* 交互项不显著
+* 组间差异不够显著
+* 低：`sim_mean =  -.0790583 `, `p = 0.435`
+* 高：`sim_mean = -.1896518`, `p = 0.032`
+
+E5 prevvis_sent_avg_bing
+
+* prevvis_sent_net_pos_bing
+* 交互项不显著
+* 组间差异不够显著
+* 低：`sim_mean =  -.2593557 `, `p = 0.007`
+* 高：`sim_mean = -.1305891`, `p = 0.216`
