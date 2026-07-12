@@ -1,3 +1,214 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: Single-user 2-core  perpetual
+Serial number: 501806366047
+  Licensed to: Sam Xie
+               samxie
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 5,000; see help set_maxvar.
+
+
+Running /Applications/Stata/profile.do ...
+command window is unrecognized
+r(199);
+
+. do scripts/stata/run_event_month_pool_gt100_reply_mechanisms_260711.do 
+
+. ************************************************************
+. * Management replies -> subsequent review generation/content
+. *
+. * Unit: hotel-calendar-month t.  The treatment is restricted to
+. * replies posted in t-1, hence observable before t starts.  It never
+. * contains a response posted in t or a review posted in t.
+. *
+. * Quantity primary outcome: review_count (including zero-review months).
+. * Content primary outcome: ars_within_current, the pooled mean cosine
+. * similarity among new reviews written in t only.  It has no review-text
+. * overlap with the t-1 treatment/cohort.  Two-/three-month pooled ARS is
+. * retained only as a clearly labelled secondary check.
+. ************************************************************
+. version 17.0
+
+. clear all
+
+. set more off
+
+. set linesize 255
+
+. capture log close
+
+. 
+. local p "/Users/samxie/Research/ReviewSimi_Sales/Code"
+
+. use "`p'/outputs/core_simi_260501/data/calendar_month_pool_visible_mr_gt100_panel_260711.dta", clear
+
+. 
+. * Fail early if the strict month-start panel has not been rebuilt.
+. capture confirm variable review_count
+
+. if _rc {
+.     display as error "Missing strict visible-reply variables. Run scripts/r/build_calendar_month_pool_visible_mr_gt100_260711.R first."
+.     exit 111
+. }
+
+. capture confirm variable mr_prevcohort_visible_rate
+
+. if _rc {
+.     display as error "Missing mr_prevcohort_visible_rate. Rebuild the strict visible-reply DTA first."
+.     exit 111
+. }
+
+. 
+. capture confirm numeric variable HotelID
+
+. if _rc encode HotelID, gen(hotel_id_num)
+
+. else gen long hotel_id_num = HotelID
+
+. capture drop ym
+
+. gen int ym = monthly(event_ym, "YM")
+
+. format ym %tm
+
+. xtset hotel_id_num ym
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9
+         Delta: 1 month
+
+. 
+. * Make the analysis self-contained even if it is run with the preceding DTA.
+. * The R builder writes these variables permanently; the algebra below is an
+. * exact fallback because every visible reply is either to a t-1 review or to
+. * an older review.  No current-month observation is used.
+. capture confirm variable mr_visible_start_oldreview_n
+
+. if _rc gen long mr_visible_start_oldreview_n = mr_visible_start_n - mr_prevcohort_visible_n
+
+. replace mr_visible_start_oldreview_n = 0 if mr_visible_start_oldreview_n < 0 | missing(mr_visible_start_oldreview_n)
+(0 real changes made)
+
+. capture confirm variable mr_prevcohort_visible_any
+
+. if _rc gen byte mr_prevcohort_visible_any = mr_prevcohort_visible_n > 0
+
+. capture confirm variable mr_visible_start_oldreview_any
+
+. if _rc gen byte mr_visible_start_oldreview_any = mr_visible_start_oldreview_n > 0
+
+. capture confirm variable ln_mr_visible_start_oldreview_n
+
+. if _rc gen double ln_mr_visible_start_oldreview_n = ln(mr_visible_start_oldreview_n + 1)
+
+. capture confirm variable pre_ars_within_current
+
+. if _rc gen double pre_ars_within_current = L.ars_within_current
+
+. capture confirm variable pre_ars_within_current_missing
+
+. if _rc gen byte pre_ars_within_current_missing = missing(pre_ars_within_current)
+
+. replace pre_ars_within_current = 0 if missing(pre_ars_within_current)
+(0 real changes made)
+
+. 
+. capture which ppmlhdfe
+
+. if _rc {
+.     display as error "ppmlhdfe is required for the review-count primary models."
+.     exit 199
+. }
+
+. capture which reghdfe
+
+. if _rc {
+.     display as error "reghdfe is required for the linear content models."
+.     exit 199
+. }
+
+. 
+. * PPML is primary for count outcomes and keeps every at-risk month, including
+. * months with zero reviews.  The following log-count outcomes are only the
+. * previously requested winsorized linear sensitivity checks.
+. capture drop ln_review_count_w199 ln_review_count_w595 ln_review_count_w195
+
+. quietly _pctile ln_review_count if !missing(ln_review_count), p(1 99)
+
+. local count_p1 = r(r1)
+
+. local count_p99 = r(r2)
+
+. gen double ln_review_count_w199 = ln_review_count
+
+. replace ln_review_count_w199 = min(max(ln_review_count, `count_p1'), `count_p99') if !missing(ln_review_count)
+(474 real changes made)
+
+. quietly _pctile ln_review_count if !missing(ln_review_count), p(5 95)
+
+. local count_p5 = r(r1)
+
+. local count_p95 = r(r2)
+
+. gen double ln_review_count_w595 = ln_review_count
+
+. replace ln_review_count_w595 = min(max(ln_review_count, `count_p5'), `count_p95') if !missing(ln_review_count)
+(2,253 real changes made)
+
+. quietly _pctile ln_review_count if !missing(ln_review_count), p(1 95)
+
+. local count_p195 = r(r1)
+
+. local count_p995 = r(r2)
+
+. gen double ln_review_count_w195 = ln_review_count
+
+. replace ln_review_count_w195 = min(max(ln_review_count, `count_p195'), `count_p995') if !missing(ln_review_count)
+(2,253 real changes made)
+
+. 
+. * Grouped reply dose: no reply, 1--3 visible replies, and 4+ visible replies.
+. * This is a grouped specification, not an interaction.
+. capture drop mr_visible_intensity_group delta_ars_pool_visible L1_mr_visible_start_any L2_mr_visible_start_any
+
+. gen byte mr_visible_intensity_group = 0 if mr_visible_start_n == 0
+(22,107 missing values generated)
+
+. replace mr_visible_intensity_group = 1 if inrange(mr_visible_start_n, 1, 3)
+(10,434 real changes made)
+
+. replace mr_visible_intensity_group = 2 if mr_visible_start_n >= 4
+(11,673 real changes made)
+
+. label define mr_visible_intensity_group_lbl 0 "0 replies" 1 "1-3 replies" 2 "4+ replies", replace
+
+. label values mr_visible_intensity_group mr_visible_intensity_group_lbl
+
+. gen double delta_ars_pool_visible = ars_pool_visible - L.ars_pool_visible if !missing(ars_pool_visible, L.ars_pool_visible)
+(20,658 missing values generated)
+
+. gen byte L1_mr_visible_start_any = L.mr_visible_start_any
+(563 missing values generated)
+
+. gen byte L2_mr_visible_start_any = L2.mr_visible_start_any
+(1,126 missing values generated)
+
+. 
+. log using "`p'/stata-log/run_event_month_pool_gt100_reply_mechanisms_260711.log", text replace
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
       name:  <unnamed>
        log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_month_pool_gt100_reply_mechanisms_260711.log
@@ -936,3 +1147,6 @@ L2_mr_visi~y |                                                                  
   log type:  text
  closed on:  12 Jul 2026, 19:51:40
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+. 
+end of do-file

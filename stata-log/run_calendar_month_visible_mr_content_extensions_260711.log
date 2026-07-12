@@ -1,3 +1,102 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: Single-user 2-core  perpetual
+Serial number: 501806366047
+  Licensed to: Sam Xie
+               samxie
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 5,000; see help set_maxvar.
+
+
+Running /Applications/Stata/profile.do ...
+command window is unrecognized
+r(199);
+
+. do scripts/stata/run_calendar_month_visible_mr_content_extensions_260711.do 
+
+. version 17.0
+
+. clear all
+
+. set more off
+
+. capture log close
+
+. local p "/Users/samxie/Research/ReviewSimi_Sales/Code"
+
+. 
+. use "`p'/outputs/core_simi_260501/data/calendar_month_pool_visible_mr_gt100_p
+> anel_260711.dta", clear
+
+. capture confirm numeric variable HotelID
+
+. if _rc encode HotelID, gen(hotel_id_num)
+
+. else gen long hotel_id_num = HotelID
+
+. capture drop ym
+
+. gen ym = monthly(event_ym, "YM")
+
+. format ym %tm
+
+. xtset hotel_id_num ym
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9
+         Delta: 1 month
+
+. 
+. * Content-test family fixed before inspecting these extension results.
+. * All controls are measured before the outcome month; no current content
+. * variables are controls in primary specifications.
+. local X ln_pre_review_count ln_cumulative_reviews_start pre_mean_rating pre_m
+> ean_rating_missing pre_sd_rating pre_sd_rating_missing pre_ln_mean_text_chars
+>  pre_ln_mean_text_chars_missing pre_ars_pool_visible pre_ars_pool_visible_mis
+> sing
+
+. 
+. * Grouped intensity: 0=no reply visible at month start; 1=1--3 replies;
+. * 2=4+ replies.  The 4+ threshold is the empirical upper quartile boundary.
+. capture drop mr_visible_intensity_group delta_ars_pool_visible L1_mr_visible_
+> start_any L2_mr_visible_start_any
+
+. gen byte mr_visible_intensity_group = 0 if mr_visible_start_n == 0
+(22,107 missing values generated)
+
+. replace mr_visible_intensity_group = 1 if inrange(mr_visible_start_n, 1, 3)
+(10,434 real changes made)
+
+. replace mr_visible_intensity_group = 2 if mr_visible_start_n >= 4
+(11,673 real changes made)
+
+. gen double delta_ars_pool_visible = ars_pool_visible - L.ars_pool_visible if 
+> !missing(ars_pool_visible, L.ars_pool_visible)
+(20,658 missing values generated)
+
+. gen byte L1_mr_visible_start_any = L.mr_visible_start_any
+(563 missing values generated)
+
+. gen byte L2_mr_visible_start_any = L2.mr_visible_start_any
+(1,126 missing values generated)
+
+. 
+. log using "`p'/stata-log/run_calendar_month_visible_mr_content_extensions_260
+> 711.log", text replace
 -------------------------------------------------------------------------------
       name:  <unnamed>
        log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_calenda
@@ -544,3 +643,6 @@ ln_review_~t |                                      0.016177
   log type:  text
  closed on:  11 Jul 2026, 19:41:34
 -------------------------------------------------------------------------------
+
+. 
+end of do-file
