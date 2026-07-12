@@ -2,7 +2,7 @@
       name:  <unnamed>
        log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_month_pool_gt100_market_boundaries_260711.log
   log type:  text
- opened on:  12 Jul 2026, 17:59:56
+ opened on:  12 Jul 2026, 19:31:30
 
 . estimates clear
 
@@ -888,5 +888,5 @@ gap_city_m~c |                                                                  
       name:  <unnamed>
        log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_month_pool_gt100_market_boundaries_260711.log
   log type:  text
- closed on:  12 Jul 2026, 17:59:58
+ closed on:  12 Jul 2026, 19:31:32
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

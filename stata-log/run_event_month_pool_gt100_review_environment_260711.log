@@ -2,7 +2,7 @@
       name:  <unnamed>
        log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_month_pool_gt100_review_environment_260711.log
   log type:  text
- opened on:  12 Jul 2026, 18:00:06
+ opened on:  12 Jul 2026, 19:31:39
 
 . estimates clear
 
@@ -458,5 +458,5 @@ prevv~s_bing |                                                               -0.
       name:  <unnamed>
        log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_month_pool_gt100_review_environment_260711.log
   log type:  text
- closed on:  12 Jul 2026, 18:00:08
+ closed on:  12 Jul 2026, 19:31:41
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

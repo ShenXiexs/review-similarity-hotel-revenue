@@ -128,12 +128,25 @@ reviews[, response_valid := as.integer((!is.na(review_response_id) & review_resp
 responses <- reviews[response_valid == 1L & !is.na(response_date) & response_date >= review_date]
 responses[, `:=`(response_ym=ym(response_date), visible_event_ym=next_ym(response_date))]
 flow <- responses[, .(mr_visible_start_n=.N), by=.(HotelID, event_ym=visible_event_ym)]
+# A reply visible at the start of t is decomposed by the vintage of the review
+# to which it was written.  "prevcohort" is the cleanest treatment for the
+# count question: its denominator is exactly the number of reviews written in
+# t-1, and no review posted in t can enter either numerator or denominator.
 cohort <- responses[response_ym == event_ym, .(mr_prevcohort_visible_n=.N), by=.(HotelID, event_ym=visible_event_ym)]
+oldreview <- responses[response_ym != event_ym, .(mr_visible_start_oldreview_n=.N), by=.(HotelID, event_ym=visible_event_ym)]
 panel <- merge(panel, flow, by=c("HotelID", "event_ym"), all.x=TRUE, sort=FALSE)
 panel <- merge(panel, cohort, by=c("HotelID", "event_ym"), all.x=TRUE, sort=FALSE)
+panel <- merge(panel, oldreview, by=c("HotelID", "event_ym"), all.x=TRUE, sort=FALSE)
 panel[is.na(mr_visible_start_n), mr_visible_start_n := 0L]
 panel[is.na(mr_prevcohort_visible_n), mr_prevcohort_visible_n := 0L]
-panel[, `:=`(mr_visible_start_any=as.integer(mr_visible_start_n > 0L), ln_mr_visible_start_n=log(mr_visible_start_n + 1))]
+panel[is.na(mr_visible_start_oldreview_n), mr_visible_start_oldreview_n := 0L]
+panel[, `:=`(
+  mr_visible_start_any=as.integer(mr_visible_start_n > 0L),
+  ln_mr_visible_start_n=log(mr_visible_start_n + 1),
+  mr_prevcohort_visible_any=as.integer(mr_prevcohort_visible_n > 0L),
+  mr_visible_start_oldreview_any=as.integer(mr_visible_start_oldreview_n > 0L),
+  ln_mr_visible_start_oldreview_n=log(mr_visible_start_oldreview_n + 1)
+)]
 
 cat("Adding strictly pre-month controls and response-cohort rates...\n")
 setorder(panel, HotelID, event_start)
@@ -142,7 +155,8 @@ panel[, `:=`(
   pre_mean_rating=shift(mean_rating),
   pre_sd_rating=shift(sd_rating),
   pre_ln_mean_text_chars=shift(ln_mean_text_chars),
-  pre_ars_pool_visible=shift(ars_pool_visible)
+  pre_ars_pool_visible=shift(ars_pool_visible),
+  pre_ars_within_current=shift(ars_within_current)
 ), by=HotelID]
 panel[, `:=`(
   ln_pre_review_count=log(pre_review_count + 1),
@@ -167,14 +181,24 @@ panel[, ln_cumulative_reviews_start := log(cumulative_reviews_start + 1)]
 
 # Retain all at-risk months in the count model.  Missing prior-quality measures
 # are explicitly flagged rather than causing zero-review months to be discarded.
-for (v in c("pre_mean_rating", "pre_sd_rating", "pre_ln_mean_text_chars", "pre_ars_pool_visible")) {
+for (v in c("pre_mean_rating", "pre_sd_rating", "pre_ln_mean_text_chars", "pre_ars_pool_visible", "pre_ars_within_current")) {
   panel[, (paste0(v, "_missing")) := as.integer(is.na(get(v)))]
   panel[is.na(get(v)), (v) := 0]
 }
 panel <- merge(panel, risk[, .(HotelID, final_review_count)], by="HotelID", all.x=TRUE, sort=FALSE)
 panel[, sample_final_reviews_gt100 := 1L]
 panel[, ym := (as.integer(format(as.Date(event_start), "%Y")) - 1960L) * 12L + as.integer(format(as.Date(event_start), "%m")) - 1L]
-stopifnot(!anyDuplicated(panel, by=c("HotelID", "event_ym")), all(panel$final_review_count > 100), all(panel$mr_visible_start_n >= 0))
+stopifnot(
+  !anyDuplicated(panel, by=c("HotelID", "event_ym")),
+  all(panel$final_review_count > 100),
+  all(panel$mr_visible_start_n >= 0),
+  # At a hotel's left analysis boundary, its immediately preceding raw-review
+  # month can fall before the at-risk calendar panel and hence has a recorded
+  # denominator of zero.  The reply-rate model explicitly excludes those
+  # months (pre_review_eligible == 0).  Whenever the denominator is observed,
+  # one review can contribute at most one valid response record.
+  all(panel$mr_prevcohort_visible_n[panel$pre_review_count > 0] <= panel$pre_review_count[panel$pre_review_count > 0])
+)
 cat("Final rows:", nrow(panel), "; hotels:", uniqueN(panel$HotelID), "; zero-review months:", sum(panel$review_count==0L), "; pooled-ARS(2m) rows:", sum(!is.na(panel$ars_pool_visible)), "; pooled-ARS(3m) rows:", sum(!is.na(panel$ars_pool_visible_3m)), "; within-current ARS rows:", sum(!is.na(panel$ars_within_current)), "; dates:", min(panel$event_ym), max(panel$event_ym), "\n")
 cat("Strict timing check: response flow is posted in month t-1 and used only in t.\n")
 write_dta(panel, out, version=14)

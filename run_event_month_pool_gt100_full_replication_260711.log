@@ -57,114 +57,12 @@ r(199);
 
 . use "`p'/outputs/core_simi_260501/data/event_month_pool_allreviews_gt100_panel_260711.dta", clear
 
-. do "`p'/scripts/stata/prepare_event_month_pool_gt100_260711.do"
-
-. version 17.0
-
-. set more off
-
-. keep if cs_sample_focus100 == 1
-(0 observations deleted)
-
-. capture confirm numeric variable HotelID
-
-. if _rc encode HotelID, gen(hotel_id_num)
-
-. else gen long hotel_id_num = HotelID
-
-. capture drop ym
-
-. gen ym = monthly(year_month, "YM")
-
-. format ym %tm
-
-. capture drop ln_RevPAR_clean_w199 ln_RevPAR_clean_w595 ln_lag_RevPAR_clean_w199 ln_lag_RevPAR_clean_w595
-
-. * Use Stata's built-in percentile command so the replication does not depend
-. * on the user-installed winsor2 package.
-. foreach x in ln_RevPAR_clean ln_lag_RevPAR_clean {
-  2.     quietly _pctile `x' if !missing(`x'), p(1 99)
-  3.     local p1 = r(r1)
-  4.     local p99 = r(r2)
-  5.     gen double `x'_w199 = `x'
-  6.     replace `x'_w199 = min(max(`x', `p1'), `p99') if !missing(`x')
-  7.     quietly _pctile `x' if !missing(`x'), p(5 95)
-  8.     local p5 = r(r1)
-  9.     local p95 = r(r2)
- 10.     gen double `x'_w595 = `x'
- 11.     replace `x'_w595 = min(max(`x', `p5'), `p95') if !missing(`x')
- 12. }
-(637 missing values generated)
-(680 real changes made)
-(637 missing values generated)
-(3,406 real changes made)
-(1,171 missing values generated)
-(671 real changes made)
-(1,171 missing values generated)
-(3,354 real changes made)
-
-. capture drop zip_n_full_c city_n_full_c gap_zip_mean_full_c gap_city_mean_full_c price_gap_c
-
-. foreach x in zip_n_full city_n_full gap_zip_mean_full gap_city_mean_full price_gap {
-  2.     quietly summarize `x' if sample_final_reviews_gt100 == 1, meanonly
-  3.     gen double `x'_c = `x' - r(mean) if !missing(`x')
-  4. }
-(716 missing values generated)
-(716 missing values generated)
-(1,833 missing values generated)
-(716 missing values generated)
-(1,171 missing values generated)
-
-. capture drop star_class_bucket3 high_star4 high_rank_status high_popularity hotel_evaluation_factor ln_lag_mr_words ln_lag_mr_avg_words
-
-. gen byte star_class_bucket3 = 1 if star_class_final < 3 & !missing(star_class_final)
-(34,623 missing values generated)
-
-. replace star_class_bucket3 = 2 if star_class_final >= 3 & star_class_final < 4
-(4,368 real changes made)
-
-. replace star_class_bucket3 = 3 if star_class_final >= 4 & !missing(star_class_final)
-(29,537 real changes made)
-
-. gen byte high_star4 = star_class_final >= 4 if !missing(star_class_final)
-(718 missing values generated)
-
-. quietly summarize hotel_rank_pct if sample_final_reviews_gt100 == 1 & !missing(hotel_rank_pct), detail
-
-. gen byte high_rank_status = hotel_rank_pct <= r(p50) if !missing(hotel_rank_pct)
-
-. quietly bysort Zip ym: egen double pool_pop_median = median(ln_lag_volumn_acc)
-
-. gen byte high_popularity = ln_lag_volumn_acc > pool_pop_median if !missing(ln_lag_volumn_acc, pool_pop_median)
-(562 missing values generated)
-
-. drop pool_pop_median
-
-. capture confirm string variable hotel_evaluation_raw
-
-. if !_rc encode hotel_evaluation_raw, gen(hotel_evaluation_factor)
-
-. else gen long hotel_evaluation_factor = hotel_evaluation_raw
-
-. gen double ln_lag_mr_words = ln(lag_mr_text_words + 1)
-
-. gen double ln_lag_mr_avg_words = ln(lag_mr_avg_text_words + 1) if !missing(lag_mr_avg_text_words)
-
-. xtset hotel_id_num ym
-
-Panel variable: hotel_id_num (unbalanced)
- Time variable: ym, 2011m1 to 2022m9, but with gaps
-         Delta: 1 month
-
-. 
-end of do-file
-
 . log using "`p'/stata-log/run_event_month_pool_gt100_market_boundaries_260711.log", text replace
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
       name:  <unnamed>
        log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_month_pool_gt100_market_boundaries_260711.log
   log type:  text
- opened on:  12 Jul 2026, 17:59:56
+ opened on:  12 Jul 2026, 19:31:30
 
 . estimates clear
 
@@ -1050,7 +948,7 @@ gap_city_m~c |                                                                  
       name:  <unnamed>
        log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_month_pool_gt100_market_boundaries_260711.log
   log type:  text
- closed on:  12 Jul 2026, 17:59:58
+ closed on:  12 Jul 2026, 19:31:32
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 . 
@@ -1076,114 +974,12 @@ end of do-file
 
 . use "`p'/outputs/core_simi_260501/data/event_month_pool_allreviews_gt100_panel_260711.dta", clear
 
-. do "`p'/scripts/stata/prepare_event_month_pool_gt100_260711.do"
-
-. version 17.0
-
-. set more off
-
-. keep if cs_sample_focus100 == 1
-(0 observations deleted)
-
-. capture confirm numeric variable HotelID
-
-. if _rc encode HotelID, gen(hotel_id_num)
-
-. else gen long hotel_id_num = HotelID
-
-. capture drop ym
-
-. gen ym = monthly(year_month, "YM")
-
-. format ym %tm
-
-. capture drop ln_RevPAR_clean_w199 ln_RevPAR_clean_w595 ln_lag_RevPAR_clean_w199 ln_lag_RevPAR_clean_w595
-
-. * Use Stata's built-in percentile command so the replication does not depend
-. * on the user-installed winsor2 package.
-. foreach x in ln_RevPAR_clean ln_lag_RevPAR_clean {
-  2.     quietly _pctile `x' if !missing(`x'), p(1 99)
-  3.     local p1 = r(r1)
-  4.     local p99 = r(r2)
-  5.     gen double `x'_w199 = `x'
-  6.     replace `x'_w199 = min(max(`x', `p1'), `p99') if !missing(`x')
-  7.     quietly _pctile `x' if !missing(`x'), p(5 95)
-  8.     local p5 = r(r1)
-  9.     local p95 = r(r2)
- 10.     gen double `x'_w595 = `x'
- 11.     replace `x'_w595 = min(max(`x', `p5'), `p95') if !missing(`x')
- 12. }
-(637 missing values generated)
-(680 real changes made)
-(637 missing values generated)
-(3,406 real changes made)
-(1,171 missing values generated)
-(671 real changes made)
-(1,171 missing values generated)
-(3,354 real changes made)
-
-. capture drop zip_n_full_c city_n_full_c gap_zip_mean_full_c gap_city_mean_full_c price_gap_c
-
-. foreach x in zip_n_full city_n_full gap_zip_mean_full gap_city_mean_full price_gap {
-  2.     quietly summarize `x' if sample_final_reviews_gt100 == 1, meanonly
-  3.     gen double `x'_c = `x' - r(mean) if !missing(`x')
-  4. }
-(716 missing values generated)
-(716 missing values generated)
-(1,833 missing values generated)
-(716 missing values generated)
-(1,171 missing values generated)
-
-. capture drop star_class_bucket3 high_star4 high_rank_status high_popularity hotel_evaluation_factor ln_lag_mr_words ln_lag_mr_avg_words
-
-. gen byte star_class_bucket3 = 1 if star_class_final < 3 & !missing(star_class_final)
-(34,623 missing values generated)
-
-. replace star_class_bucket3 = 2 if star_class_final >= 3 & star_class_final < 4
-(4,368 real changes made)
-
-. replace star_class_bucket3 = 3 if star_class_final >= 4 & !missing(star_class_final)
-(29,537 real changes made)
-
-. gen byte high_star4 = star_class_final >= 4 if !missing(star_class_final)
-(718 missing values generated)
-
-. quietly summarize hotel_rank_pct if sample_final_reviews_gt100 == 1 & !missing(hotel_rank_pct), detail
-
-. gen byte high_rank_status = hotel_rank_pct <= r(p50) if !missing(hotel_rank_pct)
-
-. quietly bysort Zip ym: egen double pool_pop_median = median(ln_lag_volumn_acc)
-
-. gen byte high_popularity = ln_lag_volumn_acc > pool_pop_median if !missing(ln_lag_volumn_acc, pool_pop_median)
-(562 missing values generated)
-
-. drop pool_pop_median
-
-. capture confirm string variable hotel_evaluation_raw
-
-. if !_rc encode hotel_evaluation_raw, gen(hotel_evaluation_factor)
-
-. else gen long hotel_evaluation_factor = hotel_evaluation_raw
-
-. gen double ln_lag_mr_words = ln(lag_mr_text_words + 1)
-
-. gen double ln_lag_mr_avg_words = ln(lag_mr_avg_text_words + 1) if !missing(lag_mr_avg_text_words)
-
-. xtset hotel_id_num ym
-
-Panel variable: hotel_id_num (unbalanced)
- Time variable: ym, 2011m1 to 2022m9, but with gaps
-         Delta: 1 month
-
-. 
-end of do-file
-
 . log using "`p'/stata-log/run_event_month_pool_gt100_organization_boundaries_260711.log", text replace
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
       name:  <unnamed>
        log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_month_pool_gt100_organization_boundaries_260711.log
   log type:  text
- opened on:  12 Jul 2026, 17:59:59
+ opened on:  12 Jul 2026, 19:31:33
 
 . estimates clear
 
@@ -2221,7 +2017,7 @@ high_popul~y#|
       name:  <unnamed>
        log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_month_pool_gt100_organization_boundaries_260711.log
   log type:  text
- closed on:  12 Jul 2026, 18:00:02
+ closed on:  12 Jul 2026, 19:31:36
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 . 
@@ -2247,114 +2043,12 @@ end of do-file
 
 . use "`p'/outputs/core_simi_260501/data/event_month_pool_allreviews_gt100_panel_260711.dta", clear
 
-. do "`p'/scripts/stata/prepare_event_month_pool_gt100_260711.do"
-
-. version 17.0
-
-. set more off
-
-. keep if cs_sample_focus100 == 1
-(0 observations deleted)
-
-. capture confirm numeric variable HotelID
-
-. if _rc encode HotelID, gen(hotel_id_num)
-
-. else gen long hotel_id_num = HotelID
-
-. capture drop ym
-
-. gen ym = monthly(year_month, "YM")
-
-. format ym %tm
-
-. capture drop ln_RevPAR_clean_w199 ln_RevPAR_clean_w595 ln_lag_RevPAR_clean_w199 ln_lag_RevPAR_clean_w595
-
-. * Use Stata's built-in percentile command so the replication does not depend
-. * on the user-installed winsor2 package.
-. foreach x in ln_RevPAR_clean ln_lag_RevPAR_clean {
-  2.     quietly _pctile `x' if !missing(`x'), p(1 99)
-  3.     local p1 = r(r1)
-  4.     local p99 = r(r2)
-  5.     gen double `x'_w199 = `x'
-  6.     replace `x'_w199 = min(max(`x', `p1'), `p99') if !missing(`x')
-  7.     quietly _pctile `x' if !missing(`x'), p(5 95)
-  8.     local p5 = r(r1)
-  9.     local p95 = r(r2)
- 10.     gen double `x'_w595 = `x'
- 11.     replace `x'_w595 = min(max(`x', `p5'), `p95') if !missing(`x')
- 12. }
-(637 missing values generated)
-(680 real changes made)
-(637 missing values generated)
-(3,406 real changes made)
-(1,171 missing values generated)
-(671 real changes made)
-(1,171 missing values generated)
-(3,354 real changes made)
-
-. capture drop zip_n_full_c city_n_full_c gap_zip_mean_full_c gap_city_mean_full_c price_gap_c
-
-. foreach x in zip_n_full city_n_full gap_zip_mean_full gap_city_mean_full price_gap {
-  2.     quietly summarize `x' if sample_final_reviews_gt100 == 1, meanonly
-  3.     gen double `x'_c = `x' - r(mean) if !missing(`x')
-  4. }
-(716 missing values generated)
-(716 missing values generated)
-(1,833 missing values generated)
-(716 missing values generated)
-(1,171 missing values generated)
-
-. capture drop star_class_bucket3 high_star4 high_rank_status high_popularity hotel_evaluation_factor ln_lag_mr_words ln_lag_mr_avg_words
-
-. gen byte star_class_bucket3 = 1 if star_class_final < 3 & !missing(star_class_final)
-(34,623 missing values generated)
-
-. replace star_class_bucket3 = 2 if star_class_final >= 3 & star_class_final < 4
-(4,368 real changes made)
-
-. replace star_class_bucket3 = 3 if star_class_final >= 4 & !missing(star_class_final)
-(29,537 real changes made)
-
-. gen byte high_star4 = star_class_final >= 4 if !missing(star_class_final)
-(718 missing values generated)
-
-. quietly summarize hotel_rank_pct if sample_final_reviews_gt100 == 1 & !missing(hotel_rank_pct), detail
-
-. gen byte high_rank_status = hotel_rank_pct <= r(p50) if !missing(hotel_rank_pct)
-
-. quietly bysort Zip ym: egen double pool_pop_median = median(ln_lag_volumn_acc)
-
-. gen byte high_popularity = ln_lag_volumn_acc > pool_pop_median if !missing(ln_lag_volumn_acc, pool_pop_median)
-(562 missing values generated)
-
-. drop pool_pop_median
-
-. capture confirm string variable hotel_evaluation_raw
-
-. if !_rc encode hotel_evaluation_raw, gen(hotel_evaluation_factor)
-
-. else gen long hotel_evaluation_factor = hotel_evaluation_raw
-
-. gen double ln_lag_mr_words = ln(lag_mr_text_words + 1)
-
-. gen double ln_lag_mr_avg_words = ln(lag_mr_avg_text_words + 1) if !missing(lag_mr_avg_text_words)
-
-. xtset hotel_id_num ym
-
-Panel variable: hotel_id_num (unbalanced)
- Time variable: ym, 2011m1 to 2022m9, but with gaps
-         Delta: 1 month
-
-. 
-end of do-file
-
 . log using "`p'/stata-log/run_event_month_pool_gt100_product_systematics_260711.log", text replace
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
       name:  <unnamed>
        log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_month_pool_gt100_product_systematics_260711.log
   log type:  text
- opened on:  12 Jul 2026, 18:00:02
+ opened on:  12 Jul 2026, 19:31:36
 
 . 
 . * Rebuild Route A TripAdvisor profile measures before merging them to the panel.
@@ -2440,8 +2134,8 @@ hotel_price_high already numeric; no replace
 .     keep HotelID ln_tp_price_mid tp_amenity_count amen_rec_index amen_serv_index amen_bus_index style_upscale travelers_choice_flag
 
 .     save `profile', replace
-(file /var/folders/x9/p1d98gj518326zdc2s5gzn8w0000gn/T//St17523.000001 not found)
-file /var/folders/x9/p1d98gj518326zdc2s5gzn8w0000gn/T//St17523.000001 saved as .dta format
+(file /var/folders/x9/p1d98gj518326zdc2s5gzn8w0000gn/T//St91757.000001 not found)
+file /var/folders/x9/p1d98gj518326zdc2s5gzn8w0000gn/T//St91757.000001 saved as .dta format
 
 . restore
 
@@ -3095,7 +2789,7 @@ ln_tp_pric~d |                                                                  
       name:  <unnamed>
        log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_month_pool_gt100_product_systematics_260711.log
   log type:  text
- closed on:  12 Jul 2026, 18:00:06
+ closed on:  12 Jul 2026, 19:31:39
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 . 
@@ -3121,114 +2815,12 @@ end of do-file
 
 . use "`p'/outputs/core_simi_260501/data/event_month_pool_allreviews_gt100_panel_260711.dta", clear
 
-. do "`p'/scripts/stata/prepare_event_month_pool_gt100_260711.do"
-
-. version 17.0
-
-. set more off
-
-. keep if cs_sample_focus100 == 1
-(0 observations deleted)
-
-. capture confirm numeric variable HotelID
-
-. if _rc encode HotelID, gen(hotel_id_num)
-
-. else gen long hotel_id_num = HotelID
-
-. capture drop ym
-
-. gen ym = monthly(year_month, "YM")
-
-. format ym %tm
-
-. capture drop ln_RevPAR_clean_w199 ln_RevPAR_clean_w595 ln_lag_RevPAR_clean_w199 ln_lag_RevPAR_clean_w595
-
-. * Use Stata's built-in percentile command so the replication does not depend
-. * on the user-installed winsor2 package.
-. foreach x in ln_RevPAR_clean ln_lag_RevPAR_clean {
-  2.     quietly _pctile `x' if !missing(`x'), p(1 99)
-  3.     local p1 = r(r1)
-  4.     local p99 = r(r2)
-  5.     gen double `x'_w199 = `x'
-  6.     replace `x'_w199 = min(max(`x', `p1'), `p99') if !missing(`x')
-  7.     quietly _pctile `x' if !missing(`x'), p(5 95)
-  8.     local p5 = r(r1)
-  9.     local p95 = r(r2)
- 10.     gen double `x'_w595 = `x'
- 11.     replace `x'_w595 = min(max(`x', `p5'), `p95') if !missing(`x')
- 12. }
-(637 missing values generated)
-(680 real changes made)
-(637 missing values generated)
-(3,406 real changes made)
-(1,171 missing values generated)
-(671 real changes made)
-(1,171 missing values generated)
-(3,354 real changes made)
-
-. capture drop zip_n_full_c city_n_full_c gap_zip_mean_full_c gap_city_mean_full_c price_gap_c
-
-. foreach x in zip_n_full city_n_full gap_zip_mean_full gap_city_mean_full price_gap {
-  2.     quietly summarize `x' if sample_final_reviews_gt100 == 1, meanonly
-  3.     gen double `x'_c = `x' - r(mean) if !missing(`x')
-  4. }
-(716 missing values generated)
-(716 missing values generated)
-(1,833 missing values generated)
-(716 missing values generated)
-(1,171 missing values generated)
-
-. capture drop star_class_bucket3 high_star4 high_rank_status high_popularity hotel_evaluation_factor ln_lag_mr_words ln_lag_mr_avg_words
-
-. gen byte star_class_bucket3 = 1 if star_class_final < 3 & !missing(star_class_final)
-(34,623 missing values generated)
-
-. replace star_class_bucket3 = 2 if star_class_final >= 3 & star_class_final < 4
-(4,368 real changes made)
-
-. replace star_class_bucket3 = 3 if star_class_final >= 4 & !missing(star_class_final)
-(29,537 real changes made)
-
-. gen byte high_star4 = star_class_final >= 4 if !missing(star_class_final)
-(718 missing values generated)
-
-. quietly summarize hotel_rank_pct if sample_final_reviews_gt100 == 1 & !missing(hotel_rank_pct), detail
-
-. gen byte high_rank_status = hotel_rank_pct <= r(p50) if !missing(hotel_rank_pct)
-
-. quietly bysort Zip ym: egen double pool_pop_median = median(ln_lag_volumn_acc)
-
-. gen byte high_popularity = ln_lag_volumn_acc > pool_pop_median if !missing(ln_lag_volumn_acc, pool_pop_median)
-(562 missing values generated)
-
-. drop pool_pop_median
-
-. capture confirm string variable hotel_evaluation_raw
-
-. if !_rc encode hotel_evaluation_raw, gen(hotel_evaluation_factor)
-
-. else gen long hotel_evaluation_factor = hotel_evaluation_raw
-
-. gen double ln_lag_mr_words = ln(lag_mr_text_words + 1)
-
-. gen double ln_lag_mr_avg_words = ln(lag_mr_avg_text_words + 1) if !missing(lag_mr_avg_text_words)
-
-. xtset hotel_id_num ym
-
-Panel variable: hotel_id_num (unbalanced)
- Time variable: ym, 2011m1 to 2022m9, but with gaps
-         Delta: 1 month
-
-. 
-end of do-file
-
 . log using "`p'/stata-log/run_event_month_pool_gt100_review_environment_260711.log", text replace
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
       name:  <unnamed>
        log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_month_pool_gt100_review_environment_260711.log
   log type:  text
- opened on:  12 Jul 2026, 18:00:06
+ opened on:  12 Jul 2026, 19:31:39
 
 . estimates clear
 
@@ -3684,7 +3276,7 @@ prevv~s_bing |                                                               -0.
       name:  <unnamed>
        log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_month_pool_gt100_review_environment_260711.log
   log type:  text
- closed on:  12 Jul 2026, 18:00:08
+ closed on:  12 Jul 2026, 19:31:41
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 . 
@@ -3710,114 +3302,12 @@ end of do-file
 
 . use "`p'/outputs/core_simi_260501/data/event_month_pool_allreviews_gt100_panel_260711.dta", clear
 
-. do "`p'/scripts/stata/prepare_event_month_pool_gt100_260711.do"
-
-. version 17.0
-
-. set more off
-
-. keep if cs_sample_focus100 == 1
-(0 observations deleted)
-
-. capture confirm numeric variable HotelID
-
-. if _rc encode HotelID, gen(hotel_id_num)
-
-. else gen long hotel_id_num = HotelID
-
-. capture drop ym
-
-. gen ym = monthly(year_month, "YM")
-
-. format ym %tm
-
-. capture drop ln_RevPAR_clean_w199 ln_RevPAR_clean_w595 ln_lag_RevPAR_clean_w199 ln_lag_RevPAR_clean_w595
-
-. * Use Stata's built-in percentile command so the replication does not depend
-. * on the user-installed winsor2 package.
-. foreach x in ln_RevPAR_clean ln_lag_RevPAR_clean {
-  2.     quietly _pctile `x' if !missing(`x'), p(1 99)
-  3.     local p1 = r(r1)
-  4.     local p99 = r(r2)
-  5.     gen double `x'_w199 = `x'
-  6.     replace `x'_w199 = min(max(`x', `p1'), `p99') if !missing(`x')
-  7.     quietly _pctile `x' if !missing(`x'), p(5 95)
-  8.     local p5 = r(r1)
-  9.     local p95 = r(r2)
- 10.     gen double `x'_w595 = `x'
- 11.     replace `x'_w595 = min(max(`x', `p5'), `p95') if !missing(`x')
- 12. }
-(637 missing values generated)
-(680 real changes made)
-(637 missing values generated)
-(3,406 real changes made)
-(1,171 missing values generated)
-(671 real changes made)
-(1,171 missing values generated)
-(3,354 real changes made)
-
-. capture drop zip_n_full_c city_n_full_c gap_zip_mean_full_c gap_city_mean_full_c price_gap_c
-
-. foreach x in zip_n_full city_n_full gap_zip_mean_full gap_city_mean_full price_gap {
-  2.     quietly summarize `x' if sample_final_reviews_gt100 == 1, meanonly
-  3.     gen double `x'_c = `x' - r(mean) if !missing(`x')
-  4. }
-(716 missing values generated)
-(716 missing values generated)
-(1,833 missing values generated)
-(716 missing values generated)
-(1,171 missing values generated)
-
-. capture drop star_class_bucket3 high_star4 high_rank_status high_popularity hotel_evaluation_factor ln_lag_mr_words ln_lag_mr_avg_words
-
-. gen byte star_class_bucket3 = 1 if star_class_final < 3 & !missing(star_class_final)
-(34,623 missing values generated)
-
-. replace star_class_bucket3 = 2 if star_class_final >= 3 & star_class_final < 4
-(4,368 real changes made)
-
-. replace star_class_bucket3 = 3 if star_class_final >= 4 & !missing(star_class_final)
-(29,537 real changes made)
-
-. gen byte high_star4 = star_class_final >= 4 if !missing(star_class_final)
-(718 missing values generated)
-
-. quietly summarize hotel_rank_pct if sample_final_reviews_gt100 == 1 & !missing(hotel_rank_pct), detail
-
-. gen byte high_rank_status = hotel_rank_pct <= r(p50) if !missing(hotel_rank_pct)
-
-. quietly bysort Zip ym: egen double pool_pop_median = median(ln_lag_volumn_acc)
-
-. gen byte high_popularity = ln_lag_volumn_acc > pool_pop_median if !missing(ln_lag_volumn_acc, pool_pop_median)
-(562 missing values generated)
-
-. drop pool_pop_median
-
-. capture confirm string variable hotel_evaluation_raw
-
-. if !_rc encode hotel_evaluation_raw, gen(hotel_evaluation_factor)
-
-. else gen long hotel_evaluation_factor = hotel_evaluation_raw
-
-. gen double ln_lag_mr_words = ln(lag_mr_text_words + 1)
-
-. gen double ln_lag_mr_avg_words = ln(lag_mr_avg_text_words + 1) if !missing(lag_mr_avg_text_words)
-
-. xtset hotel_id_num ym
-
-Panel variable: hotel_id_num (unbalanced)
- Time variable: ym, 2011m1 to 2022m9, but with gaps
-         Delta: 1 month
-
-. 
-end of do-file
-
 . log using "`p'/stata-log/run_event_month_pool_gt100_engagement_style_260711.log", text replace
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
       name:  <unnamed>
        log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_month_pool_gt100_engagement_style_260711.log
   log type:  text
- opened on:  12 Jul 2026, 18:00:08
+ opened on:  12 Jul 2026, 19:31:41
 
 . estimates clear
 
@@ -5140,7 +4630,7 @@ lag_avg_ra~h |
       name:  <unnamed>
        log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_month_pool_gt100_engagement_style_260711.log
   log type:  text
- closed on:  12 Jul 2026, 18:00:13
+ closed on:  12 Jul 2026, 19:31:45
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 . 
@@ -5166,114 +4656,12 @@ end of do-file
 
 . use "`p'/outputs/core_simi_260501/data/event_month_pool_allreviews_gt100_panel_260711.dta", clear
 
-. do "`p'/scripts/stata/prepare_event_month_pool_gt100_260711.do"
-
-. version 17.0
-
-. set more off
-
-. keep if cs_sample_focus100 == 1
-(0 observations deleted)
-
-. capture confirm numeric variable HotelID
-
-. if _rc encode HotelID, gen(hotel_id_num)
-
-. else gen long hotel_id_num = HotelID
-
-. capture drop ym
-
-. gen ym = monthly(year_month, "YM")
-
-. format ym %tm
-
-. capture drop ln_RevPAR_clean_w199 ln_RevPAR_clean_w595 ln_lag_RevPAR_clean_w199 ln_lag_RevPAR_clean_w595
-
-. * Use Stata's built-in percentile command so the replication does not depend
-. * on the user-installed winsor2 package.
-. foreach x in ln_RevPAR_clean ln_lag_RevPAR_clean {
-  2.     quietly _pctile `x' if !missing(`x'), p(1 99)
-  3.     local p1 = r(r1)
-  4.     local p99 = r(r2)
-  5.     gen double `x'_w199 = `x'
-  6.     replace `x'_w199 = min(max(`x', `p1'), `p99') if !missing(`x')
-  7.     quietly _pctile `x' if !missing(`x'), p(5 95)
-  8.     local p5 = r(r1)
-  9.     local p95 = r(r2)
- 10.     gen double `x'_w595 = `x'
- 11.     replace `x'_w595 = min(max(`x', `p5'), `p95') if !missing(`x')
- 12. }
-(637 missing values generated)
-(680 real changes made)
-(637 missing values generated)
-(3,406 real changes made)
-(1,171 missing values generated)
-(671 real changes made)
-(1,171 missing values generated)
-(3,354 real changes made)
-
-. capture drop zip_n_full_c city_n_full_c gap_zip_mean_full_c gap_city_mean_full_c price_gap_c
-
-. foreach x in zip_n_full city_n_full gap_zip_mean_full gap_city_mean_full price_gap {
-  2.     quietly summarize `x' if sample_final_reviews_gt100 == 1, meanonly
-  3.     gen double `x'_c = `x' - r(mean) if !missing(`x')
-  4. }
-(716 missing values generated)
-(716 missing values generated)
-(1,833 missing values generated)
-(716 missing values generated)
-(1,171 missing values generated)
-
-. capture drop star_class_bucket3 high_star4 high_rank_status high_popularity hotel_evaluation_factor ln_lag_mr_words ln_lag_mr_avg_words
-
-. gen byte star_class_bucket3 = 1 if star_class_final < 3 & !missing(star_class_final)
-(34,623 missing values generated)
-
-. replace star_class_bucket3 = 2 if star_class_final >= 3 & star_class_final < 4
-(4,368 real changes made)
-
-. replace star_class_bucket3 = 3 if star_class_final >= 4 & !missing(star_class_final)
-(29,537 real changes made)
-
-. gen byte high_star4 = star_class_final >= 4 if !missing(star_class_final)
-(718 missing values generated)
-
-. quietly summarize hotel_rank_pct if sample_final_reviews_gt100 == 1 & !missing(hotel_rank_pct), detail
-
-. gen byte high_rank_status = hotel_rank_pct <= r(p50) if !missing(hotel_rank_pct)
-
-. quietly bysort Zip ym: egen double pool_pop_median = median(ln_lag_volumn_acc)
-
-. gen byte high_popularity = ln_lag_volumn_acc > pool_pop_median if !missing(ln_lag_volumn_acc, pool_pop_median)
-(562 missing values generated)
-
-. drop pool_pop_median
-
-. capture confirm string variable hotel_evaluation_raw
-
-. if !_rc encode hotel_evaluation_raw, gen(hotel_evaluation_factor)
-
-. else gen long hotel_evaluation_factor = hotel_evaluation_raw
-
-. gen double ln_lag_mr_words = ln(lag_mr_text_words + 1)
-
-. gen double ln_lag_mr_avg_words = ln(lag_mr_avg_text_words + 1) if !missing(lag_mr_avg_text_words)
-
-. xtset hotel_id_num ym
-
-Panel variable: hotel_id_num (unbalanced)
- Time variable: ym, 2011m1 to 2022m9, but with gaps
-         Delta: 1 month
-
-. 
-end of do-file
-
 . log using "`p'/stata-log/run_event_month_pool_gt100_learning_effect_260711.log", text replace
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
       name:  <unnamed>
        log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_month_pool_gt100_learning_effect_260711.log
   log type:  text
- opened on:  12 Jul 2026, 18:00:13
+ opened on:  12 Jul 2026, 19:31:45
 
 . 
 . capture drop sent_neu_share_bing lead1_sent_pos_share_bing lead1_sent_neu_share_bing lead1_sent_neg_share_bing lead1_sent_avg_text_words lead1_sent_any_text d_topic_similarity d_sent_avg_text_words med_sim_mean_zipym learn_hi_ars
@@ -5669,7 +5057,7 @@ learn_hi_ars#|
       name:  <unnamed>
        log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_month_pool_gt100_learning_effect_260711.log
   log type:  text
- closed on:  12 Jul 2026, 18:00:14
+ closed on:  12 Jul 2026, 19:31:46
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 . 
@@ -5695,114 +5083,12 @@ end of do-file
 
 . use "`p'/outputs/core_simi_260501/data/event_month_pool_allreviews_gt100_panel_260711.dta", clear
 
-. do "`p'/scripts/stata/prepare_event_month_pool_gt100_260711.do"
-
-. version 17.0
-
-. set more off
-
-. keep if cs_sample_focus100 == 1
-(0 observations deleted)
-
-. capture confirm numeric variable HotelID
-
-. if _rc encode HotelID, gen(hotel_id_num)
-
-. else gen long hotel_id_num = HotelID
-
-. capture drop ym
-
-. gen ym = monthly(year_month, "YM")
-
-. format ym %tm
-
-. capture drop ln_RevPAR_clean_w199 ln_RevPAR_clean_w595 ln_lag_RevPAR_clean_w199 ln_lag_RevPAR_clean_w595
-
-. * Use Stata's built-in percentile command so the replication does not depend
-. * on the user-installed winsor2 package.
-. foreach x in ln_RevPAR_clean ln_lag_RevPAR_clean {
-  2.     quietly _pctile `x' if !missing(`x'), p(1 99)
-  3.     local p1 = r(r1)
-  4.     local p99 = r(r2)
-  5.     gen double `x'_w199 = `x'
-  6.     replace `x'_w199 = min(max(`x', `p1'), `p99') if !missing(`x')
-  7.     quietly _pctile `x' if !missing(`x'), p(5 95)
-  8.     local p5 = r(r1)
-  9.     local p95 = r(r2)
- 10.     gen double `x'_w595 = `x'
- 11.     replace `x'_w595 = min(max(`x', `p5'), `p95') if !missing(`x')
- 12. }
-(637 missing values generated)
-(680 real changes made)
-(637 missing values generated)
-(3,406 real changes made)
-(1,171 missing values generated)
-(671 real changes made)
-(1,171 missing values generated)
-(3,354 real changes made)
-
-. capture drop zip_n_full_c city_n_full_c gap_zip_mean_full_c gap_city_mean_full_c price_gap_c
-
-. foreach x in zip_n_full city_n_full gap_zip_mean_full gap_city_mean_full price_gap {
-  2.     quietly summarize `x' if sample_final_reviews_gt100 == 1, meanonly
-  3.     gen double `x'_c = `x' - r(mean) if !missing(`x')
-  4. }
-(716 missing values generated)
-(716 missing values generated)
-(1,833 missing values generated)
-(716 missing values generated)
-(1,171 missing values generated)
-
-. capture drop star_class_bucket3 high_star4 high_rank_status high_popularity hotel_evaluation_factor ln_lag_mr_words ln_lag_mr_avg_words
-
-. gen byte star_class_bucket3 = 1 if star_class_final < 3 & !missing(star_class_final)
-(34,623 missing values generated)
-
-. replace star_class_bucket3 = 2 if star_class_final >= 3 & star_class_final < 4
-(4,368 real changes made)
-
-. replace star_class_bucket3 = 3 if star_class_final >= 4 & !missing(star_class_final)
-(29,537 real changes made)
-
-. gen byte high_star4 = star_class_final >= 4 if !missing(star_class_final)
-(718 missing values generated)
-
-. quietly summarize hotel_rank_pct if sample_final_reviews_gt100 == 1 & !missing(hotel_rank_pct), detail
-
-. gen byte high_rank_status = hotel_rank_pct <= r(p50) if !missing(hotel_rank_pct)
-
-. quietly bysort Zip ym: egen double pool_pop_median = median(ln_lag_volumn_acc)
-
-. gen byte high_popularity = ln_lag_volumn_acc > pool_pop_median if !missing(ln_lag_volumn_acc, pool_pop_median)
-(562 missing values generated)
-
-. drop pool_pop_median
-
-. capture confirm string variable hotel_evaluation_raw
-
-. if !_rc encode hotel_evaluation_raw, gen(hotel_evaluation_factor)
-
-. else gen long hotel_evaluation_factor = hotel_evaluation_raw
-
-. gen double ln_lag_mr_words = ln(lag_mr_text_words + 1)
-
-. gen double ln_lag_mr_avg_words = ln(lag_mr_avg_text_words + 1) if !missing(lag_mr_avg_text_words)
-
-. xtset hotel_id_num ym
-
-Panel variable: hotel_id_num (unbalanced)
- Time variable: ym, 2011m1 to 2022m9, but with gaps
-         Delta: 1 month
-
-. 
-end of do-file
-
 . log using "`p'/stata-log/run_event_month_pool_gt100_mr_targeting_260711.log", text replace
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
       name:  <unnamed>
        log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_month_pool_gt100_mr_targeting_260711.log
   log type:  text
- opened on:  12 Jul 2026, 18:00:14
+ opened on:  12 Jul 2026, 19:31:46
 
 . estimates clear
 
@@ -6276,7 +5562,7 @@ lag_avg_ra~h |                                       -0.0030      0.0067     -0.
       name:  <unnamed>
        log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_month_pool_gt100_mr_targeting_260711.log
   log type:  text
- closed on:  12 Jul 2026, 18:00:16
+ closed on:  12 Jul 2026, 19:31:48
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 . 

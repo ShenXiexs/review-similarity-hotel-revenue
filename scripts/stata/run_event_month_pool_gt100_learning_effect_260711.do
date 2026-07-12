@@ -9,7 +9,6 @@ set linesize 255
 capture log close
 local p "/Users/samxie/Research/ReviewSimi_Sales/Code"
 use "`p'/outputs/core_simi_260501/data/event_month_pool_allreviews_gt100_panel_260711.dta", clear
-do "`p'/scripts/stata/prepare_event_month_pool_gt100_260711.do"
 log using "`p'/stata-log/run_event_month_pool_gt100_learning_effect_260711.log", text replace
 
 capture drop sent_neu_share_bing lead1_sent_pos_share_bing lead1_sent_neu_share_bing lead1_sent_neg_share_bing lead1_sent_avg_text_words lead1_sent_any_text d_topic_similarity d_sent_avg_text_words med_sim_mean_zipym learn_hi_ars

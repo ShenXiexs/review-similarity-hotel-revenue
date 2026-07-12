@@ -2,7 +2,7 @@
       name:  <unnamed>
        log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_month_pool_gt100_mr_targeting_260711.log
   log type:  text
- opened on:  12 Jul 2026, 18:00:14
+ opened on:  12 Jul 2026, 19:31:46
 
 . estimates clear
 
@@ -476,5 +476,5 @@ lag_avg_ra~h |                                       -0.0030      0.0067     -0.
       name:  <unnamed>
        log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_month_pool_gt100_mr_targeting_260711.log
   log type:  text
- closed on:  12 Jul 2026, 18:00:16
+ closed on:  12 Jul 2026, 19:31:48
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

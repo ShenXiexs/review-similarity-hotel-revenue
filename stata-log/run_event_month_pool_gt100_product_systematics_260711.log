@@ -2,7 +2,7 @@
       name:  <unnamed>
        log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_month_pool_gt100_product_systematics_260711.log
   log type:  text
- opened on:  12 Jul 2026, 18:00:02
+ opened on:  12 Jul 2026, 19:31:36
 
 . 
 . * Rebuild Route A TripAdvisor profile measures before merging them to the panel.
@@ -88,8 +88,8 @@ hotel_price_high already numeric; no replace
 .     keep HotelID ln_tp_price_mid tp_amenity_count amen_rec_index amen_serv_index amen_bus_index style_upscale travelers_choice_flag
 
 .     save `profile', replace
-(file /var/folders/x9/p1d98gj518326zdc2s5gzn8w0000gn/T//St17523.000001 not found)
-file /var/folders/x9/p1d98gj518326zdc2s5gzn8w0000gn/T//St17523.000001 saved as .dta format
+(file /var/folders/x9/p1d98gj518326zdc2s5gzn8w0000gn/T//St91757.000001 not found)
+file /var/folders/x9/p1d98gj518326zdc2s5gzn8w0000gn/T//St91757.000001 saved as .dta format
 
 . restore
 
@@ -743,5 +743,5 @@ ln_tp_pric~d |                                                                  
       name:  <unnamed>
        log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_month_pool_gt100_product_systematics_260711.log
   log type:  text
- closed on:  12 Jul 2026, 18:00:06
+ closed on:  12 Jul 2026, 19:31:39
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

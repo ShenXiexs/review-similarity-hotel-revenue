@@ -2,7 +2,7 @@
       name:  <unnamed>
        log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_month_pool_gt100_learning_effect_260711.log
   log type:  text
- opened on:  12 Jul 2026, 18:00:13
+ opened on:  12 Jul 2026, 19:31:45
 
 . 
 . capture drop sent_neu_share_bing lead1_sent_pos_share_bing lead1_sent_neu_share_bing lead1_sent_neg_share_bing lead1_sent_avg_text_words lead1_sent_any_text d_topic_similarity d_sent_avg_text_words med_sim_mean_zipym learn_hi_ars
@@ -398,5 +398,5 @@ learn_hi_ars#|
       name:  <unnamed>
        log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_month_pool_gt100_learning_effect_260711.log
   log type:  text
- closed on:  12 Jul 2026, 18:00:14
+ closed on:  12 Jul 2026, 19:31:46
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
