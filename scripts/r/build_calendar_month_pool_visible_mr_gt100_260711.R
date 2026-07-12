@@ -77,6 +77,9 @@ cat("Valid-vector review coverage:", mean(reviews$valid_vec), "\n")
 cat("Building balanced at-risk calendar months and pre-month outcomes...\n")
 month_out <- reviews[, .(
   review_count=.N,
+  rating_n=sum(!is.na(review_rating_num)),
+  rating_sum=sum(review_rating_num, na.rm=TRUE),
+  rating_sumsq=sum(review_rating_num^2, na.rm=TRUE),
   mean_rating=smean(review_rating_num),
   sd_rating=if (.N > 1) suppressWarnings(sd(review_rating_num, na.rm=TRUE)) else NA_real_,
   mean_text_chars=smean(text_chars),
@@ -88,6 +91,9 @@ grid <- risk[, {
 }, by=HotelID]
 panel <- merge(grid, month_out, by=c("HotelID", "event_ym", "event_start"), all.x=TRUE, sort=FALSE)
 panel[is.na(review_count), review_count := 0L]
+panel[is.na(rating_n), rating_n := 0L]
+panel[is.na(rating_sum), rating_sum := 0]
+panel[is.na(rating_sumsq), rating_sumsq := 0]
 panel[, ln_review_count := log(review_count + 1)]
 
 cat("Computing pre-specified pooled and new-review ARS measures...\n")
@@ -158,6 +164,11 @@ panel[, `:=`(
   pre_ars_pool_visible=shift(ars_pool_visible),
   pre_ars_within_current=shift(ars_within_current)
 ), by=HotelID]
+# Direct legacy Route A/B names, with the strict calendar-month meaning.  The
+# lagged monthly rating remains missing when t-1 has no valid rating, exactly
+# as in the original event-panel interface; the pre_* companion is separately
+# zero-filled only for the strict count-model missing-indicator design below.
+panel[, lag_avg_rating_month := pre_mean_rating]
 panel[, `:=`(
   ln_pre_review_count=log(pre_review_count + 1),
   mr_prevcohort_visible_rate=fifelse(pre_review_count > 0L, mr_prevcohort_visible_n / pre_review_count, NA_real_),
@@ -172,12 +183,36 @@ hist_grid <- hist_range[, {
   ds <- seq(as.Date(history_start), as.Date(paste0(last_base_ym, "-01")), by="month")
   .(event_start=as.IDate(ds))
 }, by=HotelID]
-hist_panel <- merge(hist_grid, month_out[, .(HotelID, event_start, review_count)], by=c("HotelID", "event_start"), all.x=TRUE, sort=FALSE)
+hist_panel <- merge(hist_grid, month_out[, .(HotelID, event_start, review_count, rating_n, rating_sum, rating_sumsq)], by=c("HotelID", "event_start"), all.x=TRUE, sort=FALSE)
 hist_panel[is.na(review_count), review_count:=0L]
+hist_panel[is.na(rating_n), rating_n:=0L]
+hist_panel[is.na(rating_sum), rating_sum:=0]
+hist_panel[is.na(rating_sumsq), rating_sumsq:=0]
 setorder(hist_panel, HotelID, event_start)
-hist_panel[, cumulative_reviews_start := shift(cumsum(review_count), fill=0L), by=HotelID]
-panel <- merge(panel, hist_panel[, .(HotelID, event_start, cumulative_reviews_start)], by=c("HotelID", "event_start"), all.x=TRUE, sort=FALSE)
+hist_panel[, `:=`(
+  cumulative_reviews_start=shift(cumsum(review_count), fill=0L),
+  cumulative_rating_n_start=shift(cumsum(rating_n), fill=0L),
+  cumulative_rating_sum_start=shift(cumsum(rating_sum), fill=0),
+  cumulative_rating_sumsq_start=shift(cumsum(rating_sumsq), fill=0)
+), by=HotelID]
+hist_panel[, lag_avg_rating_acc := fifelse(cumulative_rating_n_start > 0L, cumulative_rating_sum_start / cumulative_rating_n_start, NA_real_)]
+hist_panel[, lag_sd_acc := fifelse(
+  cumulative_rating_n_start > 1L,
+  sqrt(pmax((cumulative_rating_sumsq_start - cumulative_rating_sum_start^2 / cumulative_rating_n_start) / (cumulative_rating_n_start - 1L), 0)),
+  NA_real_
+)]
+hist_panel[, ln_lag_volumn_acc := fifelse(cumulative_reviews_start > 0L, log(cumulative_reviews_start), NA_real_)]
+panel <- merge(panel, hist_panel[, .(HotelID, event_start, cumulative_reviews_start, cumulative_rating_n_start, cumulative_rating_sum_start, cumulative_rating_sumsq_start, ln_lag_volumn_acc, lag_avg_rating_acc, lag_sd_acc)], by=c("HotelID", "event_start"), all.x=TRUE, sort=FALSE)
 panel[, ln_cumulative_reviews_start := log(cumulative_reviews_start + 1)]
+
+# Materialize the remaining legacy names directly in the strict calendar DTA.
+# Unlike pre_* variables, these retain legacy missingness for manual Route A/B
+# style specifications rather than being used as zero-filled controls here.
+panel[, `:=`(
+  ln_recent_volumn=ln_review_count,
+  recent_rating=mean_rating,
+  recent_sd=sd_rating
+)]
 
 # Retain all at-risk months in the count model.  Missing prior-quality measures
 # are explicitly flagged rather than causing zero-review months to be discarded.

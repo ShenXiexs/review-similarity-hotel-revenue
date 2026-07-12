@@ -112,11 +112,20 @@ estimates clear
 * for the t-1 review opportunity and is the denominator for A3.
 * ----------------------------------------------------------
 ppmlhdfe review_count mr_visible_start_any ln_pre_review_count ln_cumulative_reviews_start pre_mean_rating pre_mean_rating_missing pre_sd_rating pre_sd_rating_missing pre_ln_mean_text_chars pre_ln_mean_text_chars_missing pre_ars_within_current pre_ars_within_current_missing, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+* --- nbreg
+nbreg review_count mr_visible_start_any ///
+    ln_pre_review_count ln_cumulative_reviews_start ///
+    pre_mean_rating pre_mean_rating_missing ///
+    pre_sd_rating pre_sd_rating_missing ///
+    pre_ln_mean_text_chars pre_ln_mean_text_chars_missing ///
+    pre_ars_within_current pre_ars_within_current_missing ///
+    i.hotel_id_num i.ym, vce(cluster hotel_id_num)
 estimates store Q1_ppml_any
 
 ppmlhdfe review_count ln_mr_visible_start_n ln_pre_review_count ln_cumulative_reviews_start pre_mean_rating pre_mean_rating_missing pre_sd_rating pre_sd_rating_missing pre_ln_mean_text_chars pre_ln_mean_text_chars_missing pre_ars_within_current pre_ars_within_current_missing, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 estimates store Q2_ppml_lnn
 
+*mr_prevcohort_visible_rate：上月评论中，在同一个上月已得到回复的比例。只保留上月至少有一条评论的月，因此这个比例有定义。它是最直接处理"上月评论更多自然会有更多回复"的规格。
 ppmlhdfe review_count mr_prevcohort_visible_rate ln_pre_review_count ln_cumulative_reviews_start pre_mean_rating pre_mean_rating_missing pre_sd_rating pre_sd_rating_missing pre_ln_mean_text_chars pre_ln_mean_text_chars_missing pre_ars_within_current pre_ars_within_current_missing if pre_review_eligible == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 estimates store Q3_ppml_prevcohort_rate
 
@@ -184,3 +193,9 @@ estimates store S3_pool3_any
 estimates table Q1_ppml_any Q2_ppml_lnn Q3_ppml_prevcohort_rate Q4_ppml_oldreview Q5_log_w199 Q6_log_w595 Q7_log_w195, b(%9.6f) se(%9.6f) stats(N r2_a)
 estimates table C1_within_any C2_within_lnn C3_within_prevcohort_rate C4_within_groups C5_within_oldreview C6_within_condcount C7_within_lags S1_pool2_any S2_pool2_change S3_pool3_any, b(%9.6f) se(%9.6f) stats(N r2_a)
 log close
+
+
+**** More Test
+reghdfe ars_pool_visible mr_visible_start_any ln_pre_review_count pre_mean_rating pre_mean_rating_missing pre_sd_rating pre_sd_rating_missing pre_ars_within_current ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month if !missing(ars_pool_visible), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+
+
