@@ -1,0 +1,185 @@
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_m
+> onth_pool_gt100_winsor_sensitivity_260711.log
+  log type:  text
+ opened on:  11 Jul 2026, 18:20:57
+
+. local C ev_ln_review_count ev_mean_rating ev_sd_rating ev_ln_mean_text_chars 
+> ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR
+
+. estimates clear
+
+. 
+. * M0.1: change only the symmetric outcome/lag winsorization rule.
+. reghdfe lnRevenue_current_w199 ars_pool_ev `C' lnRevenue_lag_month_w199 if !m
+> issing(ars_pool_ev), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 12 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     26,173
+Absorbing 2 HDFE groups                           F(  10,    541) =     121.97
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8823
+                                                  Adj R-squared   =     0.8791
+                                                  Within R-sq.    =     0.3015
+Number of clusters (hotel_id_num) =        542    Root MSE        =     0.2123
+
+                         (Std. err. adjusted for 542 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |   -.072287   .0387804    -1.86   0.063    -.1484656    .0038916
+ev_ln_revi~t |   .0396044   .0046415     8.53   0.000     .0304869    .0487218
+ev_mean_ra~g |   .0023953   .0032158     0.74   0.457    -.0039217    .0087123
+ev_sd_rating |   .0023349   .0032423     0.72   0.472     -.004034    .0087039
+ev_ln_mean~s |   .0097738    .004288     2.28   0.023     .0013505     .018197
+ln_lag_vol~c |   .0299493   .0068148     4.39   0.000     .0165625    .0433361
+lag_avg_ra~c |   .0434058   .0264331     1.64   0.101    -.0085183    .0953298
+  lag_sd_acc |   .0019195   .0319583     0.06   0.952    -.0608581     .064697
+ln_avg_com~R |   .1183715   .0124825     9.48   0.000     .0938515    .1428916
+lnRev~h_w199 |   .4372881   .0187845    23.28   0.000     .4003886    .4741877
+       _cons |   1.467572   .1459674    10.05   0.000      1.18084    1.754305
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       542         542           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store W199
+
+. reghdfe lnRevenue_current_w595 ars_pool_ev `C' lnRevenue_lag_month_w595 if !m
+> issing(ars_pool_ev), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 12 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     26,173
+Absorbing 2 HDFE groups                           F(  10,    541) =     207.80
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8819
+                                                  Adj R-squared   =     0.8787
+                                                  Within R-sq.    =     0.3148
+Number of clusters (hotel_id_num) =        542    Root MSE        =     0.1860
+
+                         (Std. err. adjusted for 542 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w595 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |   -.064695   .0328714    -1.97   0.050    -.1292663   -.0001237
+ev_ln_revi~t |   .0395025   .0040831     9.67   0.000     .0314818    .0475233
+ev_mean_ra~g |  -.0022537   .0026435    -0.85   0.394    -.0074466    .0029391
+ev_sd_rating |   .0005323   .0028575     0.19   0.852    -.0050807    .0061454
+ev_ln_mean~s |   .0069255   .0036923     1.88   0.061    -.0003275    .0141784
+ln_lag_vol~c |   .0252057    .005611     4.49   0.000     .0141836    .0362277
+lag_avg_ra~c |   .0370146   .0225091     1.64   0.101    -.0072013    .0812306
+  lag_sd_acc |  -.0005341   .0276434    -0.02   0.985    -.0548357    .0537675
+ln_avg_com~R |   .1047099   .0112309     9.32   0.000     .0826484    .1267714
+lnRev~h_w595 |   .4513146   .0148685    30.35   0.000     .4221075    .4805218
+       _cons |   1.548111   .1202644    12.87   0.000     1.311868    1.784353
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       542         542           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store W595
+
+. reghdfe lnRevenue_current_w195 ars_pool_ev `C' lnRevenue_lag_month_w195 if !m
+> issing(ars_pool_ev), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 12 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     26,173
+Absorbing 2 HDFE groups                           F(  10,    541) =     134.36
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8724
+                                                  Adj R-squared   =     0.8690
+                                                  Within R-sq.    =     0.3131
+Number of clusters (hotel_id_num) =        542    Root MSE        =     0.2026
+
+                         (Std. err. adjusted for 542 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w195 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |  -.0768477   .0372241    -2.06   0.039    -.1499692   -.0037262
+ev_ln_revi~t |   .0407557   .0044569     9.14   0.000     .0320007    .0495107
+ev_mean_ra~g |   .0021227   .0031537     0.67   0.501    -.0040724    .0083178
+ev_sd_rating |   .0032444   .0031795     1.02   0.308    -.0030013    .0094901
+ev_ln_mean~s |   .0089168   .0041502     2.15   0.032     .0007643    .0170694
+ln_lag_vol~c |   .0261305     .00635     4.12   0.000     .0136569    .0386041
+lag_avg_ra~c |   .0408403   .0258147     1.58   0.114     -.009869    .0915496
+  lag_sd_acc |  -.0008733   .0310235    -0.03   0.978    -.0618147     .060068
+ln_avg_com~R |   .1096281   .0116532     9.41   0.000     .0867371    .1325191
+lnRev~h_w195 |   .4489631   .0186563    24.06   0.000     .4123153    .4856108
+       _cons |   1.481275   .1406269    10.53   0.000     1.205033    1.757517
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       542         542           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store W195
+
+. 
+. estimates table W199 W595 W195, b(%9.6f) se(%9.6f) stats(N r2_a)
+
+--------------------------------------------------
+    Variable |   W199        W595        W195     
+-------------+------------------------------------
+ ars_pool_ev | -0.072287   -0.064695   -0.076848  
+             |  0.038780    0.032871    0.037224  
+ev_ln_revi~t |  0.039604    0.039503    0.040756  
+             |  0.004641    0.004083    0.004457  
+ev_mean_ra~g |  0.002395   -0.002254    0.002123  
+             |  0.003216    0.002644    0.003154  
+ev_sd_rating |  0.002335    0.000532    0.003244  
+             |  0.003242    0.002857    0.003180  
+ev_ln_mean~s |  0.009774    0.006925    0.008917  
+             |  0.004288    0.003692    0.004150  
+ln_lag_vol~c |  0.029949    0.025206    0.026130  
+             |  0.006815    0.005611    0.006350  
+lag_avg_ra~c |  0.043406    0.037015    0.040840  
+             |  0.026433    0.022509    0.025815  
+  lag_sd_acc |  0.001919   -0.000534   -0.000873  
+             |  0.031958    0.027643    0.031024  
+ln_avg_com~R |  0.118372    0.104710    0.109628  
+             |  0.012482    0.011231    0.011653  
+lnRev~h_w199 |  0.437288                          
+             |  0.018785                          
+lnRev~h_w595 |              0.451315              
+             |              0.014869              
+lnRev~h_w195 |                          0.448963  
+             |                          0.018656  
+       _cons |  1.467572    1.548111    1.481275  
+             |  0.145967    0.120264    0.140627  
+-------------+------------------------------------
+           N |     26173       26173       26173  
+        r2_a |  0.879087    0.878681    0.868986  
+--------------------------------------------------
+                                      Legend: b/se
+
+. log close
+      name:  <unnamed>
+       log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_m
+> onth_pool_gt100_winsor_sensitivity_260711.log
+  log type:  text
+ closed on:  11 Jul 2026, 18:20:58
+-------------------------------------------------------------------------------

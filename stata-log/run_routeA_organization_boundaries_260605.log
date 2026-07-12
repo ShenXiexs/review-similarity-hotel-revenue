@@ -218,7 +218,6 @@ Panel variable: hotel_id_num (unbalanced)
 
 . label values high_rank_status high_rank_status_lbl
 
-. 
 . capture drop hotel_evaluation_factor
 
 . encode hotel_evaluation_raw, gen(hotel_evaluation_factor)

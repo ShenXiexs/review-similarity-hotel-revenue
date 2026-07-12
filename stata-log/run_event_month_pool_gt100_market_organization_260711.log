@@ -1,0 +1,3255 @@
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_m
+> onth_pool_gt100_market_organization_260711.log
+  log type:  text
+ opened on:  11 Jul 2026, 18:06:55
+
+. local C ev_ln_review_count ev_mean_rating ev_sd_rating ev_ln_mean_text_chars 
+> ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR lnRevenue_l
+> ag_month_w199
+
+. estimates clear
+
+. * M0.1-M9 market boundaries, pooled ARS only.
+. reghdfe lnRevenue_current_w199 ars_pool_ev `C' if !missing(ars_pool_ev), abso
+> rb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 12 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     26,173
+Absorbing 2 HDFE groups                           F(  10,    541) =     121.97
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8823
+                                                  Adj R-squared   =     0.8791
+                                                  Within R-sq.    =     0.3015
+Number of clusters (hotel_id_num) =        542    Root MSE        =     0.2123
+
+                         (Std. err. adjusted for 542 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |   -.072287   .0387804    -1.86   0.063    -.1484656    .0038916
+ev_ln_revi~t |   .0396044   .0046415     8.53   0.000     .0304869    .0487218
+ev_mean_ra~g |   .0023953   .0032158     0.74   0.457    -.0039217    .0087123
+ev_sd_rating |   .0023349   .0032423     0.72   0.472     -.004034    .0087039
+ev_ln_mean~s |   .0097738    .004288     2.28   0.023     .0013505     .018197
+ln_lag_vol~c |   .0299493   .0068148     4.39   0.000     .0165625    .0433361
+lag_avg_ra~c |   .0434058   .0264331     1.64   0.101    -.0085183    .0953298
+  lag_sd_acc |   .0019195   .0319583     0.06   0.952    -.0608581     .064697
+ln_avg_com~R |   .1183715   .0124825     9.48   0.000     .0938515    .1428916
+lnRev~h_w199 |   .4372881   .0187845    23.28   0.000     .4003886    .4741877
+       _cons |   1.467572   .1459674    10.05   0.000      1.18084    1.754305
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       542         542           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store M01
+
+. reghdfe lnRevenue_current_w199 c.ars_pool_ev##c.ln_avg_com_RevPAR ev_ln_revie
+> w_count ev_mean_rating ev_sd_rating ev_ln_mean_text_chars ln_lag_volumn_acc l
+> ag_avg_rating_acc lag_sd_acc lnRevenue_lag_month_w199 if !missing(ars_pool_ev
+> ,ln_avg_com_RevPAR), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 12 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     26,173
+Absorbing 2 HDFE groups                           F(  11,    541) =     113.04
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8823
+                                                  Adj R-squared   =     0.8791
+                                                  Within R-sq.    =     0.3016
+Number of clusters (hotel_id_num) =        542    Root MSE        =     0.2123
+
+                         (Std. err. adjusted for 542 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |   .1944645   .2337467     0.83   0.406    -.2646979    .6536269
+ln_avg_com~R |   .1373423   .0204774     6.71   0.000     .0971173    .1775674
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_avg_com~R |  -.0627777   .0526527    -1.19   0.234    -.1662065    .0406511
+             |
+ev_ln_revi~t |   .0397955   .0046278     8.60   0.000      .030705    .0488861
+ev_mean_ra~g |   .0024919   .0032225     0.77   0.440    -.0038381     .008822
+ev_sd_rating |   .0023899   .0032419     0.74   0.461    -.0039784    .0087582
+ev_ln_mean~s |   .0097227   .0042852     2.27   0.024     .0013051    .0181404
+ln_lag_vol~c |   .0300247   .0068196     4.40   0.000     .0166286    .0434208
+lag_avg_ra~c |   .0431482    .026405     1.63   0.103    -.0087207    .0950171
+  lag_sd_acc |   .0013547   .0319615     0.04   0.966    -.0614291    .0641385
+lnRev~h_w199 |   .4372725   .0187905    23.27   0.000     .4003612    .4741839
+       _cons |   1.387569   .1605116     8.64   0.000     1.072267    1.702871
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       542         542           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store M02
+
+. reghdfe lnRevenue_current_w199 c.ars_pool_ev##i.high_comp_zip_focus100 `C' if
+>  !missing(ars_pool_ev,high_comp_zip_focus100), absorb(hotel_id_num ym) vce(cl
+> uster hotel_id_num)
+(dropped 12 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     26,135
+Absorbing 2 HDFE groups                           F(  12,    541) =     102.20
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8853
+                                                  Adj R-squared   =     0.8822
+                                                  Within R-sq.    =     0.2921
+Number of clusters (hotel_id_num) =        542    Root MSE        =     0.2080
+
+                         (Std. err. adjusted for 542 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |  -.1288094   .0543184    -2.37   0.018    -.2355103   -.0221085
+1.high_com.. |  -.0388873   .0225834    -1.72   0.086    -.0832493    .0054746
+             |
+h~p_focus100#|
+          c. |
+ ars_pool_ev |
+          1  |   .1176336   .0705672     1.67   0.096    -.0209856    .2562529
+             |
+ev_ln_revi~t |     .03959    .004641     8.53   0.000     .0304734    .0487066
+ev_mean_ra~g |   .0002038   .0029961     0.07   0.946    -.0056816    .0060891
+ev_sd_rating |   .0009977   .0031788     0.31   0.754    -.0052465     .007242
+ev_ln_mean~s |   .0083138   .0042096     1.97   0.049     .0000447    .0165829
+ln_lag_vol~c |    .032128   .0069213     4.64   0.000     .0185321     .045724
+lag_avg_ra~c |   .0452107   .0254832     1.77   0.077    -.0048475    .0952688
+  lag_sd_acc |   .0070206   .0319951     0.22   0.826    -.0558292    .0698704
+ln_avg_com~R |   .1190357   .0126959     9.38   0.000     .0940964     .143975
+lnRev~h_w199 |   .4179756   .0176222    23.72   0.000     .3833593    .4525919
+       _cons |   1.563278   .1444629    10.82   0.000     1.279501    1.847055
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       542         542           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store M1_zipcomp
+
+. reghdfe lnRevenue_current_w199 c.ars_pool_ev##i.high_comp_city_focus100 `C' i
+> f !missing(ars_pool_ev,high_comp_city_focus100), absorb(hotel_id_num ym) vce(
+> cluster hotel_id_num)
+(dropped 12 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     26,135
+Absorbing 2 HDFE groups                           F(  12,    541) =     102.44
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8853
+                                                  Adj R-squared   =     0.8822
+                                                  Within R-sq.    =     0.2923
+Number of clusters (hotel_id_num) =        542    Root MSE        =     0.2079
+
+                         (Std. err. adjusted for 542 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |  -.0719475   .0533781    -1.35   0.178    -.1768013    .0329063
+1.high_com.. |   .0185296   .0208463     0.89   0.374    -.0224199    .0594792
+             |
+h~y_focus100#|
+          c. |
+ ars_pool_ev |
+          1  |   .0000167    .064826     0.00   1.000    -.1273248    .1273583
+             |
+ev_ln_revi~t |   .0398808   .0046451     8.59   0.000     .0307561    .0490055
+ev_mean_ra~g |   .0002551   .0029965     0.09   0.932    -.0056311    .0061414
+ev_sd_rating |   .0010723   .0031832     0.34   0.736    -.0051806    .0073252
+ev_ln_mean~s |   .0084036   .0042166     1.99   0.047     .0001208    .0166865
+ln_lag_vol~c |   .0319813   .0069323     4.61   0.000     .0183638    .0455987
+lag_avg_ra~c |    .044724    .025818     1.73   0.084    -.0059918    .0954397
+  lag_sd_acc |   .0087773   .0321515     0.27   0.785    -.0543798    .0719345
+ln_avg_com~R |   .1186838   .0126204     9.40   0.000     .0938928    .1434748
+lnRev~h_w199 |   .4172214   .0177135    23.55   0.000     .3824256    .4520171
+       _cons |   1.539681    .145152    10.61   0.000      1.25455    1.824812
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       542         542           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store M2_citycomp
+
+. reghdfe lnRevenue_current_w199 c.ars_pool_ev##c.zip_n_full_c `C' if !missing(
+> ars_pool_ev,zip_n_full_c), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 12 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     26,135
+Absorbing 2 HDFE groups                           F(  12,    541) =     101.13
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8853
+                                                  Adj R-squared   =     0.8822
+                                                  Within R-sq.    =     0.2920
+Number of clusters (hotel_id_num) =        542    Root MSE        =     0.2080
+
+                         (Std. err. adjusted for 542 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |  -.0719018   .0379566    -1.89   0.059    -.1464622    .0026585
+zip_n_full_c |  -.0012076   .0016088    -0.75   0.453    -.0043678    .0019526
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+zip_n_full_c |   .0039503   .0042089     0.94   0.348    -.0043174     .012218
+             |
+ev_ln_revi~t |   .0395682   .0046265     8.55   0.000     .0304801    .0486564
+ev_mean_ra~g |   .0001834   .0029987     0.06   0.951    -.0057072    .0060739
+ev_sd_rating |   .0009707   .0031804     0.31   0.760    -.0052768    .0072182
+ev_ln_mean~s |   .0084083   .0042064     2.00   0.046     .0001454    .0166713
+ln_lag_vol~c |   .0321631   .0069054     4.66   0.000     .0185985    .0457278
+lag_avg_ra~c |   .0448537    .025692     1.75   0.081    -.0056146     .095322
+  lag_sd_acc |   .0074192   .0320523     0.23   0.817    -.0555429    .0703814
+ln_avg_com~R |   .1192484   .0126115     9.46   0.000     .0944749    .1440219
+lnRev~h_w199 |   .4180188   .0176365    23.70   0.000     .3833744    .4526632
+       _cons |   1.543657   .1437632    10.74   0.000     1.261255     1.82606
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       542         542           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store M3_zipthick
+
+. reghdfe lnRevenue_current_w199 c.ars_pool_ev##c.city_n_full_c `C' if !missing
+> (ars_pool_ev,city_n_full_c), absorb(hotel_id_num ym) vce(cluster hotel_id_num
+> )
+(dropped 12 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     26,135
+Absorbing 2 HDFE groups                           F(  12,    541) =     115.09
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8859
+                                                  Adj R-squared   =     0.8828
+                                                  Within R-sq.    =     0.2955
+Number of clusters (hotel_id_num) =        542    Root MSE        =     0.2075
+
+                         (Std. err. adjusted for 542 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |  -.0779509   .0381825    -2.04   0.042     -.152955   -.0029468
+city_n_ful~c |  -.0008246   .0001567    -5.26   0.000    -.0011324   -.0005167
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+city_n_ful~c |   .0004602   .0002975     1.55   0.122    -.0001241    .0010445
+             |
+ev_ln_revi~t |   .0401818   .0045816     8.77   0.000     .0311819    .0491818
+ev_mean_ra~g |   .0002914   .0029669     0.10   0.922    -.0055367    .0061195
+ev_sd_rating |   .0012979   .0031734     0.41   0.683    -.0049357    .0075316
+ev_ln_mean~s |   .0086943   .0041552     2.09   0.037      .000532    .0168566
+ln_lag_vol~c |   .0332907   .0066553     5.00   0.000     .0202172    .0463642
+lag_avg_ra~c |   .0451042   .0241625     1.87   0.062    -.0023596     .092568
+  lag_sd_acc |   .0111072   .0306301     0.36   0.717    -.0490613    .0712756
+ln_avg_com~R |   .1136394   .0123922     9.17   0.000     .0892966    .1379822
+lnRev~h_w199 |   .4111792   .0180889    22.73   0.000     .3756462    .4467122
+       _cons |   1.580884   .1394096    11.34   0.000     1.307033    1.854734
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       542         542           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store M4_citythick
+
+. reghdfe lnRevenue_current_w199 c.ars_pool_ev##c.ln_comp_zip_mean_excl_full `C
+> ' if !missing(ars_pool_ev,ln_comp_zip_mean_excl_full), absorb(hotel_id_num ym
+> ) vce(cluster hotel_id_num)
+(dropped 11 singleton observations)
+(MWFE estimator converged in 8 iterations)
+
+HDFE Linear regression                            Number of obs   =     25,233
+Absorbing 2 HDFE groups                           F(  12,    535) =     107.10
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8906
+                                                  Adj R-squared   =     0.8876
+                                                  Within R-sq.    =     0.3199
+Number of clusters (hotel_id_num) =        536    Root MSE        =     0.2043
+
+                         (Std. err. adjusted for 536 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |   .4565056   .3175076     1.44   0.151    -.1672088     1.08022
+ln_comp_zi~l |   .1933217   .0295206     6.55   0.000     .1353313    .2513122
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_comp_zi~l |  -.1206776   .0745135    -1.62   0.106    -.2670525    .0256972
+             |
+ev_ln_revi~t |   .0363783   .0048324     7.53   0.000     .0268855    .0458711
+ev_mean_ra~g |    .002083   .0030407     0.69   0.494    -.0038901    .0080561
+ev_sd_rating |   .0016153   .0032129     0.50   0.615    -.0046963    .0079268
+ev_ln_mean~s |   .0101253   .0043403     2.33   0.020     .0015992    .0186514
+ln_lag_vol~c |   .0322416   .0072347     4.46   0.000     .0180297    .0464535
+lag_avg_ra~c |   .0469572   .0266827     1.76   0.079    -.0054585    .0993729
+  lag_sd_acc |    .005286   .0316124     0.17   0.867    -.0568136    .0673856
+ln_avg_com~R |    .057368   .0126864     4.52   0.000     .0324468    .0822891
+lnRev~h_w199 |    .402509   .0173748    23.17   0.000     .3683778    .4366402
+       _cons |   1.020939   .1834173     5.57   0.000     .6606322    1.381245
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       536         536           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store M5_ziprev
+
+. reghdfe lnRevenue_current_w199 c.ars_pool_ev##c.ln_comp_city_mean_excl_full `
+> C' if !missing(ars_pool_ev,ln_comp_city_mean_excl_full), absorb(hotel_id_num 
+> ym) vce(cluster hotel_id_num)
+(dropped 12 singleton observations)
+(MWFE estimator converged in 8 iterations)
+
+HDFE Linear regression                            Number of obs   =     26,135
+Absorbing 2 HDFE groups                           F(  12,    541) =     157.22
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8910
+                                                  Adj R-squared   =     0.8881
+                                                  Within R-sq.    =     0.3273
+Number of clusters (hotel_id_num) =        542    Root MSE        =     0.2027
+
+                         (Std. err. adjusted for 542 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |   .3008539    .522952     0.58   0.565    -.7264113    1.328119
+ln_comp_ci~l |   .3496273   .0394143     8.87   0.000     .2722034    .4270511
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_comp_ci~l |  -.0802607   .1182137    -0.68   0.497    -.3124747    .1519534
+             |
+ev_ln_revi~t |   .0400191   .0046142     8.67   0.000      .030955    .0490831
+ev_mean_ra~g |   .0024874   .0029231     0.85   0.395    -.0032547    .0082295
+ev_sd_rating |   .0020734   .0031065     0.67   0.505    -.0040289    .0081757
+ev_ln_mean~s |   .0088329   .0041246     2.14   0.033     .0007306    .0169351
+ln_lag_vol~c |   .0374182   .0073054     5.12   0.000     .0230678    .0517686
+lag_avg_ra~c |   .0337802    .026668     1.27   0.206    -.0186053    .0861657
+  lag_sd_acc |   .0066299   .0331688     0.20   0.842    -.0585255    .0717853
+ln_avg_com~R |   .0880579    .012151     7.25   0.000     .0641891    .1119268
+lnRev~h_w199 |   .3988952   .0187215    21.31   0.000     .3621195     .435671
+       _cons |   .2176749   .2163148     1.01   0.315    -.2072451    .6425948
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       542         542           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store M6_cityrev
+
+. reghdfe lnRevenue_current_w199 c.ars_pool_ev##c.gap_zip_mean_full_c `C' if !m
+> issing(ars_pool_ev,gap_zip_mean_full_c), absorb(hotel_id_num ym) vce(cluster 
+> hotel_id_num)
+(dropped 11 singleton observations)
+(MWFE estimator converged in 8 iterations)
+
+HDFE Linear regression                            Number of obs   =     25,233
+Absorbing 2 HDFE groups                           F(  12,    535) =     159.15
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.9219
+                                                  Adj R-squared   =     0.9197
+                                                  Within R-sq.    =     0.5144
+Number of clusters (hotel_id_num) =        536    Root MSE        =     0.1726
+
+                         (Std. err. adjusted for 536 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |   -.069932   .0338542    -2.07   0.039    -.1364354   -.0034286
+gap_zip_me~c |   .3653806   .0448706     8.14   0.000     .2772363    .4535248
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+gap_zip_me~c |  -.0183987   .0834822    -0.22   0.826    -.1823918    .1455944
+             |
+ev_ln_revi~t |   .0298362   .0048371     6.17   0.000     .0203341    .0393383
+ev_mean_ra~g |  -.0038104    .002817    -1.35   0.177    -.0093442    .0017234
+ev_sd_rating |  -.0018483   .0025668    -0.72   0.472    -.0068905    .0031939
+ev_ln_mean~s |   .0015648   .0034563     0.45   0.651    -.0052247    .0083543
+ln_lag_vol~c |   .0288183    .007537     3.82   0.000     .0140126    .0436241
+lag_avg_ra~c |   -.004071   .0272436    -0.15   0.881    -.0575886    .0494467
+  lag_sd_acc |  -.0634298   .0382657    -1.66   0.098    -.1385993    .0117398
+ln_avg_com~R |   .2401616   .0267964     8.96   0.000     .1875224    .2928007
+lnRev~h_w199 |   .2935566   .0172376    17.03   0.000     .2596949    .3274183
+       _cons |   1.914657   .1466458    13.06   0.000     1.626585     2.20273
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       536         536           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store M7_zipgap
+
+. reghdfe lnRevenue_current_w199 c.ars_pool_ev##c.gap_city_mean_full_c `C' if !
+> missing(ars_pool_ev,gap_city_mean_full_c), absorb(hotel_id_num ym) vce(cluste
+> r hotel_id_num)
+(dropped 12 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     26,135
+Absorbing 2 HDFE groups                           F(  12,    541) =     256.98
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.9470
+                                                  Adj R-squared   =     0.9456
+                                                  Within R-sq.    =     0.6729
+Number of clusters (hotel_id_num) =        542    Root MSE        =     0.1414
+
+                         (Std. err. adjusted for 542 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |  -.0829704   .0248918    -3.33   0.001    -.1318667    -.034074
+gap_city_m~c |   .5472839   .0811887     6.74   0.000     .3878003    .7067676
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+gap_city_m~c |   .1173061   .0867561     1.35   0.177     -.053114    .2877262
+             |
+ev_ln_revi~t |   .0183192    .004645     3.94   0.000     .0091948    .0274437
+ev_mean_ra~g |  -.0059295   .0022252    -2.66   0.008    -.0103006   -.0015583
+ev_sd_rating |   -.002671   .0021268    -1.26   0.210    -.0068488    .0015068
+ev_ln_mean~s |   .0014444   .0028097     0.51   0.607    -.0040747    .0069636
+ln_lag_vol~c |   .0040456   .0065982     0.61   0.540    -.0089156    .0170068
+lag_avg_ra~c |    .031066   .0207195     1.50   0.134    -.0096345    .0717665
+  lag_sd_acc |   .0016055   .0256962     0.06   0.950    -.0488711    .0520821
+ln_avg_com~R |   .1032159   .0091976    11.22   0.000     .0851486    .1212832
+lnRev~h_w199 |   .1893012   .0177206    10.68   0.000     .1544917    .2241108
+       _cons |   2.895227   .1558128    18.58   0.000     2.589154    3.201299
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       542         542           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store M8_citygap
+
+. reghdfe lnRevenue_current_w199 c.ars_pool_ev##c.price_gap_c `C' if !missing(a
+> rs_pool_ev,price_gap_c), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 12 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     26,173
+Absorbing 2 HDFE groups                           F(  12,    541) =     107.49
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8862
+                                                  Adj R-squared   =     0.8832
+                                                  Within R-sq.    =     0.3250
+Number of clusters (hotel_id_num) =        542    Root MSE        =     0.2087
+
+                         (Std. err. adjusted for 542 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |  -.0736503   .0374976    -1.96   0.050     -.147309    8.48e-06
+ price_gap_c |   .1494585   .0253013     5.91   0.000     .0997576    .1991593
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ price_gap_c |  -.0158778   .0678174    -0.23   0.815    -.1490955      .11734
+             |
+ev_ln_revi~t |   .0397033   .0044711     8.88   0.000     .0309204    .0484862
+ev_mean_ra~g |   .0020973   .0030949     0.68   0.498    -.0039822    .0081768
+ev_sd_rating |   .0022087   .0032004     0.69   0.490    -.0040781    .0084955
+ev_ln_mean~s |    .007543    .004271     1.77   0.078    -.0008467    .0159327
+ln_lag_vol~c |   .0277016   .0066753     4.15   0.000     .0145889    .0408144
+lag_avg_ra~c |   .0366337   .0253534     1.44   0.149    -.0131695    .0864369
+  lag_sd_acc |  -.0056018   .0298556    -0.19   0.851     -.064249    .0530454
+ln_avg_com~R |    .220477   .0185555    11.88   0.000     .1840274    .2569267
+lnRev~h_w199 |   .3199195   .0187631    17.05   0.000     .2830621     .356777
+       _cons |   1.593277   .1383993    11.51   0.000     1.321411    1.865143
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       542         542           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store M9_pricegap
+
+. * M1-M13 organization boundaries, pooled ARS only.
+. reghdfe lnRevenue_current_w199 c.ars_pool_ev##i.chain `C' if !missing(ars_poo
+> l_ev,chain), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 12 singleton observations)
+(MWFE estimator converged in 7 iterations)
+note: 1bn.chain is probably collinear with the fixed effects (all partialled-ou
+> t values are close to zero; tol = 1.0e-09)
+
+HDFE Linear regression                            Number of obs   =     26,173
+Absorbing 2 HDFE groups                           F(  11,    541) =     111.07
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8823
+                                                  Adj R-squared   =     0.8791
+                                                  Within R-sq.    =     0.3015
+Number of clusters (hotel_id_num) =        542    Root MSE        =     0.2123
+
+                         (Std. err. adjusted for 542 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |  -.0608455   .0726837    -0.84   0.403    -.2036224    .0819313
+     1.chain |          0  (omitted)
+             |
+       chain#|
+          c. |
+ ars_pool_ev |
+          1  |  -.0162603   .0824459    -0.20   0.844    -.1782136     .145693
+             |
+ev_ln_revi~t |   .0395802   .0046533     8.51   0.000     .0304393     .048721
+ev_mean_ra~g |   .0023998   .0032187     0.75   0.456    -.0039229    .0087225
+ev_sd_rating |   .0023449   .0032465     0.72   0.470    -.0040324    .0087223
+ev_ln_mean~s |   .0097723   .0042884     2.28   0.023     .0013483    .0181962
+ln_lag_vol~c |   .0299647   .0068109     4.40   0.000     .0165856    .0433437
+lag_avg_ra~c |   .0433923   .0264346     1.64   0.101    -.0085347    .0953192
+  lag_sd_acc |    .002012   .0319055     0.06   0.950    -.0606618    .0646858
+ln_avg_com~R |   .1183662   .0124837     9.48   0.000     .0938437    .1428887
+lnRev~h_w199 |   .4372822   .0187821    23.28   0.000     .4003875    .4741769
+       _cons |   1.467529   .1459846    10.05   0.000     1.180763    1.754296
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       542         542           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store O1_chain
+
+. reghdfe lnRevenue_current_w199 c.ars_pool_ev##i.independent `C' if !missing(a
+> rs_pool_ev,independent), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 12 singleton observations)
+(MWFE estimator converged in 7 iterations)
+note: 1bn.independent is probably collinear with the fixed effects (all partial
+> led-out values are close to zero; tol = 1.0e-09)
+
+HDFE Linear regression                            Number of obs   =     26,173
+Absorbing 2 HDFE groups                           F(  11,    541) =     111.07
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8823
+                                                  Adj R-squared   =     0.8791
+                                                  Within R-sq.    =     0.3015
+Number of clusters (hotel_id_num) =        542    Root MSE        =     0.2123
+
+                         (Std. err. adjusted for 542 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |  -.0771058   .0439152    -1.76   0.080     -.163371    .0091593
+1.independ~t |          0  (omitted)
+             |
+ independent#|
+          c. |
+ ars_pool_ev |
+          1  |   .0162603   .0824459     0.20   0.844     -.145693    .1782136
+             |
+ev_ln_revi~t |   .0395802   .0046533     8.51   0.000     .0304393     .048721
+ev_mean_ra~g |   .0023998   .0032187     0.75   0.456    -.0039229    .0087225
+ev_sd_rating |   .0023449   .0032465     0.72   0.470    -.0040324    .0087223
+ev_ln_mean~s |   .0097723   .0042884     2.28   0.023     .0013483    .0181962
+ln_lag_vol~c |   .0299647   .0068109     4.40   0.000     .0165856    .0433437
+lag_avg_ra~c |   .0433923   .0264346     1.64   0.101    -.0085347    .0953192
+  lag_sd_acc |    .002012   .0319055     0.06   0.950    -.0606618    .0646858
+ln_avg_com~R |   .1183662   .0124837     9.48   0.000     .0938437    .1428887
+lnRev~h_w199 |   .4372822   .0187821    23.28   0.000     .4003875    .4741769
+       _cons |   1.467529   .1459846    10.05   0.000     1.180763    1.754296
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       542         542           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store O2_independent
+
+. reghdfe lnRevenue_current_w199 c.ars_pool_ev##i.chain_small `C' if !missing(a
+> rs_pool_ev,chain_small), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 12 singleton observations)
+(MWFE estimator converged in 7 iterations)
+note: 1bn.chain_small is probably collinear with the fixed effects (all partial
+> led-out values are close to zero; tol = 1.0e-09)
+
+HDFE Linear regression                            Number of obs   =     26,173
+Absorbing 2 HDFE groups                           F(  11,    541) =     111.07
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8823
+                                                  Adj R-squared   =     0.8791
+                                                  Within R-sq.    =     0.3015
+Number of clusters (hotel_id_num) =        542    Root MSE        =     0.2123
+
+                         (Std. err. adjusted for 542 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |  -.0608455   .0726837    -0.84   0.403    -.2036224    .0819313
+1.chain_sm~l |          0  (omitted)
+             |
+ chain_small#|
+          c. |
+ ars_pool_ev |
+          1  |  -.0162603   .0824459    -0.20   0.844    -.1782136     .145693
+             |
+ev_ln_revi~t |   .0395802   .0046533     8.51   0.000     .0304393     .048721
+ev_mean_ra~g |   .0023998   .0032187     0.75   0.456    -.0039229    .0087225
+ev_sd_rating |   .0023449   .0032465     0.72   0.470    -.0040324    .0087223
+ev_ln_mean~s |   .0097723   .0042884     2.28   0.023     .0013483    .0181962
+ln_lag_vol~c |   .0299647   .0068109     4.40   0.000     .0165856    .0433437
+lag_avg_ra~c |   .0433923   .0264346     1.64   0.101    -.0085347    .0953192
+  lag_sd_acc |    .002012   .0319055     0.06   0.950    -.0606618    .0646858
+ln_avg_com~R |   .1183662   .0124837     9.48   0.000     .0938437    .1428887
+lnRev~h_w199 |   .4372822   .0187821    23.28   0.000     .4003875    .4741769
+       _cons |   1.467529   .1459846    10.05   0.000     1.180763    1.754296
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       542         542           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store O3_smallchain
+
+. reghdfe lnRevenue_current_w199 c.ars_pool_ev##i.chain3_small `C' if !missing(
+> ars_pool_ev,chain3_small), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 12 singleton observations)
+(MWFE estimator converged in 7 iterations)
+note: 1bn.chain3_small is probably collinear with the fixed effects (all partia
+> lled-out values are close to zero; tol = 1.0e-09)
+
+HDFE Linear regression                            Number of obs   =     26,173
+Absorbing 2 HDFE groups                           F(  11,    541) =     111.05
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8823
+                                                  Adj R-squared   =     0.8791
+                                                  Within R-sq.    =     0.3015
+Number of clusters (hotel_id_num) =        542    Root MSE        =     0.2123
+
+                         (Std. err. adjusted for 542 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |  -.0589686   .0722254    -0.82   0.415    -.2008451    .0829079
+1.chain3_s~l |          0  (omitted)
+             |
+chain3_small#|
+          c. |
+ ars_pool_ev |
+          1  |  -.0189941   .0821264    -0.23   0.817    -.1803198    .1423317
+             |
+ev_ln_revi~t |   .0395772   .0046528     8.51   0.000     .0304375     .048717
+ev_mean_ra~g |   .0024015   .0032194     0.75   0.456    -.0039225    .0087256
+ev_sd_rating |   .0023476   .0032471     0.72   0.470    -.0040309    .0087261
+ev_ln_mean~s |   .0097712   .0042884     2.28   0.023     .0013473    .0181951
+ln_lag_vol~c |   .0299669   .0068109     4.40   0.000     .0165878     .043346
+lag_avg_ra~c |   .0433895   .0264345     1.64   0.101    -.0085373    .0953163
+  lag_sd_acc |   .0020233    .031909     0.06   0.949    -.0606575    .0647042
+ln_avg_com~R |   .1183655   .0124838     9.48   0.000     .0938427    .1428882
+lnRev~h_w199 |   .4372796   .0187815    23.28   0.000     .4003859    .4741733
+       _cons |   1.467535   .1459856    10.05   0.000     1.180767    1.754303
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       542         542           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store O4_chain3
+
+. reghdfe lnRevenue_current_w199 c.ars_pool_ev##i.star_class_final `C' if !miss
+> ing(ars_pool_ev,star_class_final), absorb(hotel_id_num ym) vce(cluster hotel_
+> id_num)
+(dropped 12 singleton observations)
+(MWFE estimator converged in 7 iterations)
+note: 3bn.star_class_final is probably collinear with the fixed effects (all pa
+> rtialled-out values are close to zero; tol = 1.0e-09)
+note: 4bn.star_class_final is probably collinear with the fixed effects (all pa
+> rtialled-out values are close to zero; tol = 1.0e-09)
+note: 5bn.star_class_final is probably collinear with the fixed effects (all pa
+> rtialled-out values are close to zero; tol = 1.0e-09)
+note: 6bn.star_class_final is probably collinear with the fixed effects (all pa
+> rtialled-out values are close to zero; tol = 1.0e-09)
+note: 7bn.star_class_final is probably collinear with the fixed effects (all pa
+> rtialled-out values are close to zero; tol = 1.0e-09)
+note: 8bn.star_class_final is probably collinear with the fixed effects (all pa
+> rtialled-out values are close to zero; tol = 1.0e-09)
+note: 9bn.star_class_final is probably collinear with the fixed effects (all pa
+> rtialled-out values are close to zero; tol = 1.0e-09)
+
+HDFE Linear regression                            Number of obs   =     25,652
+Absorbing 2 HDFE groups                           F(  17,    530) =     120.18
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8800
+                                                  Adj R-squared   =     0.8768
+                                                  Within R-sq.    =     0.3091
+Number of clusters (hotel_id_num) =        531    Root MSE        =     0.2088
+
+                         (Std. err. adjusted for 531 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |   1.161057   .0686574    16.91   0.000     1.026183    1.295931
+             |
+star_class~l |
+          3  |          0  (omitted)
+          4  |          0  (omitted)
+          5  |          0  (omitted)
+          6  |          0  (omitted)
+          7  |          0  (omitted)
+          8  |          0  (omitted)
+          9  |          0  (omitted)
+             |
+star_class~l#|
+          c. |
+ ars_pool_ev |
+          3  |  -1.177213   .1236657    -9.52   0.000    -1.420148   -.9342778
+          4  |  -1.296528   .1008654   -12.85   0.000    -1.494673   -1.098383
+          5  |  -1.167674   .0786707   -14.84   0.000    -1.322219    -1.01313
+          6  |  -1.336228   .1788508    -7.47   0.000    -1.687571   -.9848842
+          7  |  -1.273107   .1522316    -8.36   0.000    -1.572158   -.9740552
+          8  |  -1.809551    .330643    -5.47   0.000    -2.459083    -1.16002
+          9  |  -1.186206   .2446894    -4.85   0.000    -1.666886   -.7055261
+             |
+ev_ln_revi~t |   .0396527   .0047149     8.41   0.000     .0303905     .048915
+ev_mean_ra~g |   .0022706   .0032077     0.71   0.479    -.0040308    .0085721
+ev_sd_rating |   .0029418   .0032299     0.91   0.363    -.0034033    .0092868
+ev_ln_mean~s |   .0093646   .0042758     2.19   0.029      .000965    .0177643
+ln_lag_vol~c |   .0279132   .0069985     3.99   0.000      .014165    .0416613
+lag_avg_ra~c |   .0429569   .0264756     1.62   0.105    -.0090531    .0949669
+  lag_sd_acc |   .0002879    .032305     0.01   0.993    -.0631736    .0637494
+ln_avg_com~R |   .1173295   .0124854     9.40   0.000     .0928026    .1418565
+lnRev~h_w199 |   .4438088   .0190067    23.35   0.000     .4064712    .4811464
+       _cons |   1.455621   .1469491     9.91   0.000     1.166947    1.744295
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       531         531           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store O5_starclass
+
+. reghdfe lnRevenue_current_w199 c.ars_pool_ev##ib2.star_class_bucket3 `C' if !
+> missing(ars_pool_ev,star_class_bucket3), absorb(hotel_id_num ym) vce(cluster 
+> hotel_id_num)
+(dropped 12 singleton observations)
+(MWFE estimator converged in 7 iterations)
+note: 1bn.star_class_bucket3 is probably collinear with the fixed effects (all 
+> partialled-out values are close to zero; tol = 1.0e-09)
+note: 3bn.star_class_bucket3 is probably collinear with the fixed effects (all 
+> partialled-out values are close to zero; tol = 1.0e-09)
+
+HDFE Linear regression                            Number of obs   =     25,652
+Absorbing 2 HDFE groups                           F(  12,    530) =     167.55
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8800
+                                                  Adj R-squared   =     0.8767
+                                                  Within R-sq.    =     0.3089
+Number of clusters (hotel_id_num) =        531    Root MSE        =     0.2088
+
+                         (Std. err. adjusted for 531 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |   -.015718   .1120952    -0.14   0.889    -.2359235    .2044874
+             |
+star_class~3 |
+          1  |          0  (omitted)
+          3  |          0  (omitted)
+             |
+star_class~3#|
+          c. |
+ ars_pool_ev |
+          1  |   1.181743   .1235854     9.56   0.000     .9389651     1.42452
+          3  |  -.0568275   .1185449    -0.48   0.632     -.289703     .176048
+             |
+ev_ln_revi~t |   .0393714   .0046631     8.44   0.000     .0302109    .0485319
+ev_mean_ra~g |   .0022421   .0032137     0.70   0.486     -.004071    .0085553
+ev_sd_rating |   .0029455   .0032329     0.91   0.363    -.0034052    .0092963
+ev_ln_mean~s |   .0095054   .0042775     2.22   0.027     .0011025    .0179082
+ln_lag_vol~c |   .0274549   .0069043     3.98   0.000     .0138918     .041018
+lag_avg_ra~c |   .0443988   .0264797     1.68   0.094    -.0076192    .0964168
+  lag_sd_acc |   .0017653   .0322421     0.05   0.956    -.0615727    .0651034
+ln_avg_com~R |   .1172539   .0124893     9.39   0.000     .0927193    .1417884
+lnRev~h_w199 |   .4438989   .0190149    23.34   0.000     .4065452    .4812527
+       _cons |    1.44818    .146736     9.87   0.000     1.159925    1.736436
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       531         531           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store O6_starbucket
+
+. reghdfe lnRevenue_current_w199 c.ars_pool_ev##i.high_star4 `C' if !missing(ar
+> s_pool_ev,high_star4), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 12 singleton observations)
+(MWFE estimator converged in 7 iterations)
+note: 1bn.high_star4 is probably collinear with the fixed effects (all partiall
+> ed-out values are close to zero; tol = 1.0e-09)
+
+HDFE Linear regression                            Number of obs   =     25,652
+Absorbing 2 HDFE groups                           F(  11,    530) =     111.68
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8800
+                                                  Adj R-squared   =     0.8767
+                                                  Within R-sq.    =     0.3088
+Number of clusters (hotel_id_num) =        531    Root MSE        =     0.2088
+
+                         (Std. err. adjusted for 531 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |  -.0043535   .1119699    -0.04   0.969    -.2243128    .2156059
+1.high_star4 |          0  (omitted)
+             |
+  high_star4#|
+          c. |
+ ars_pool_ev |
+          1  |  -.0683103   .1182543    -0.58   0.564     -.300615    .1639945
+             |
+ev_ln_revi~t |   .0394023   .0046673     8.44   0.000     .0302335     .048571
+ev_mean_ra~g |   .0021973   .0032158     0.68   0.495      -.00412    .0085145
+ev_sd_rating |   .0029166   .0032316     0.90   0.367    -.0034317    .0092648
+ev_ln_mean~s |   .0094457   .0042717     2.21   0.027     .0010541    .0178373
+ln_lag_vol~c |   .0275675   .0068924     4.00   0.000     .0140278    .0411073
+lag_avg_ra~c |   .0441042   .0264315     1.67   0.096    -.0078191    .0960275
+  lag_sd_acc |   .0020937   .0322519     0.06   0.948    -.0612635    .0654509
+ln_avg_com~R |     .11727   .0124913     9.39   0.000     .0927315    .1418086
+lnRev~h_w199 |   .4438549   .0190139    23.34   0.000      .406503    .4812068
+       _cons |   1.449707   .1466514     9.89   0.000     1.161618    1.737796
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       531         531           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store O7_highstar
+
+. reghdfe lnRevenue_current_w199 c.ars_pool_ev##c.lag_avg_rating_acc `C' if !mi
+> ssing(ars_pool_ev,lag_avg_rating_acc), absorb(hotel_id_num ym) vce(cluster ho
+> tel_id_num)
+(dropped 12 singleton observations)
+(MWFE estimator converged in 7 iterations)
+note: lag_avg_rating_acc omitted because of collinearity
+
+HDFE Linear regression                            Number of obs   =     26,173
+Absorbing 2 HDFE groups                           F(  11,    541) =     114.85
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8823
+                                                  Adj R-squared   =     0.8791
+                                                  Within R-sq.    =     0.3015
+Number of clusters (hotel_id_num) =        542    Root MSE        =     0.2123
+
+                         (Std. err. adjusted for 542 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |  -.2101884   .2913977    -0.72   0.471    -.7825981    .3622212
+lag_avg_ra~c |    .033348    .031601     1.06   0.292    -.0287276    .0954236
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+lag_avg_ra~c |   .0349877   .0725635     0.48   0.630    -.1075531    .1775285
+             |
+ev_ln_revi~t |   .0395736   .0046381     8.53   0.000     .0304628    .0486845
+ev_mean_ra~g |    .002294   .0032177     0.71   0.476    -.0040267    .0086147
+ev_sd_rating |    .002303   .0032398     0.71   0.477    -.0040611    .0086672
+ev_ln_mean~s |   .0097793   .0042877     2.28   0.023     .0013567     .018202
+ln_lag_vol~c |   .0299271     .00682     4.39   0.000     .0165302     .043324
+lag_avg_ra~c |          0  (omitted)
+  lag_sd_acc |   .0022154   .0320265     0.07   0.945     -.060696    .0651269
+ln_avg_com~R |   .1183688   .0124809     9.48   0.000     .0938519    .1428857
+lnRev~h_w199 |    .437306   .0187879    23.28   0.000     .4003997    .4742122
+       _cons |   1.507322   .1524097     9.89   0.000     1.207934    1.806709
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       542         542           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store O8_qualitylevel
+
+. reghdfe lnRevenue_current_w199 c.ars_pool_ev##i.high_quality_ym `C' if !missi
+> ng(ars_pool_ev,high_quality_ym), absorb(hotel_id_num ym) vce(cluster hotel_id
+> _num)
+(dropped 12 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     26,173
+Absorbing 2 HDFE groups                           F(  12,    541) =     104.86
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8823
+                                                  Adj R-squared   =     0.8791
+                                                  Within R-sq.    =     0.3019
+Number of clusters (hotel_id_num) =        542    Root MSE        =     0.2122
+
+                         (Std. err. adjusted for 542 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |  -.0584003   .0547855    -1.07   0.287    -.1660187     .049218
+1.high_q~_ym |   -.018251    .022297    -0.82   0.413    -.0620502    .0255482
+             |
+high_qua~_ym#|
+          c. |
+ ars_pool_ev |
+          1  |  -.0241154   .0694991    -0.35   0.729    -.1606365    .1124057
+             |
+ev_ln_revi~t |   .0393383   .0046584     8.44   0.000     .0301875    .0484892
+ev_mean_ra~g |   .0023759   .0032106     0.74   0.460    -.0039309    .0086827
+ev_sd_rating |   .0022726   .0032433     0.70   0.484    -.0040984    .0086437
+ev_ln_mean~s |   .0096493   .0042866     2.25   0.025     .0012289    .0180698
+ln_lag_vol~c |   .0303792   .0068036     4.47   0.000     .0170144    .0437439
+lag_avg_ra~c |   .0593482   .0265316     2.24   0.026     .0072306    .1114658
+  lag_sd_acc |  -.0015216   .0319848    -0.05   0.962    -.0643511    .0613079
+ln_avg_com~R |   .1188183   .0124451     9.55   0.000     .0943717    .1432649
+lnRev~h_w199 |   .4368294   .0187124    23.34   0.000     .4000716    .4735873
+       _cons |    1.41651   .1444339     9.81   0.000      1.13279     1.70023
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       542         542           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store O8_qualityym
+
+. reghdfe lnRevenue_current_w199 c.ars_pool_ev##i.high_quality_cityym `C' if !m
+> issing(ars_pool_ev,high_quality_cityym), absorb(hotel_id_num ym) vce(cluster 
+> hotel_id_num)
+(dropped 12 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     26,173
+Absorbing 2 HDFE groups                           F(  12,    541) =     104.15
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8823
+                                                  Adj R-squared   =     0.8791
+                                                  Within R-sq.    =     0.3018
+Number of clusters (hotel_id_num) =        542    Root MSE        =     0.2122
+
+                         (Std. err. adjusted for 542 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |  -.0373679   .0542832    -0.69   0.492    -.1439995    .0692637
+1.high_q~yym |  -.0012554   .0221477    -0.06   0.955    -.0447613    .0422506
+             |
+high_qua~yym#|
+          c. |
+ ars_pool_ev |
+          1  |  -.0659691   .0693523    -0.95   0.342    -.2022019    .0702638
+             |
+ev_ln_revi~t |   .0397574   .0046229     8.60   0.000     .0306763    .0488385
+ev_mean_ra~g |   .0024283   .0032077     0.76   0.449    -.0038727    .0087293
+ev_sd_rating |   .0022931   .0032445     0.71   0.480    -.0040802    .0086664
+ev_ln_mean~s |   .0096846   .0042814     2.26   0.024     .0012743    .0180948
+ln_lag_vol~c |   .0303933   .0067886     4.48   0.000      .017058    .0437286
+lag_avg_ra~c |   .0557457   .0268467     2.08   0.038     .0030091    .1084823
+  lag_sd_acc |  -.0024166   .0318171    -0.08   0.939    -.0649168    .0600836
+ln_avg_com~R |   .1184071    .012483     9.49   0.000      .093886    .1429281
+lnRev~h_w199 |   .4370796   .0187019    23.37   0.000     .4003424    .4738167
+       _cons |   1.422473   .1469449     9.68   0.000     1.133821    1.711126
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       542         542           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store O9_qualitycity
+
+. reghdfe lnRevenue_current_w199 c.ars_pool_ev##i.high_quality_zipym `C' if !mi
+> ssing(ars_pool_ev,high_quality_zipym), absorb(hotel_id_num ym) vce(cluster ho
+> tel_id_num)
+(dropped 12 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     26,173
+Absorbing 2 HDFE groups                           F(  12,    541) =     102.53
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8823
+                                                  Adj R-squared   =     0.8791
+                                                  Within R-sq.    =     0.3016
+Number of clusters (hotel_id_num) =        542    Root MSE        =     0.2123
+
+                         (Std. err. adjusted for 542 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |  -.0724935   .0498003    -1.46   0.146    -.1703192    .0253322
+1.high_q~pym |  -.0081324   .0197402    -0.41   0.681    -.0469091    .0306444
+             |
+high_qua~pym#|
+          c. |
+ ars_pool_ev |
+          1  |   .0028988   .0628478     0.05   0.963    -.1205567    .1263544
+             |
+ev_ln_revi~t |   .0394022   .0046476     8.48   0.000     .0302726    .0485319
+ev_mean_ra~g |   .0024299   .0032165     0.76   0.450    -.0038886    .0087483
+ev_sd_rating |   .0023858   .0032365     0.74   0.461    -.0039719    .0087434
+ev_ln_mean~s |   .0097874   .0042903     2.28   0.023     .0013598     .018215
+ln_lag_vol~c |   .0299751    .006822     4.39   0.000     .0165742     .043376
+lag_avg_ra~c |   .0469681    .026338     1.78   0.075    -.0047691    .0987053
+  lag_sd_acc |   .0011363   .0320697     0.04   0.972    -.0618601    .0641327
+ln_avg_com~R |   .1185454   .0124842     9.50   0.000     .0940221    .1430688
+lnRev~h_w199 |   .4372828   .0187789    23.29   0.000     .4003943    .4741712
+       _cons |   1.456665   .1453326    10.02   0.000      1.17118     1.74215
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       542         542           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store O10_qualityzip
+
+. reghdfe lnRevenue_current_w199 c.ars_pool_ev##i.high_rank_status `C' if !miss
+> ing(ars_pool_ev,high_rank_status), absorb(hotel_id_num ym) vce(cluster hotel_
+> id_num)
+(dropped 12 singleton observations)
+(MWFE estimator converged in 7 iterations)
+note: 1bn.high_rank_status is probably collinear with the fixed effects (all pa
+> rtialled-out values are close to zero; tol = 1.0e-09)
+
+HDFE Linear regression                            Number of obs   =     26,173
+Absorbing 2 HDFE groups                           F(  11,    541) =     111.85
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8823
+                                                  Adj R-squared   =     0.8791
+                                                  Within R-sq.    =     0.3015
+Number of clusters (hotel_id_num) =        542    Root MSE        =     0.2123
+
+                         (Std. err. adjusted for 542 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |  -.0569648   .0486676    -1.17   0.242    -.1525654    .0386358
+1.high_ran~s |          0  (omitted)
+             |
+high_rank_~s#|
+          c. |
+ ars_pool_ev |
+          1  |  -.0313639   .0716976    -0.44   0.662    -.1722037     .109476
+             |
+ev_ln_revi~t |     .03976    .004647     8.56   0.000     .0306316    .0488884
+ev_mean_ra~g |   .0024563   .0032166     0.76   0.445    -.0038623    .0087748
+ev_sd_rating |   .0023235   .0032417     0.72   0.474    -.0040444    .0086913
+ev_ln_mean~s |   .0097816   .0042856     2.28   0.023     .0013631    .0182001
+ln_lag_vol~c |   .0300031   .0068354     4.39   0.000     .0165759    .0434303
+lag_avg_ra~c |   .0435099   .0264133     1.65   0.100    -.0083752     .095395
+  lag_sd_acc |   .0017882   .0319724     0.06   0.955    -.0610171    .0645935
+ln_avg_com~R |   .1183783   .0124812     9.48   0.000     .0938607    .1428958
+lnRev~h_w199 |   .4372916   .0187846    23.28   0.000     .4003919    .4741912
+       _cons |   1.467103   .1458415    10.06   0.000     1.180618    1.753588
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       542         542           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store O11_rank
+
+. reghdfe lnRevenue_current_w199 c.ars_pool_ev##i.hotel_evaluation_factor `C' i
+> f !missing(ars_pool_ev,hotel_evaluation_factor), absorb(hotel_id_num ym) vce(
+> cluster hotel_id_num)
+(dropped 12 singleton observations)
+(MWFE estimator converged in 7 iterations)
+note: 2bn.hotel_evaluation_factor is probably collinear with the fixed effects 
+> (all partialled-out values are close to zero; tol = 1.0e-09)
+note: 3bn.hotel_evaluation_factor is probably collinear with the fixed effects 
+> (all partialled-out values are close to zero; tol = 1.0e-09)
+note: 4bn.hotel_evaluation_factor is probably collinear with the fixed effects 
+> (all partialled-out values are close to zero; tol = 1.0e-09)
+note: 5bn.hotel_evaluation_factor is probably collinear with the fixed effects 
+> (all partialled-out values are close to zero; tol = 1.0e-09)
+
+HDFE Linear regression                            Number of obs   =     26,173
+Absorbing 2 HDFE groups                           F(  14,    541) =      91.71
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8823
+                                                  Adj R-squared   =     0.8791
+                                                  Within R-sq.    =     0.3016
+Number of clusters (hotel_id_num) =        542    Root MSE        =     0.2123
+
+                         (Std. err. adjusted for 542 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |    .021555   .0790789     0.27   0.785    -.1337843    .1768943
+             |
+hotel_eval~r |
+  Excellent  |          0  (omitted)
+       Good  |          0  (omitted)
+       Poor  |          0  (omitted)
+  Very Good  |          0  (omitted)
+             |
+hotel_eval~r#|
+          c. |
+ ars_pool_ev |
+  Excellent  |  -.2631496    .248645    -1.06   0.290    -.7515775    .2252783
+       Good  |  -.0807529   .0951745    -0.85   0.397    -.2677097     .106204
+       Poor  |  -.1592096   .2193722    -0.73   0.468    -.5901352     .271716
+  Very Good  |  -.1476058   .1038754    -1.42   0.156    -.3516543    .0564427
+             |
+ev_ln_revi~t |   .0399728   .0046442     8.61   0.000       .03085    .0490957
+ev_mean_ra~g |    .002438   .0031976     0.76   0.446    -.0038431    .0087192
+ev_sd_rating |   .0022365   .0032353     0.69   0.490    -.0041187    .0085917
+ev_ln_mean~s |   .0098989   .0042824     2.31   0.021     .0014866    .0183112
+ln_lag_vol~c |   .0300476   .0068415     4.39   0.000     .0166084    .0434868
+lag_avg_ra~c |   .0432527   .0263705     1.64   0.102    -.0085485    .0950539
+  lag_sd_acc |   .0007913   .0318628     0.02   0.980    -.0617986    .0633813
+ln_avg_com~R |   .1184199   .0124701     9.50   0.000     .0939241    .1429157
+lnRev~h_w199 |    .437348   .0187973    23.27   0.000     .4004234    .4742726
+       _cons |   1.467613   .1454415    10.09   0.000     1.181914    1.753312
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       542         542           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store O12_evaluation
+
+. reghdfe lnRevenue_current_w199 c.ars_pool_ev##c.ln_lag_volumn_acc ev_ln_revie
+> w_count ev_mean_rating ev_sd_rating ev_ln_mean_text_chars lag_avg_rating_acc 
+> lag_sd_acc ln_avg_com_RevPAR lnRevenue_lag_month_w199 if !missing(ars_pool_ev
+> ,ln_lag_volumn_acc), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 12 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     26,173
+Absorbing 2 HDFE groups                           F(  11,    541) =     111.90
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8823
+                                                  Adj R-squared   =     0.8791
+                                                  Within R-sq.    =     0.3018
+Number of clusters (hotel_id_num) =        542    Root MSE        =     0.2122
+
+                         (Std. err. adjusted for 542 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |  -.4721398   .1720183    -2.74   0.006    -.8100454   -.1342341
+ln_lag_vol~c |   .0075474   .0126489     0.60   0.551    -.0172995    .0323944
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_lag_vol~c |   .0744609   .0330567     2.25   0.025     .0095258    .1393961
+             |
+ev_ln_revi~t |   .0385567   .0046314     8.33   0.000     .0294589    .0476545
+ev_mean_ra~g |   .0021675   .0032024     0.68   0.499    -.0041232    .0084582
+ev_sd_rating |   .0025587    .003238     0.79   0.430    -.0038019    .0089194
+ev_ln_mean~s |    .009959   .0042772     2.33   0.020     .0015571    .0183608
+lag_avg_ra~c |   .0421411   .0262747     1.60   0.109    -.0094717     .093754
+  lag_sd_acc |   .0008722   .0318599     0.03   0.978    -.0617121    .0634566
+ln_avg_com~R |   .1182308   .0124703     9.48   0.000     .0937346     .142727
+lnRev~h_w199 |   .4372636   .0187927    23.27   0.000     .4003479    .4741793
+       _cons |   1.596167   .1511233    10.56   0.000     1.299306    1.893027
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       542         542           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store O13_popularity
+
+. reghdfe lnRevenue_current_w199 c.ars_pool_ev##i.high_popularity `C' if !missi
+> ng(ars_pool_ev,high_popularity), absorb(hotel_id_num ym) vce(cluster hotel_id
+> _num)
+(dropped 12 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     26,173
+Absorbing 2 HDFE groups                           F(  12,    541) =     101.76
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8823
+                                                  Adj R-squared   =     0.8791
+                                                  Within R-sq.    =     0.3016
+Number of clusters (hotel_id_num) =        542    Root MSE        =     0.2123
+
+                         (Std. err. adjusted for 542 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+lnRev~t_w199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ ars_pool_ev |  -.0883853   .0446423    -1.98   0.048    -.1760787   -.0006918
+1.high_pop~y |  -.0073091   .0200924    -0.36   0.716    -.0467778    .0321596
+             |
+high_popul~y#|
+          c. |
+ ars_pool_ev |
+          1  |   .0387956   .0645776     0.60   0.548     -.088058    .1656491
+             |
+ev_ln_revi~t |   .0394832   .0046492     8.49   0.000     .0303505    .0486158
+ev_mean_ra~g |   .0023979   .0032154     0.75   0.456    -.0039182    .0087141
+ev_sd_rating |   .0023543   .0032399     0.73   0.468    -.0040101    .0087187
+ev_ln_mean~s |   .0098745   .0042966     2.30   0.022     .0014345    .0183146
+ln_lag_vol~c |    .029068    .006939     4.19   0.000     .0154374    .0426987
+lag_avg_ra~c |   .0434363   .0264928     1.64   0.102     -.008605    .0954776
+  lag_sd_acc |   .0025061   .0320399     0.08   0.938    -.0604317    .0654438
+ln_avg_com~R |   .1183559   .0124824     9.48   0.000      .093836    .1428759
+lnRev~h_w199 |   .4373199   .0187792    23.29   0.000      .400431    .4742089
+       _cons |   1.473862   .1454996    10.13   0.000     1.188048    1.759675
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       542         542           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store O13_popularitycell
+
+. estimates table M01 M02 M1_zipcomp M2_citycomp M3_zipthick M4_citythick M5_zi
+> prev M6_cityrev M7_zipgap M8_citygap M9_pricegap O1_chain O2_independent O3_s
+> mallchain O4_chain3 O5_starclass O6_starbucket O7_highstar O8_qualitylevel O8
+> _qualityym O9_qualitycity O10_qualityzip O11_rank O12_evaluation O13_populari
+> ty O13_popularitycell, b(%9.4f) se stats(N r2_a)
+
+--------------------------------------------------------------------------
+    Variable |    M01         M02      M1_zipc~p   M2_city~p   M3_zipt~k  
+-------------+------------------------------------------------------------
+ ars_pool_ev |   -0.0723      0.1945     -0.1288     -0.0719     -0.0719  
+             |    0.0388      0.2337      0.0543      0.0534      0.0380  
+ev_ln_revi~t |    0.0396      0.0398      0.0396      0.0399      0.0396  
+             |    0.0046      0.0046      0.0046      0.0046      0.0046  
+ev_mean_ra~g |    0.0024      0.0025      0.0002      0.0003      0.0002  
+             |    0.0032      0.0032      0.0030      0.0030      0.0030  
+ev_sd_rating |    0.0023      0.0024      0.0010      0.0011      0.0010  
+             |    0.0032      0.0032      0.0032      0.0032      0.0032  
+ev_ln_mean~s |    0.0098      0.0097      0.0083      0.0084      0.0084  
+             |    0.0043      0.0043      0.0042      0.0042      0.0042  
+ln_lag_vol~c |    0.0299      0.0300      0.0321      0.0320      0.0322  
+             |    0.0068      0.0068      0.0069      0.0069      0.0069  
+lag_avg_ra~c |    0.0434      0.0431      0.0452      0.0447      0.0449  
+             |    0.0264      0.0264      0.0255      0.0258      0.0257  
+  lag_sd_acc |    0.0019      0.0014      0.0070      0.0088      0.0074  
+             |    0.0320      0.0320      0.0320      0.0322      0.0321  
+ln_avg_com~R |    0.1184      0.1373      0.1190      0.1187      0.1192  
+             |    0.0125      0.0205      0.0127      0.0126      0.0126  
+lnRev~h_w199 |    0.4373      0.4373      0.4180      0.4172      0.4180  
+             |    0.0188      0.0188      0.0176      0.0177      0.0176  
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_avg_com~R |               -0.0628                                      
+             |                0.0527                                      
+             |
+h~p_focus100 |
+          1  |                           -0.0389                          
+             |                            0.0226                          
+             |
+h~p_focus100#|
+          c. |
+ ars_pool_ev |
+          1  |                            0.1176                          
+             |                            0.0706                          
+             |
+h~y_focus100 |
+          1  |                                        0.0185              
+             |                                        0.0208              
+             |
+h~y_focus100#|
+          c. |
+ ars_pool_ev |
+          1  |                                        0.0000              
+             |                                        0.0648              
+             |
+zip_n_full_c |                                                   -0.0012  
+             |                                                    0.0016  
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+zip_n_full_c |                                                    0.0040  
+             |                                                    0.0042  
+             |
+city_n_ful~c |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+city_n_ful~c |                                                            
+             |                                                            
+             |
+ln_comp_zi~l |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_comp_zi~l |                                                            
+             |                                                            
+             |
+ln_comp_ci~l |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_comp_ci~l |                                                            
+             |                                                            
+             |
+gap_zip_me~c |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+gap_zip_me~c |                                                            
+             |                                                            
+             |
+gap_city_m~c |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+gap_city_m~c |                                                            
+             |                                                            
+             |
+ price_gap_c |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ price_gap_c |                                                            
+             |                                                            
+             |
+       chain |
+          1  |                                                            
+             |                                                            
+             |
+       chain#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+ independent |
+          1  |                                                            
+             |                                                            
+             |
+ independent#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+ chain_small |
+          1  |                                                            
+             |                                                            
+             |
+ chain_small#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+chain3_small |
+          1  |                                                            
+             |                                                            
+             |
+chain3_small#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+star_class~l |
+          3  |                                                            
+             |                                                            
+          4  |                                                            
+             |                                                            
+          5  |                                                            
+             |                                                            
+          6  |                                                            
+             |                                                            
+          7  |                                                            
+             |                                                            
+          8  |                                                            
+             |                                                            
+          9  |                                                            
+             |                                                            
+             |
+star_class~l#|
+          c. |
+ ars_pool_ev |
+          3  |                                                            
+             |                                                            
+          4  |                                                            
+             |                                                            
+          5  |                                                            
+             |                                                            
+          6  |                                                            
+             |                                                            
+          7  |                                                            
+             |                                                            
+          8  |                                                            
+             |                                                            
+          9  |                                                            
+             |                                                            
+             |
+star_class~3 |
+          1  |                                                            
+             |                                                            
+             |
+star_class~3 |
+          3  |                                                            
+             |                                                            
+             |
+star_class~3#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+star_class~3#|
+          c. |
+ ars_pool_ev |
+          3  |                                                            
+             |                                                            
+             |
+  high_star4 |
+          1  |                                                            
+             |                                                            
+             |
+  high_star4#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+lag_avg_ra~c |                                                            
+             |                                                            
+             |
+lag_avg_ra~c |                                                            
+             |                                                            
+             |
+high_qua~_ym |
+          1  |                                                            
+             |                                                            
+             |
+high_qua~_ym#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+high_qua~yym |
+          1  |                                                            
+             |                                                            
+             |
+high_qua~yym#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+high_qua~pym |
+          1  |                                                            
+             |                                                            
+             |
+high_qua~pym#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+high_rank_~s |
+          1  |                                                            
+             |                                                            
+             |
+high_rank_~s#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+hotel_eval~r |
+          2  |                                                            
+             |                                                            
+          3  |                                                            
+             |                                                            
+          4  |                                                            
+             |                                                            
+          5  |                                                            
+             |                                                            
+             |
+hotel_eval~r#|
+          c. |
+ ars_pool_ev |
+          2  |                                                            
+             |                                                            
+          3  |                                                            
+             |                                                            
+          4  |                                                            
+             |                                                            
+          5  |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_lag_vol~c |                                                            
+             |                                                            
+             |
+high_popul~y |
+          1  |                                                            
+             |                                                            
+             |
+high_popul~y#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+       _cons |    1.4676      1.3876      1.5633      1.5397      1.5437  
+             |    0.1460      0.1605      0.1445      0.1452      0.1438  
+-------------+------------------------------------------------------------
+           N |     26173       26173       26135       26135       26135  
+        r2_a |    0.8791      0.8791      0.8822      0.8822      0.8822  
+--------------------------------------------------------------------------
+                                                              Legend: b/se
+
+
+--------------------------------------------------------------------------
+    Variable | M4_city~k   M5_ziprev   M6_city~v   M7_zipgap   M8_city~p  
+-------------+------------------------------------------------------------
+ ars_pool_ev |   -0.0780      0.4565      0.3009     -0.0699     -0.0830  
+             |    0.0382      0.3175      0.5230      0.0339      0.0249  
+ev_ln_revi~t |    0.0402      0.0364      0.0400      0.0298      0.0183  
+             |    0.0046      0.0048      0.0046      0.0048      0.0046  
+ev_mean_ra~g |    0.0003      0.0021      0.0025     -0.0038     -0.0059  
+             |    0.0030      0.0030      0.0029      0.0028      0.0022  
+ev_sd_rating |    0.0013      0.0016      0.0021     -0.0018     -0.0027  
+             |    0.0032      0.0032      0.0031      0.0026      0.0021  
+ev_ln_mean~s |    0.0087      0.0101      0.0088      0.0016      0.0014  
+             |    0.0042      0.0043      0.0041      0.0035      0.0028  
+ln_lag_vol~c |    0.0333      0.0322      0.0374      0.0288      0.0040  
+             |    0.0067      0.0072      0.0073      0.0075      0.0066  
+lag_avg_ra~c |    0.0451      0.0470      0.0338     -0.0041      0.0311  
+             |    0.0242      0.0267      0.0267      0.0272      0.0207  
+  lag_sd_acc |    0.0111      0.0053      0.0066     -0.0634      0.0016  
+             |    0.0306      0.0316      0.0332      0.0383      0.0257  
+ln_avg_com~R |    0.1136      0.0574      0.0881      0.2402      0.1032  
+             |    0.0124      0.0127      0.0122      0.0268      0.0092  
+lnRev~h_w199 |    0.4112      0.4025      0.3989      0.2936      0.1893  
+             |    0.0181      0.0174      0.0187      0.0172      0.0177  
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_avg_com~R |                                                            
+             |                                                            
+             |
+h~p_focus100 |
+          1  |                                                            
+             |                                                            
+             |
+h~p_focus100#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+h~y_focus100 |
+          1  |                                                            
+             |                                                            
+             |
+h~y_focus100#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+zip_n_full_c |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+zip_n_full_c |                                                            
+             |                                                            
+             |
+city_n_ful~c |   -0.0008                                                  
+             |    0.0002                                                  
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+city_n_ful~c |    0.0005                                                  
+             |    0.0003                                                  
+             |
+ln_comp_zi~l |                0.1933                                      
+             |                0.0295                                      
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_comp_zi~l |               -0.1207                                      
+             |                0.0745                                      
+             |
+ln_comp_ci~l |                            0.3496                          
+             |                            0.0394                          
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_comp_ci~l |                           -0.0803                          
+             |                            0.1182                          
+             |
+gap_zip_me~c |                                        0.3654              
+             |                                        0.0449              
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+gap_zip_me~c |                                       -0.0184              
+             |                                        0.0835              
+             |
+gap_city_m~c |                                                    0.5473  
+             |                                                    0.0812  
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+gap_city_m~c |                                                    0.1173  
+             |                                                    0.0868  
+             |
+ price_gap_c |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ price_gap_c |                                                            
+             |                                                            
+             |
+       chain |
+          1  |                                                            
+             |                                                            
+             |
+       chain#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+ independent |
+          1  |                                                            
+             |                                                            
+             |
+ independent#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+ chain_small |
+          1  |                                                            
+             |                                                            
+             |
+ chain_small#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+chain3_small |
+          1  |                                                            
+             |                                                            
+             |
+chain3_small#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+star_class~l |
+          3  |                                                            
+             |                                                            
+          4  |                                                            
+             |                                                            
+          5  |                                                            
+             |                                                            
+          6  |                                                            
+             |                                                            
+          7  |                                                            
+             |                                                            
+          8  |                                                            
+             |                                                            
+          9  |                                                            
+             |                                                            
+             |
+star_class~l#|
+          c. |
+ ars_pool_ev |
+          3  |                                                            
+             |                                                            
+          4  |                                                            
+             |                                                            
+          5  |                                                            
+             |                                                            
+          6  |                                                            
+             |                                                            
+          7  |                                                            
+             |                                                            
+          8  |                                                            
+             |                                                            
+          9  |                                                            
+             |                                                            
+             |
+star_class~3 |
+          1  |                                                            
+             |                                                            
+             |
+star_class~3 |
+          3  |                                                            
+             |                                                            
+             |
+star_class~3#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+star_class~3#|
+          c. |
+ ars_pool_ev |
+          3  |                                                            
+             |                                                            
+             |
+  high_star4 |
+          1  |                                                            
+             |                                                            
+             |
+  high_star4#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+lag_avg_ra~c |                                                            
+             |                                                            
+             |
+lag_avg_ra~c |                                                            
+             |                                                            
+             |
+high_qua~_ym |
+          1  |                                                            
+             |                                                            
+             |
+high_qua~_ym#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+high_qua~yym |
+          1  |                                                            
+             |                                                            
+             |
+high_qua~yym#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+high_qua~pym |
+          1  |                                                            
+             |                                                            
+             |
+high_qua~pym#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+high_rank_~s |
+          1  |                                                            
+             |                                                            
+             |
+high_rank_~s#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+hotel_eval~r |
+          2  |                                                            
+             |                                                            
+          3  |                                                            
+             |                                                            
+          4  |                                                            
+             |                                                            
+          5  |                                                            
+             |                                                            
+             |
+hotel_eval~r#|
+          c. |
+ ars_pool_ev |
+          2  |                                                            
+             |                                                            
+          3  |                                                            
+             |                                                            
+          4  |                                                            
+             |                                                            
+          5  |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_lag_vol~c |                                                            
+             |                                                            
+             |
+high_popul~y |
+          1  |                                                            
+             |                                                            
+             |
+high_popul~y#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+       _cons |    1.5809      1.0209      0.2177      1.9147      2.8952  
+             |    0.1394      0.1834      0.2163      0.1466      0.1558  
+-------------+------------------------------------------------------------
+           N |     26135       25233       26135       25233       26135  
+        r2_a |    0.8828      0.8876      0.8881      0.9197      0.9456  
+--------------------------------------------------------------------------
+                                                              Legend: b/se
+
+
+--------------------------------------------------------------------------
+    Variable | M9_pric~p   O1_chain    O2_inde~t   O3_smal~n   O4_chain3  
+-------------+------------------------------------------------------------
+ ars_pool_ev |   -0.0737     -0.0608     -0.0771     -0.0608     -0.0590  
+             |    0.0375      0.0727      0.0439      0.0727      0.0722  
+ev_ln_revi~t |    0.0397      0.0396      0.0396      0.0396      0.0396  
+             |    0.0045      0.0047      0.0047      0.0047      0.0047  
+ev_mean_ra~g |    0.0021      0.0024      0.0024      0.0024      0.0024  
+             |    0.0031      0.0032      0.0032      0.0032      0.0032  
+ev_sd_rating |    0.0022      0.0023      0.0023      0.0023      0.0023  
+             |    0.0032      0.0032      0.0032      0.0032      0.0032  
+ev_ln_mean~s |    0.0075      0.0098      0.0098      0.0098      0.0098  
+             |    0.0043      0.0043      0.0043      0.0043      0.0043  
+ln_lag_vol~c |    0.0277      0.0300      0.0300      0.0300      0.0300  
+             |    0.0067      0.0068      0.0068      0.0068      0.0068  
+lag_avg_ra~c |    0.0366      0.0434      0.0434      0.0434      0.0434  
+             |    0.0254      0.0264      0.0264      0.0264      0.0264  
+  lag_sd_acc |   -0.0056      0.0020      0.0020      0.0020      0.0020  
+             |    0.0299      0.0319      0.0319      0.0319      0.0319  
+ln_avg_com~R |    0.2205      0.1184      0.1184      0.1184      0.1184  
+             |    0.0186      0.0125      0.0125      0.0125      0.0125  
+lnRev~h_w199 |    0.3199      0.4373      0.4373      0.4373      0.4373  
+             |    0.0188      0.0188      0.0188      0.0188      0.0188  
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_avg_com~R |                                                            
+             |                                                            
+             |
+h~p_focus100 |
+          1  |                                                            
+             |                                                            
+             |
+h~p_focus100#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+h~y_focus100 |
+          1  |                                                            
+             |                                                            
+             |
+h~y_focus100#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+zip_n_full_c |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+zip_n_full_c |                                                            
+             |                                                            
+             |
+city_n_ful~c |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+city_n_ful~c |                                                            
+             |                                                            
+             |
+ln_comp_zi~l |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_comp_zi~l |                                                            
+             |                                                            
+             |
+ln_comp_ci~l |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_comp_ci~l |                                                            
+             |                                                            
+             |
+gap_zip_me~c |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+gap_zip_me~c |                                                            
+             |                                                            
+             |
+gap_city_m~c |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+gap_city_m~c |                                                            
+             |                                                            
+             |
+ price_gap_c |    0.1495                                                  
+             |    0.0253                                                  
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ price_gap_c |   -0.0159                                                  
+             |    0.0678                                                  
+             |
+       chain |
+          1  |             (omitted)                                      
+             |                                                            
+             |
+       chain#|
+          c. |
+ ars_pool_ev |
+          1  |               -0.0163                                      
+             |                0.0824                                      
+             |
+ independent |
+          1  |                         (omitted)                          
+             |                                                            
+             |
+ independent#|
+          c. |
+ ars_pool_ev |
+          1  |                            0.0163                          
+             |                            0.0824                          
+             |
+ chain_small |
+          1  |                                     (omitted)              
+             |                                                            
+             |
+ chain_small#|
+          c. |
+ ars_pool_ev |
+          1  |                                       -0.0163              
+             |                                        0.0824              
+             |
+chain3_small |
+          1  |                                                 (omitted)  
+             |                                                            
+             |
+chain3_small#|
+          c. |
+ ars_pool_ev |
+          1  |                                                   -0.0190  
+             |                                                    0.0821  
+             |
+star_class~l |
+          3  |                                                            
+             |                                                            
+          4  |                                                            
+             |                                                            
+          5  |                                                            
+             |                                                            
+          6  |                                                            
+             |                                                            
+          7  |                                                            
+             |                                                            
+          8  |                                                            
+             |                                                            
+          9  |                                                            
+             |                                                            
+             |
+star_class~l#|
+          c. |
+ ars_pool_ev |
+          3  |                                                            
+             |                                                            
+          4  |                                                            
+             |                                                            
+          5  |                                                            
+             |                                                            
+          6  |                                                            
+             |                                                            
+          7  |                                                            
+             |                                                            
+          8  |                                                            
+             |                                                            
+          9  |                                                            
+             |                                                            
+             |
+star_class~3 |
+          1  |                                                            
+             |                                                            
+             |
+star_class~3 |
+          3  |                                                            
+             |                                                            
+             |
+star_class~3#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+star_class~3#|
+          c. |
+ ars_pool_ev |
+          3  |                                                            
+             |                                                            
+             |
+  high_star4 |
+          1  |                                                            
+             |                                                            
+             |
+  high_star4#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+lag_avg_ra~c |                                                            
+             |                                                            
+             |
+lag_avg_ra~c |                                                            
+             |                                                            
+             |
+high_qua~_ym |
+          1  |                                                            
+             |                                                            
+             |
+high_qua~_ym#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+high_qua~yym |
+          1  |                                                            
+             |                                                            
+             |
+high_qua~yym#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+high_qua~pym |
+          1  |                                                            
+             |                                                            
+             |
+high_qua~pym#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+high_rank_~s |
+          1  |                                                            
+             |                                                            
+             |
+high_rank_~s#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+hotel_eval~r |
+          2  |                                                            
+             |                                                            
+          3  |                                                            
+             |                                                            
+          4  |                                                            
+             |                                                            
+          5  |                                                            
+             |                                                            
+             |
+hotel_eval~r#|
+          c. |
+ ars_pool_ev |
+          2  |                                                            
+             |                                                            
+          3  |                                                            
+             |                                                            
+          4  |                                                            
+             |                                                            
+          5  |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_lag_vol~c |                                                            
+             |                                                            
+             |
+high_popul~y |
+          1  |                                                            
+             |                                                            
+             |
+high_popul~y#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+       _cons |    1.5933      1.4675      1.4675      1.4675      1.4675  
+             |    0.1384      0.1460      0.1460      0.1460      0.1460  
+-------------+------------------------------------------------------------
+           N |     26173       26173       26173       26173       26173  
+        r2_a |    0.8832      0.8791      0.8791      0.8791      0.8791  
+--------------------------------------------------------------------------
+                                                              Legend: b/se
+
+
+--------------------------------------------------------------------------
+    Variable | O5_star~s   O6_star~t   O7_high~r   O8_qual~l   O8_qual~m  
+-------------+------------------------------------------------------------
+ ars_pool_ev |    1.1611     -0.0157     -0.0044     -0.2102     -0.0584  
+             |    0.0687      0.1121      0.1120      0.2914      0.0548  
+ev_ln_revi~t |    0.0397      0.0394      0.0394      0.0396      0.0393  
+             |    0.0047      0.0047      0.0047      0.0046      0.0047  
+ev_mean_ra~g |    0.0023      0.0022      0.0022      0.0023      0.0024  
+             |    0.0032      0.0032      0.0032      0.0032      0.0032  
+ev_sd_rating |    0.0029      0.0029      0.0029      0.0023      0.0023  
+             |    0.0032      0.0032      0.0032      0.0032      0.0032  
+ev_ln_mean~s |    0.0094      0.0095      0.0094      0.0098      0.0096  
+             |    0.0043      0.0043      0.0043      0.0043      0.0043  
+ln_lag_vol~c |    0.0279      0.0275      0.0276      0.0299      0.0304  
+             |    0.0070      0.0069      0.0069      0.0068      0.0068  
+lag_avg_ra~c |    0.0430      0.0444      0.0441      0.0333      0.0593  
+             |    0.0265      0.0265      0.0264      0.0316      0.0265  
+  lag_sd_acc |    0.0003      0.0018      0.0021      0.0022     -0.0015  
+             |    0.0323      0.0322      0.0323      0.0320      0.0320  
+ln_avg_com~R |    0.1173      0.1173      0.1173      0.1184      0.1188  
+             |    0.0125      0.0125      0.0125      0.0125      0.0124  
+lnRev~h_w199 |    0.4438      0.4439      0.4439      0.4373      0.4368  
+             |    0.0190      0.0190      0.0190      0.0188      0.0187  
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_avg_com~R |                                                            
+             |                                                            
+             |
+h~p_focus100 |
+          1  |                                                            
+             |                                                            
+             |
+h~p_focus100#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+h~y_focus100 |
+          1  |                                                            
+             |                                                            
+             |
+h~y_focus100#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+zip_n_full_c |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+zip_n_full_c |                                                            
+             |                                                            
+             |
+city_n_ful~c |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+city_n_ful~c |                                                            
+             |                                                            
+             |
+ln_comp_zi~l |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_comp_zi~l |                                                            
+             |                                                            
+             |
+ln_comp_ci~l |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_comp_ci~l |                                                            
+             |                                                            
+             |
+gap_zip_me~c |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+gap_zip_me~c |                                                            
+             |                                                            
+             |
+gap_city_m~c |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+gap_city_m~c |                                                            
+             |                                                            
+             |
+ price_gap_c |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ price_gap_c |                                                            
+             |                                                            
+             |
+       chain |
+          1  |                                                            
+             |                                                            
+             |
+       chain#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+ independent |
+          1  |                                                            
+             |                                                            
+             |
+ independent#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+ chain_small |
+          1  |                                                            
+             |                                                            
+             |
+ chain_small#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+chain3_small |
+          1  |                                                            
+             |                                                            
+             |
+chain3_small#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+star_class~l |
+          3  | (omitted)                                                  
+             |                                                            
+          4  | (omitted)                                                  
+             |                                                            
+          5  | (omitted)                                                  
+             |                                                            
+          6  | (omitted)                                                  
+             |                                                            
+          7  | (omitted)                                                  
+             |                                                            
+          8  | (omitted)                                                  
+             |                                                            
+          9  | (omitted)                                                  
+             |                                                            
+             |
+star_class~l#|
+          c. |
+ ars_pool_ev |
+          3  |   -1.1772                                                  
+             |    0.1237                                                  
+          4  |   -1.2965                                                  
+             |    0.1009                                                  
+          5  |   -1.1677                                                  
+             |    0.0787                                                  
+          6  |   -1.3362                                                  
+             |    0.1789                                                  
+          7  |   -1.2731                                                  
+             |    0.1522                                                  
+          8  |   -1.8096                                                  
+             |    0.3306                                                  
+          9  |   -1.1862                                                  
+             |    0.2447                                                  
+             |
+star_class~3 |
+          1  |             (omitted)                                      
+             |                                                            
+             |
+star_class~3 |
+          3  |             (omitted)                                      
+             |                                                            
+             |
+star_class~3#|
+          c. |
+ ars_pool_ev |
+          1  |                1.1817                                      
+             |                0.1236                                      
+             |
+star_class~3#|
+          c. |
+ ars_pool_ev |
+          3  |               -0.0568                                      
+             |                0.1185                                      
+             |
+  high_star4 |
+          1  |                         (omitted)                          
+             |                                                            
+             |
+  high_star4#|
+          c. |
+ ars_pool_ev |
+          1  |                           -0.0683                          
+             |                            0.1183                          
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+lag_avg_ra~c |                                        0.0350              
+             |                                        0.0726              
+             |
+lag_avg_ra~c |                                     (omitted)              
+             |                                                            
+             |
+high_qua~_ym |
+          1  |                                                   -0.0183  
+             |                                                    0.0223  
+             |
+high_qua~_ym#|
+          c. |
+ ars_pool_ev |
+          1  |                                                   -0.0241  
+             |                                                    0.0695  
+             |
+high_qua~yym |
+          1  |                                                            
+             |                                                            
+             |
+high_qua~yym#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+high_qua~pym |
+          1  |                                                            
+             |                                                            
+             |
+high_qua~pym#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+high_rank_~s |
+          1  |                                                            
+             |                                                            
+             |
+high_rank_~s#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+hotel_eval~r |
+          2  |                                                            
+             |                                                            
+          3  |                                                            
+             |                                                            
+          4  |                                                            
+             |                                                            
+          5  |                                                            
+             |                                                            
+             |
+hotel_eval~r#|
+          c. |
+ ars_pool_ev |
+          2  |                                                            
+             |                                                            
+          3  |                                                            
+             |                                                            
+          4  |                                                            
+             |                                                            
+          5  |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_lag_vol~c |                                                            
+             |                                                            
+             |
+high_popul~y |
+          1  |                                                            
+             |                                                            
+             |
+high_popul~y#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+       _cons |    1.4556      1.4482      1.4497      1.5073      1.4165  
+             |    0.1469      0.1467      0.1467      0.1524      0.1444  
+-------------+------------------------------------------------------------
+           N |     25652       25652       25652       26173       26173  
+        r2_a |    0.8768      0.8767      0.8767      0.8791      0.8791  
+--------------------------------------------------------------------------
+                                                              Legend: b/se
+
+
+--------------------------------------------------------------------------
+    Variable | O9_qual~y   O10_qua~p   O11_rank    O12_eva~n   O13_pop~y  
+-------------+------------------------------------------------------------
+ ars_pool_ev |   -0.0374     -0.0725     -0.0570      0.0216     -0.4721  
+             |    0.0543      0.0498      0.0487      0.0791      0.1720  
+ev_ln_revi~t |    0.0398      0.0394      0.0398      0.0400      0.0386  
+             |    0.0046      0.0046      0.0046      0.0046      0.0046  
+ev_mean_ra~g |    0.0024      0.0024      0.0025      0.0024      0.0022  
+             |    0.0032      0.0032      0.0032      0.0032      0.0032  
+ev_sd_rating |    0.0023      0.0024      0.0023      0.0022      0.0026  
+             |    0.0032      0.0032      0.0032      0.0032      0.0032  
+ev_ln_mean~s |    0.0097      0.0098      0.0098      0.0099      0.0100  
+             |    0.0043      0.0043      0.0043      0.0043      0.0043  
+ln_lag_vol~c |    0.0304      0.0300      0.0300      0.0300      0.0075  
+             |    0.0068      0.0068      0.0068      0.0068      0.0126  
+lag_avg_ra~c |    0.0557      0.0470      0.0435      0.0433      0.0421  
+             |    0.0268      0.0263      0.0264      0.0264      0.0263  
+  lag_sd_acc |   -0.0024      0.0011      0.0018      0.0008      0.0009  
+             |    0.0318      0.0321      0.0320      0.0319      0.0319  
+ln_avg_com~R |    0.1184      0.1185      0.1184      0.1184      0.1182  
+             |    0.0125      0.0125      0.0125      0.0125      0.0125  
+lnRev~h_w199 |    0.4371      0.4373      0.4373      0.4373      0.4373  
+             |    0.0187      0.0188      0.0188      0.0188      0.0188  
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_avg_com~R |                                                            
+             |                                                            
+             |
+h~p_focus100 |
+          1  |                                                            
+             |                                                            
+             |
+h~p_focus100#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+h~y_focus100 |
+          1  |                                                            
+             |                                                            
+             |
+h~y_focus100#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+zip_n_full_c |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+zip_n_full_c |                                                            
+             |                                                            
+             |
+city_n_ful~c |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+city_n_ful~c |                                                            
+             |                                                            
+             |
+ln_comp_zi~l |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_comp_zi~l |                                                            
+             |                                                            
+             |
+ln_comp_ci~l |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_comp_ci~l |                                                            
+             |                                                            
+             |
+gap_zip_me~c |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+gap_zip_me~c |                                                            
+             |                                                            
+             |
+gap_city_m~c |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+gap_city_m~c |                                                            
+             |                                                            
+             |
+ price_gap_c |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ price_gap_c |                                                            
+             |                                                            
+             |
+       chain |
+          1  |                                                            
+             |                                                            
+             |
+       chain#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+ independent |
+          1  |                                                            
+             |                                                            
+             |
+ independent#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+ chain_small |
+          1  |                                                            
+             |                                                            
+             |
+ chain_small#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+chain3_small |
+          1  |                                                            
+             |                                                            
+             |
+chain3_small#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+star_class~l |
+          3  |                                                            
+             |                                                            
+          4  |                                                            
+             |                                                            
+          5  |                                                            
+             |                                                            
+          6  |                                                            
+             |                                                            
+          7  |                                                            
+             |                                                            
+          8  |                                                            
+             |                                                            
+          9  |                                                            
+             |                                                            
+             |
+star_class~l#|
+          c. |
+ ars_pool_ev |
+          3  |                                                            
+             |                                                            
+          4  |                                                            
+             |                                                            
+          5  |                                                            
+             |                                                            
+          6  |                                                            
+             |                                                            
+          7  |                                                            
+             |                                                            
+          8  |                                                            
+             |                                                            
+          9  |                                                            
+             |                                                            
+             |
+star_class~3 |
+          1  |                                                            
+             |                                                            
+             |
+star_class~3 |
+          3  |                                                            
+             |                                                            
+             |
+star_class~3#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+star_class~3#|
+          c. |
+ ars_pool_ev |
+          3  |                                                            
+             |                                                            
+             |
+  high_star4 |
+          1  |                                                            
+             |                                                            
+             |
+  high_star4#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+lag_avg_ra~c |                                                            
+             |                                                            
+             |
+lag_avg_ra~c |                                                            
+             |                                                            
+             |
+high_qua~_ym |
+          1  |                                                            
+             |                                                            
+             |
+high_qua~_ym#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+high_qua~yym |
+          1  |   -0.0013                                                  
+             |    0.0221                                                  
+             |
+high_qua~yym#|
+          c. |
+ ars_pool_ev |
+          1  |   -0.0660                                                  
+             |    0.0694                                                  
+             |
+high_qua~pym |
+          1  |               -0.0081                                      
+             |                0.0197                                      
+             |
+high_qua~pym#|
+          c. |
+ ars_pool_ev |
+          1  |                0.0029                                      
+             |                0.0628                                      
+             |
+high_rank_~s |
+          1  |                         (omitted)                          
+             |                                                            
+             |
+high_rank_~s#|
+          c. |
+ ars_pool_ev |
+          1  |                           -0.0314                          
+             |                            0.0717                          
+             |
+hotel_eval~r |
+          2  |                                     (omitted)              
+             |                                                            
+          3  |                                     (omitted)              
+             |                                                            
+          4  |                                     (omitted)              
+             |                                                            
+          5  |                                     (omitted)              
+             |                                                            
+             |
+hotel_eval~r#|
+          c. |
+ ars_pool_ev |
+          2  |                                       -0.2631              
+             |                                        0.2486              
+          3  |                                       -0.0808              
+             |                                        0.0952              
+          4  |                                       -0.1592              
+             |                                        0.2194              
+          5  |                                       -0.1476              
+             |                                        0.1039              
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_lag_vol~c |                                                    0.0745  
+             |                                                    0.0331  
+             |
+high_popul~y |
+          1  |                                                            
+             |                                                            
+             |
+high_popul~y#|
+          c. |
+ ars_pool_ev |
+          1  |                                                            
+             |                                                            
+             |
+       _cons |    1.4225      1.4567      1.4671      1.4676      1.5962  
+             |    0.1469      0.1453      0.1458      0.1454      0.1511  
+-------------+------------------------------------------------------------
+           N |     26173       26173       26173       26173       26173  
+        r2_a |    0.8791      0.8791      0.8791      0.8791      0.8791  
+--------------------------------------------------------------------------
+                                                              Legend: b/se
+
+
+--------------------------
+    Variable | O13_pop~l  
+-------------+------------
+ ars_pool_ev |   -0.0884  
+             |    0.0446  
+ev_ln_revi~t |    0.0395  
+             |    0.0046  
+ev_mean_ra~g |    0.0024  
+             |    0.0032  
+ev_sd_rating |    0.0024  
+             |    0.0032  
+ev_ln_mean~s |    0.0099  
+             |    0.0043  
+ln_lag_vol~c |    0.0291  
+             |    0.0069  
+lag_avg_ra~c |    0.0434  
+             |    0.0265  
+  lag_sd_acc |    0.0025  
+             |    0.0320  
+ln_avg_com~R |    0.1184  
+             |    0.0125  
+lnRev~h_w199 |    0.4373  
+             |    0.0188  
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_avg_com~R |            
+             |            
+             |
+h~p_focus100 |
+          1  |            
+             |            
+             |
+h~p_focus100#|
+          c. |
+ ars_pool_ev |
+          1  |            
+             |            
+             |
+h~y_focus100 |
+          1  |            
+             |            
+             |
+h~y_focus100#|
+          c. |
+ ars_pool_ev |
+          1  |            
+             |            
+             |
+zip_n_full_c |            
+             |            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+zip_n_full_c |            
+             |            
+             |
+city_n_ful~c |            
+             |            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+city_n_ful~c |            
+             |            
+             |
+ln_comp_zi~l |            
+             |            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_comp_zi~l |            
+             |            
+             |
+ln_comp_ci~l |            
+             |            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_comp_ci~l |            
+             |            
+             |
+gap_zip_me~c |            
+             |            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+gap_zip_me~c |            
+             |            
+             |
+gap_city_m~c |            
+             |            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+gap_city_m~c |            
+             |            
+             |
+ price_gap_c |            
+             |            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ price_gap_c |            
+             |            
+             |
+       chain |
+          1  |            
+             |            
+             |
+       chain#|
+          c. |
+ ars_pool_ev |
+          1  |            
+             |            
+             |
+ independent |
+          1  |            
+             |            
+             |
+ independent#|
+          c. |
+ ars_pool_ev |
+          1  |            
+             |            
+             |
+ chain_small |
+          1  |            
+             |            
+             |
+ chain_small#|
+          c. |
+ ars_pool_ev |
+          1  |            
+             |            
+             |
+chain3_small |
+          1  |            
+             |            
+             |
+chain3_small#|
+          c. |
+ ars_pool_ev |
+          1  |            
+             |            
+             |
+star_class~l |
+          3  |            
+             |            
+          4  |            
+             |            
+          5  |            
+             |            
+          6  |            
+             |            
+          7  |            
+             |            
+          8  |            
+             |            
+          9  |            
+             |            
+             |
+star_class~l#|
+          c. |
+ ars_pool_ev |
+          3  |            
+             |            
+          4  |            
+             |            
+          5  |            
+             |            
+          6  |            
+             |            
+          7  |            
+             |            
+          8  |            
+             |            
+          9  |            
+             |            
+             |
+star_class~3 |
+          1  |            
+             |            
+             |
+star_class~3 |
+          3  |            
+             |            
+             |
+star_class~3#|
+          c. |
+ ars_pool_ev |
+          1  |            
+             |            
+             |
+star_class~3#|
+          c. |
+ ars_pool_ev |
+          3  |            
+             |            
+             |
+  high_star4 |
+          1  |            
+             |            
+             |
+  high_star4#|
+          c. |
+ ars_pool_ev |
+          1  |            
+             |            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+lag_avg_ra~c |            
+             |            
+             |
+lag_avg_ra~c |            
+             |            
+             |
+high_qua~_ym |
+          1  |            
+             |            
+             |
+high_qua~_ym#|
+          c. |
+ ars_pool_ev |
+          1  |            
+             |            
+             |
+high_qua~yym |
+          1  |            
+             |            
+             |
+high_qua~yym#|
+          c. |
+ ars_pool_ev |
+          1  |            
+             |            
+             |
+high_qua~pym |
+          1  |            
+             |            
+             |
+high_qua~pym#|
+          c. |
+ ars_pool_ev |
+          1  |            
+             |            
+             |
+high_rank_~s |
+          1  |            
+             |            
+             |
+high_rank_~s#|
+          c. |
+ ars_pool_ev |
+          1  |            
+             |            
+             |
+hotel_eval~r |
+          2  |            
+             |            
+          3  |            
+             |            
+          4  |            
+             |            
+          5  |            
+             |            
+             |
+hotel_eval~r#|
+          c. |
+ ars_pool_ev |
+          2  |            
+             |            
+          3  |            
+             |            
+          4  |            
+             |            
+          5  |            
+             |            
+             |
+          c. |
+ ars_pool_ev#|
+          c. |
+ln_lag_vol~c |            
+             |            
+             |
+high_popul~y |
+          1  |   -0.0073  
+             |    0.0201  
+             |
+high_popul~y#|
+          c. |
+ ars_pool_ev |
+          1  |    0.0388  
+             |    0.0646  
+             |
+       _cons |    1.4739  
+             |    0.1455  
+-------------+------------
+           N |     26173  
+        r2_a |    0.8791  
+--------------------------
+              Legend: b/se
+
+. log close
+      name:  <unnamed>
+       log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_event_m
+> onth_pool_gt100_market_organization_260711.log
+  log type:  text
+ closed on:  11 Jul 2026, 18:07:00
+-------------------------------------------------------------------------------

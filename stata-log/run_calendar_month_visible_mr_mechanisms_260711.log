@@ -1,0 +1,635 @@
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_calenda
+> r_month_visible_mr_mechanisms_260711.log
+  log type:  text
+ opened on:  11 Jul 2026, 18:47:06
+
+. estimates clear
+
+. 
+. * A. Review generation. Treatment is response activity posted in t-1 and
+. * observable before month t begins; it never uses a reply posted during t.
+. ppmlhdfe review_count mr_visible_start_any `X', absorb(hotel_id_num ym) vce(c
+> luster hotel_id_num)
+note: 1 variable omitted because of collinearity: pre_ln_mean_text_chars_missin
+> g
+Iteration 1:   deviance = 9.9137e+04  eps = .         iters = 5    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -3.21  P   
+Iteration 2:   deviance = 8.5780e+04  eps = 1.56e-01  iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -4.73      
+Iteration 3:   deviance = 8.5022e+04  eps = 8.92e-03  iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -5.86      
+Iteration 4:   deviance = 8.4990e+04  eps = 3.76e-04  iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -6.37      
+Iteration 5:   deviance = 8.4989e+04  eps = 6.26e-06  iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -6.45      
+Iteration 6:   deviance = 8.4989e+04  eps = 4.96e-09  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -6.45   S  
+Iteration 7:   deviance = 8.4989e+04  eps = 1.41e-14  iters = 2    tol = 1.0e-0
+> 7                                                                            
+>    min(eta) =  -6.45   S  
+Iteration 8:   deviance = 8.4989e+04  eps = 0.00e+00  iters = 3    tol = 1.0e-0
+> 9                                                                            
+>    min(eta) =  -6.45   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 8 iterations and 27 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     48,252
+Absorbing 2 HDFE groups                           Residual df     =        562
+Statistics robust to heteroskedasticity           Wald chi2(10)   =     832.38
+Deviance             =  84989.25865               Prob > chi2     =     0.0000
+Log pseudolikelihood = -102772.1703               Pseudo R2       =     0.6358
+
+Number of clusters (hotel_id_num)=       563
+                         (Std. err. adjusted for 563 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+review_count | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+mr_visible~y |   .0693626    .015363     4.51   0.000     .0392517    .0994735
+ln_pre_rev~t |    .482309   .0257673    18.72   0.000      .431806    .5328119
+ln_cumulat~t |   .0541344   .0219661     2.46   0.014     .0110817    .0971872
+pre_mea~ting |   .0337419   .0082397     4.10   0.000     .0175923    .0498915
+pre_mea~sing |  -.1961825   .0976865    -2.01   0.045    -.3876446   -.0047204
+pre_sd_~ting |  -.0244392   .0101378    -2.41   0.016     -.044309   -.0045694
+pre_sd_~sing |   .0491593   .0268503     1.83   0.067    -.0034664    .1017849
+pre_ln_mea~s |  -.1018916    .014242    -7.15   0.000    -.1298054   -.0739778
+pre_ln_mea~g |          0  (omitted)
+pre_ars_po~e |   .8575707    .131298     6.53   0.000     .6002313     1.11491
+pre_ars_po~g |   .1076238   .0421517     2.55   0.011      .025008    .1902395
+       _cons |   1.037433   .1811766     5.73   0.000     .6823337    1.392533
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       563         563           0    *|
+           ym |       141           1         140     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store V1_ppml_any
+
+. ppmlhdfe review_count ln_mr_visible_start_n `X', absorb(hotel_id_num ym) vce(
+> cluster hotel_id_num)
+note: 1 variable omitted because of collinearity: pre_ln_mean_text_chars_missin
+> g
+Iteration 1:   deviance = 9.9175e+04  eps = .         iters = 5    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -3.20  P   
+Iteration 2:   deviance = 8.5785e+04  eps = 1.56e-01  iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -4.72      
+Iteration 3:   deviance = 8.5025e+04  eps = 8.94e-03  iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -5.85      
+Iteration 4:   deviance = 8.4993e+04  eps = 3.77e-04  iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -6.36      
+Iteration 5:   deviance = 8.4993e+04  eps = 6.32e-06  iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -6.44      
+Iteration 6:   deviance = 8.4993e+04  eps = 5.06e-09  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -6.44   S  
+Iteration 7:   deviance = 8.4993e+04  eps = 1.43e-14  iters = 2    tol = 1.0e-0
+> 7                                                                            
+>    min(eta) =  -6.44   S  
+Iteration 8:   deviance = 8.4993e+04  eps = 2.04e-16  iters = 3    tol = 1.0e-0
+> 9                                                                            
+>    min(eta) =  -6.44   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 8 iterations and 27 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     48,252
+Absorbing 2 HDFE groups                           Residual df     =        562
+Statistics robust to heteroskedasticity           Wald chi2(10)   =     870.43
+Deviance             =   84992.8552               Prob > chi2     =     0.0000
+Log pseudolikelihood = -102773.9685               Pseudo R2       =     0.6358
+
+Number of clusters (hotel_id_num)=       563
+                         (Std. err. adjusted for 563 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+review_count | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ln_mr_visi~n |   .0274424   .0081096     3.38   0.001     .0115478     .043337
+ln_pre_rev~t |   .4682408   .0283189    16.53   0.000     .4127367    .5237449
+ln_cumulat~t |   .0539701   .0218936     2.47   0.014     .0110594    .0968808
+pre_mea~ting |   .0330743   .0082131     4.03   0.000      .016977    .0491717
+pre_mea~sing |  -.2143942    .097089    -2.21   0.027    -.4046852   -.0241033
+pre_sd_~ting |  -.0226263   .0100201    -2.26   0.024    -.0422654   -.0029872
+pre_sd_~sing |   .0396047   .0278379     1.42   0.155    -.0149566    .0941659
+pre_ln_mea~s |   -.100939   .0142492    -7.08   0.000    -.1288669   -.0730111
+pre_ln_mea~g |          0  (omitted)
+pre_ars_po~e |   .8559267   .1321713     6.48   0.000     .5968757    1.114978
+pre_ars_po~g |   .1049173   .0421114     2.49   0.013     .0223804    .1874542
+       _cons |   1.074697   .1801033     5.97   0.000     .7217011    1.427693
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       563         563           0    *|
+           ym |       141           1         140     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store V2_ppml_lnn
+
+. ppmlhdfe review_count mr_prevcohort_visible_rate `X' if pre_review_eligible =
+> = 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 7 observations that are either singletons or separated by a fixed effe
+> ct)
+note: 2 variables omitted because of collinearity: pre_mean_rating_missing pre_
+> ln_mean_text_chars_missing
+Iteration 1:   deviance = 7.6119e+04  eps = .         iters = 5    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -3.27  P   
+Iteration 2:   deviance = 6.7444e+04  eps = 1.29e-01  iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -4.89      
+Iteration 3:   deviance = 6.7045e+04  eps = 5.95e-03  iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -6.04      
+Iteration 4:   deviance = 6.7025e+04  eps = 3.03e-04  iters = 4    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -6.52      
+Iteration 5:   deviance = 6.7025e+04  eps = 7.17e-06  iters = 3    tol = 1.0e-0
+> 4                                                                            
+>    min(eta) =  -6.62      
+Iteration 6:   deviance = 6.7025e+04  eps = 1.02e-08  iters = 2    tol = 1.0e-0
+> 5                                                                            
+>    min(eta) =  -6.63   S  
+Iteration 7:   deviance = 6.7025e+04  eps = 1.35e-13  iters = 2    tol = 1.0e-0
+> 7                                                                            
+>    min(eta) =  -6.63   S  
+Iteration 8:   deviance = 6.7025e+04  eps = 1.43e-16  iters = 3    tol = 1.0e-0
+> 9                                                                            
+>    min(eta) =  -6.63   S O
+-------------------------------------------------------------------------------
+> -----------------------------
+(legend: p: exact partial-out   s: exact solver   h: step-halving   o: epsilon 
+> below tolerance)
+Converged in 8 iterations and 27 HDFE sub-iterations (tol = 1.0e-08)
+
+HDFE PPML regression                              No. of obs      =     36,384
+Absorbing 2 HDFE groups                           Residual df     =        558
+Statistics robust to heteroskedasticity           Wald chi2(9)    =     911.76
+Deviance             =  67024.54142               Prob > chi2     =     0.0000
+Log pseudolikelihood = -86848.46376               Pseudo R2       =     0.6137
+
+Number of clusters (hotel_id_num)=       559
+                         (Std. err. adjusted for 559 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+review_count | Coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+mr_prevcoh~e |   .0604761   .0161802     3.74   0.000     .0287636    .0921887
+ln_pre_rev~t |   .5169555   .0236628    21.85   0.000     .4705773    .5633336
+ln_cumulat~t |   .0498273   .0201058     2.48   0.013     .0104206     .089234
+pre_mea~ting |    .041563   .0081408     5.11   0.000     .0256074    .0575186
+pre_mea~sing |          0  (omitted)
+pre_sd_~ting |  -.0188578   .0097695    -1.93   0.054    -.0380056    .0002899
+pre_sd_~sing |   .0441372   .0259488     1.70   0.089    -.0067215    .0949959
+pre_ln_mea~s |  -.0908074   .0136715    -6.64   0.000    -.1176031   -.0640118
+pre_ln_mea~g |          0  (omitted)
+pre_ars_po~e |   .7613139   .1211633     6.28   0.000     .5238383    .9987896
+pre_ars_po~g |   .0501821   .0390732     1.28   0.199    -.0263999    .1267641
+       _cons |   .9673051   .1740303     5.56   0.000     .6262119    1.308398
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       559         559           0    *|
+           ym |       140           1         139     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store V3_ppml_rate
+
+. reghdfe ln_review_count_w199 mr_visible_start_any `X', absorb(hotel_id_num ym
+> ) vce(cluster hotel_id_num)
+(MWFE estimator converged in 7 iterations)
+note: pre_ln_mean_text_chars_missing omitted because of collinearity
+
+HDFE Linear regression                            Number of obs   =     48,252
+Absorbing 2 HDFE groups                           F(  10,    562) =     197.93
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.7329
+                                                  Adj R-squared   =     0.7289
+                                                  Within R-sq.    =     0.1940
+Number of clusters (hotel_id_num) =        563    Root MSE        =     0.5198
+
+                         (Std. err. adjusted for 563 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+ln_revie~199 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+mr_visible~y |   .0595589   .0081813     7.28   0.000     .0434891    .0756286
+ln_pre_rev~t |    .547446    .015848    34.54   0.000     .5163176    .5785745
+ln_cumulat~t |   .0185219   .0128372     1.44   0.150    -.0066928    .0437367
+pre_mea~ting |    .009627   .0038376     2.51   0.012     .0020891    .0171648
+pre_mea~sing |   .1105893   .0547652     2.02   0.044     .0030198    .2181588
+pre_sd_~ting |  -.0255919   .0064391    -3.97   0.000    -.0382396   -.0129443
+pre_sd_~sing |   .1565812   .0135559    11.55   0.000     .1299547    .1832076
+pre_ln_mea~s |   -.055129   .0078703    -7.00   0.000    -.0705878   -.0396703
+pre_ln_mea~g |          0  (omitted)
+pre_ars_po~e |   .3372653   .0687066     4.91   0.000     .2023121    .4722185
+pre_ars_po~g |  -.0030111     .02149    -0.14   0.889    -.0452216    .0391994
+       _cons |   .5419397   .0951765     5.69   0.000     .3549945    .7288849
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       563         563           0    *|
+           ym |       141           1         140     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store V4_log_w199
+
+. reghdfe ln_review_count_w595 mr_visible_start_any `X', absorb(hotel_id_num ym
+> ) vce(cluster hotel_id_num)
+(MWFE estimator converged in 7 iterations)
+note: pre_ln_mean_text_chars_missing omitted because of collinearity
+
+HDFE Linear regression                            Number of obs   =     48,252
+Absorbing 2 HDFE groups                           F(  10,    562) =     170.38
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.7155
+                                                  Adj R-squared   =     0.7112
+                                                  Within R-sq.    =     0.1706
+Number of clusters (hotel_id_num) =        563    Root MSE        =     0.5148
+
+                         (Std. err. adjusted for 563 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+ln_revie~595 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+mr_visible~y |     .06218   .0082632     7.52   0.000     .0459494    .0784106
+ln_pre_rev~t |   .4794556   .0149923    31.98   0.000     .4500078    .5089033
+ln_cumulat~t |   .0150564   .0127773     1.18   0.239    -.0100406    .0401535
+pre_mea~ting |   .0106429   .0038492     2.76   0.006     .0030823    .0182034
+pre_mea~sing |   .0906351   .0539926     1.68   0.094    -.0154168     .196687
+pre_sd_~ting |  -.0184884   .0064971    -2.85   0.005    -.0312501   -.0057268
+pre_sd_~sing |   .1065245   .0140155     7.60   0.000     .0789953    .1340537
+pre_ln_mea~s |   -.052367   .0078741    -6.65   0.000    -.0678332   -.0369007
+pre_ln_mea~g |          0  (omitted)
+pre_ars_po~e |   .3282537   .0682848     4.81   0.000     .1941292    .4623782
+pre_ars_po~g |  -.0176179     .02134    -0.83   0.409    -.0595338    .0242981
+       _cons |   .6391113   .0959692     6.66   0.000     .4506092    .8276134
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       563         563           0    *|
+           ym |       141           1         140     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store V5_log_w595
+
+. reghdfe ln_review_count_w195 mr_visible_start_any `X', absorb(hotel_id_num ym
+> ) vce(cluster hotel_id_num)
+(MWFE estimator converged in 7 iterations)
+note: pre_ln_mean_text_chars_missing omitted because of collinearity
+
+HDFE Linear regression                            Number of obs   =     48,252
+Absorbing 2 HDFE groups                           F(  10,    562) =     170.38
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.7155
+                                                  Adj R-squared   =     0.7112
+                                                  Within R-sq.    =     0.1706
+Number of clusters (hotel_id_num) =        563    Root MSE        =     0.5148
+
+                         (Std. err. adjusted for 563 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+ln_revie~195 | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+mr_visible~y |     .06218   .0082632     7.52   0.000     .0459494    .0784106
+ln_pre_rev~t |   .4794556   .0149923    31.98   0.000     .4500078    .5089033
+ln_cumulat~t |   .0150564   .0127773     1.18   0.239    -.0100406    .0401535
+pre_mea~ting |   .0106429   .0038492     2.76   0.006     .0030823    .0182034
+pre_mea~sing |   .0906351   .0539926     1.68   0.094    -.0154168     .196687
+pre_sd_~ting |  -.0184884   .0064971    -2.85   0.005    -.0312501   -.0057268
+pre_sd_~sing |   .1065245   .0140155     7.60   0.000     .0789953    .1340537
+pre_ln_mea~s |   -.052367   .0078741    -6.65   0.000    -.0678332   -.0369007
+pre_ln_mea~g |          0  (omitted)
+pre_ars_po~e |   .3282537   .0682848     4.81   0.000     .1941292    .4623782
+pre_ars_po~g |  -.0176179     .02134    -0.83   0.409    -.0595338    .0242981
+       _cons |   .6391113   .0959692     6.66   0.000     .4506092    .8276134
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       563         563           0    *|
+           ym |       141           1         140     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store V6_log_w195
+
+. 
+. * B. New-content homogeneity. Higher pooled ARS means current-month review te
+> xt
+. * is more similar within the current-plus-previous-month pooled review set.
+. * It is bounded, so it is not winsorized.
+. reghdfe ars_pool_visible mr_visible_start_any `X' if !missing(ars_pool_visibl
+> e), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 6 singleton observations)
+(MWFE estimator converged in 7 iterations)
+note: pre_ln_mean_text_chars_missing omitted because of collinearity
+
+HDFE Linear regression                            Number of obs   =     31,090
+Absorbing 2 HDFE groups                           F(  10,    553) =     450.89
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.3618
+                                                  Adj R-squared   =     0.3470
+                                                  Within R-sq.    =     0.1910
+Number of clusters (hotel_id_num) =        554    Root MSE        =     0.0498
+
+                         (Std. err. adjusted for 554 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+ars_pool_v~e | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+mr_visible~y |   .0008393   .0008613     0.97   0.330    -.0008526    .0025311
+ln_pre_rev~t |   .0101807   .0007599    13.40   0.000     .0086881    .0116733
+ln_cumulat~t |  -.0011204   .0009726    -1.15   0.250    -.0030308      .00079
+pre_mea~ting |   .0025944   .0006831     3.80   0.000     .0012526    .0039362
+pre_mea~sing |   -.167156   .0085257   -19.61   0.000    -.1839027   -.1504092
+pre_sd_~ting |  -.0129173   .0006871   -18.80   0.000    -.0142669   -.0115677
+pre_sd_~sing |  -.0137845   .0016371    -8.42   0.000    -.0170001   -.0105689
+pre_ln_mea~s |   -.032322   .0009513   -33.98   0.000    -.0341905   -.0304534
+pre_ln_mea~g |          0  (omitted)
+pre_ars_po~e |   .2305534   .0101789    22.65   0.000     .2105594    .2505474
+pre_ars_po~g |   .0676406   .0032884    20.57   0.000     .0611814    .0740998
+       _cons |   .4184246     .00997    41.97   0.000     .3988408    .4380084
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       554         554           0    *|
+           ym |       141           1         140     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store C1_pool_any
+
+. reghdfe ars_pool_visible ln_mr_visible_start_n `X' if !missing(ars_pool_visib
+> le), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 6 singleton observations)
+(MWFE estimator converged in 7 iterations)
+note: pre_ln_mean_text_chars_missing omitted because of collinearity
+
+HDFE Linear regression                            Number of obs   =     31,090
+Absorbing 2 HDFE groups                           F(  10,    553) =     451.53
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.3618
+                                                  Adj R-squared   =     0.3470
+                                                  Within R-sq.    =     0.1910
+Number of clusters (hotel_id_num) =        554    Root MSE        =     0.0498
+
+                         (Std. err. adjusted for 554 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+ars_pool_v~e | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+ln_mr_visi~n |   .0001492   .0003746     0.40   0.691    -.0005867    .0008851
+ln_pre_rev~t |    .010169   .0007865    12.93   0.000     .0086241    .0117139
+ln_cumulat~t |  -.0011147   .0009728    -1.15   0.252    -.0030255    .0007961
+pre_mea~ting |   .0025812   .0006836     3.78   0.000     .0012385     .003924
+pre_mea~sing |  -.1670736   .0085566   -19.53   0.000    -.1838809   -.1502662
+pre_sd_~ting |  -.0128963   .0006877   -18.75   0.000    -.0142472   -.0115455
+pre_sd_~sing |  -.0138488   .0016442    -8.42   0.000    -.0170785   -.0106191
+pre_ln_mea~s |  -.0323122   .0009504   -34.00   0.000     -.034179   -.0304454
+pre_ln_mea~g |          0  (omitted)
+pre_ars_po~e |   .2304456   .0101696    22.66   0.000     .2104699    .2504213
+pre_ars_po~g |   .0675778   .0032821    20.59   0.000     .0611308    .0740248
+       _cons |    .418787   .0100023    41.87   0.000     .3991398    .4384342
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       554         554           0    *|
+           ym |       141           1         140     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store C2_pool_lnn
+
+. reghdfe ars_pool_visible mr_prevcohort_visible_rate `X' if pre_review_eligibl
+> e == 1 & !missing(ars_pool_visible), absorb(hotel_id_num ym) vce(cluster hote
+> l_id_num)
+(dropped 8 singleton observations)
+(MWFE estimator converged in 7 iterations)
+note: pre_mean_rating_missing omitted because of collinearity
+note: pre_ln_mean_text_chars_missing omitted because of collinearity
+
+HDFE Linear regression                            Number of obs   =     30,826
+Absorbing 2 HDFE groups                           F(   9,    551) =     499.84
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.3641
+                                                  Adj R-squared   =     0.3493
+                                                  Within R-sq.    =     0.1932
+Number of clusters (hotel_id_num) =        552    Root MSE        =     0.0497
+
+                         (Std. err. adjusted for 552 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+ars_pool_v~e | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+mr_prevcoh~e |   .0006383   .0010097     0.63   0.528     -.001345    .0026215
+ln_pre_rev~t |   .0101916   .0007621    13.37   0.000     .0086947    .0116886
+ln_cumulat~t |   -.001061   .0009916    -1.07   0.285    -.0030089    .0008868
+pre_mea~ting |   .0026991   .0006819     3.96   0.000     .0013597    .0040385
+pre_mea~sing |          0  (omitted)
+pre_sd_~ting |  -.0128666   .0006859   -18.76   0.000    -.0142139   -.0115192
+pre_sd_~sing |  -.0138324   .0016406    -8.43   0.000    -.0170549   -.0106098
+pre_ln_mea~s |  -.0323263   .0009493   -34.05   0.000    -.0341909   -.0304616
+pre_ln_mea~g |          0  (omitted)
+pre_ars_po~e |   .2310095   .0101622    22.73   0.000      .211048     .250971
+pre_ars_po~g |   .0677036   .0032767    20.66   0.000     .0612671      .07414
+       _cons |    .417792   .0099879    41.83   0.000     .3981729     .437411
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       552         552           0    *|
+           ym |       140           1         139     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store C3_pool_rate
+
+. 
+. * Conditional composition check: current count is a possible response mediato
+> r,
+. * so this model is secondary and does not replace C1-C3.
+. reghdfe ars_pool_visible mr_visible_start_any ln_review_count `X' if !missing
+> (ars_pool_visible), absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 6 singleton observations)
+(MWFE estimator converged in 7 iterations)
+note: pre_ln_mean_text_chars_missing omitted because of collinearity
+
+HDFE Linear regression                            Number of obs   =     31,090
+Absorbing 2 HDFE groups                           F(  11,    553) =     420.23
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.3641
+                                                  Adj R-squared   =     0.3493
+                                                  Within R-sq.    =     0.1939
+Number of clusters (hotel_id_num) =        554    Root MSE        =     0.0498
+
+                         (Std. err. adjusted for 554 clusters in hotel_id_num)
+------------------------------------------------------------------------------
+             |               Robust
+ars_pool_v~e | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+mr_visible~y |   .0005718   .0008619     0.66   0.507    -.0011212    .0022647
+ln_review_~t |   .0068411   .0007158     9.56   0.000     .0054351    .0082472
+ln_pre_rev~t |   .0069722   .0006994     9.97   0.000     .0055984    .0083461
+ln_cumulat~t |  -.0012687   .0009634    -1.32   0.188    -.0031611    .0006238
+pre_mea~ting |   .0025481   .0006802     3.75   0.000      .001212    .0038843
+pre_mea~sing |  -.1698741   .0084619   -20.08   0.000    -.1864954   -.1532527
+pre_sd_~ting |  -.0126862   .0006853   -18.51   0.000    -.0140324     -.01134
+pre_sd_~sing |  -.0152581   .0016585    -9.20   0.000    -.0185158   -.0120005
+pre_ln_mea~s |  -.0320015   .0009559   -33.48   0.000    -.0338792   -.0301238
+pre_ln_mea~g |          0  (omitted)
+pre_ars_po~e |   .2282565   .0101219    22.55   0.000     .2083743    .2481387
+pre_ars_po~g |   .0671939   .0032758    20.51   0.000     .0607593    .0736285
+       _cons |   .4118091   .0100169    41.11   0.000     .3921332     .431485
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       554         554           0    *|
+           ym |       141           1         140     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store C4_pool_any_condcount
+
+. 
+. estimates table V1_ppml_any V2_ppml_lnn V3_ppml_rate V4_log_w199 V5_log_w595 
+> V6_log_w195 C1_pool_any C2_pool_lnn C3_pool_rate C4_pool_any_condcount, b(%9.
+> 6f) se(%9.6f) stats(N r2_a)
+
+--------------------------------------------------------------------------
+    Variable | V1_ppml~y   V2_ppml~n   V3_ppml~e   V4_lo~199   V5_lo~595  
+-------------+------------------------------------------------------------
+mr_visible~y |  0.069363                            0.059559    0.062180  
+             |  0.015363                            0.008181    0.008263  
+ln_pre_rev~t |  0.482309    0.468241    0.516955    0.547446    0.479456  
+             |  0.025767    0.028319    0.023663    0.015848    0.014992  
+ln_cumulat~t |  0.054134    0.053970    0.049827    0.018522    0.015056  
+             |  0.021966    0.021894    0.020106    0.012837    0.012777  
+pre_mea~ting |  0.033742    0.033074    0.041563    0.009627    0.010643  
+             |  0.008240    0.008213    0.008141    0.003838    0.003849  
+pre_mea~sing | -0.196182   -0.214394   (omitted)    0.110589    0.090635  
+             |  0.097687    0.097089                0.054765    0.053993  
+pre_sd_~ting | -0.024439   -0.022626   -0.018858   -0.025592   -0.018488  
+             |  0.010138    0.010020    0.009769    0.006439    0.006497  
+pre_sd_~sing |  0.049159    0.039605    0.044137    0.156581    0.106524  
+             |  0.026850    0.027838    0.025949    0.013556    0.014016  
+pre_ln_mea~s | -0.101892   -0.100939   -0.090807   -0.055129   -0.052367  
+             |  0.014242    0.014249    0.013671    0.007870    0.007874  
+pre_ln_mea~g | (omitted)   (omitted)   (omitted)   (omitted)   (omitted)  
+             |                                                            
+pre_ars_po~e |  0.857571    0.855927    0.761314    0.337265    0.328254  
+             |  0.131298    0.132171    0.121163    0.068707    0.068285  
+pre_ars_po~g |  0.107624    0.104917    0.050182   -0.003011   -0.017618  
+             |  0.042152    0.042111    0.039073    0.021490    0.021340  
+ln_mr_visi~n |              0.027442                                      
+             |              0.008110                                      
+mr_prevcoh~e |                          0.060476                          
+             |                          0.016180                          
+ln_review_~t |                                                            
+             |                                                            
+       _cons |  1.037433    1.074697    0.967305    0.541940    0.639111  
+             |  0.181177    0.180103    0.174030    0.095177    0.095969  
+-------------+------------------------------------------------------------
+           N |     48252       48252       36384       48252       48252  
+        r2_a |                                      0.728935    0.711236  
+--------------------------------------------------------------------------
+                                                              Legend: b/se
+
+
+--------------------------------------------------------------------------
+    Variable | V6_lo~195   C1_pool~y   C2_pool~n   C3_pool~e   C4_pool~t  
+-------------+------------------------------------------------------------
+mr_visible~y |  0.062180    0.000839                            0.000572  
+             |  0.008263    0.000861                            0.000862  
+ln_pre_rev~t |  0.479456    0.010181    0.010169    0.010192    0.006972  
+             |  0.014992    0.000760    0.000787    0.000762    0.000699  
+ln_cumulat~t |  0.015056   -0.001120   -0.001115   -0.001061   -0.001269  
+             |  0.012777    0.000973    0.000973    0.000992    0.000963  
+pre_mea~ting |  0.010643    0.002594    0.002581    0.002699    0.002548  
+             |  0.003849    0.000683    0.000684    0.000682    0.000680  
+pre_mea~sing |  0.090635   -0.167156   -0.167074   (omitted)   -0.169874  
+             |  0.053993    0.008526    0.008557                0.008462  
+pre_sd_~ting | -0.018488   -0.012917   -0.012896   -0.012867   -0.012686  
+             |  0.006497    0.000687    0.000688    0.000686    0.000685  
+pre_sd_~sing |  0.106524   -0.013785   -0.013849   -0.013832   -0.015258  
+             |  0.014016    0.001637    0.001644    0.001641    0.001658  
+pre_ln_mea~s | -0.052367   -0.032322   -0.032312   -0.032326   -0.032001  
+             |  0.007874    0.000951    0.000950    0.000949    0.000956  
+pre_ln_mea~g | (omitted)   (omitted)   (omitted)   (omitted)   (omitted)  
+             |                                                            
+pre_ars_po~e |  0.328254    0.230553    0.230446    0.231010    0.228256  
+             |  0.068285    0.010179    0.010170    0.010162    0.010122  
+pre_ars_po~g | -0.017618    0.067641    0.067578    0.067704    0.067194  
+             |  0.021340    0.003288    0.003282    0.003277    0.003276  
+ln_mr_visi~n |                          0.000149                          
+             |                          0.000375                          
+mr_prevcoh~e |                                      0.000638              
+             |                                      0.001010              
+ln_review_~t |                                                  0.006841  
+             |                                                  0.000716  
+       _cons |  0.639111    0.418425    0.418787    0.417792    0.411809  
+             |  0.095969    0.009970    0.010002    0.009988    0.010017  
+-------------+------------------------------------------------------------
+           N |     48252       31090       31090       30826       31090  
+        r2_a |  0.711236    0.347018    0.346993    0.349346    0.349335  
+--------------------------------------------------------------------------
+                                                              Legend: b/se
+
+. log close
+      name:  <unnamed>
+       log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_calenda
+> r_month_visible_mr_mechanisms_260711.log
+  log type:  text
+ closed on:  11 Jul 2026, 18:47:11
+-------------------------------------------------------------------------------

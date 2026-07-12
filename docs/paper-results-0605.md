@@ -11,6 +11,8 @@ M0.1 Baseline
 
 M0.2 `hi_compavg 在 `focus100 ` 样本里按中位数切成低组 / 高组`
 
+这个作为价格可能更好
+
 这个是竞争者的利润
 
 - `sim_mean = .7777166`, `p = 0.019`
@@ -47,8 +49,8 @@ M5 ZIP competitor RevPAR
 - `c.sim_mean × c.ln_comp_zip_full_c =  -.2398413`, `p = 0.029`
 
   分组回归，都显著为负，无法区分
-- 低 ZIP competitor RevPAR：`sim_mean = -.1434568`, `p = 0.035`
-- 高 ZIP competitor RevPAR：`sim_mean = -.1912956 `, `p = 0.020`
+- 低 ZIP num：`sim_mean = -.1434568`, `p = 0.035`
+- 高 ZIP num：`sim_mean = -.1912956 `, `p = 0.020`
 
 M6 City competitor RevPAR
 
@@ -57,8 +59,8 @@ M6 City competitor RevPAR
 - `c.sim_mean × c.ln_comp_city_full_c =  -.4363411`, `p = 0.007`
 
   分组回归，都显著为负，无法区分
-- 低 ZIP competitor RevPAR：`sim_mean = -.1255386`, `p = 0.034`
-- 高 ZIP competitor RevPAR：`sim_mean = -.1870382 `, `p = 0.011`
+- 低 City revenue：`sim_mean = -.1255386`, `p = 0.034`
+- 高 City revenue：`sim_mean = -.1870382 `, `p = 0.011`
 
 M7 ZIP positioning gap
 
@@ -97,12 +99,16 @@ M9 revenue gap
 
 M0-4 Chain or Independent
 
+样本差太大
+
 - 交互做不出来，因为数据集中可以确认的chain数量太少
 - 分组结果：
 - chain：`sim_mean = -.0747849`, `p = 0.366`
 - independent：`sim_mean =  -.2034301`, `p = 0.003`
 
 M5-7 Star
+
+暂时保留
 
 - `sim_mean × star_class 交互效果不好！`
 - 分组回归：
@@ -130,6 +136,8 @@ M10 Quality 3
 
 M11 Rank
 
+酒店排位/总数
+
 - 交互项不显著
 - 分组回归差异不够显著：
 - 低Rank：`sim_mean = -.2519876`, `p = 0.006`
@@ -152,6 +160,8 @@ M13 Popularity
 Vertical1 Star 见上M5-7 Star
 
 Vertical2 tp_quality_index 结果与上面的M10 Quality 3类似
+
+*选择维度，或者分类，看哪个维度影响更大*
 
 egen double tp_quality_index = rowmean(
     hotel_avg_rating
@@ -194,6 +204,8 @@ Horizontal2-4 是对amenities细分，结果都不太行，也不好做
 
 Horizontal5 Upscale-style boundary
 
+风格偏向：商务要求没那么高，经济型要求没那么高
+
 * **style_upscale = 1**
   * **hotel_style** 文本里出现了偏高端/精品/现代时尚的风格标签
   * gen byte style_luxury = regexm(hotel_style_lc, "luxury|romantic|boutique")
@@ -206,6 +218,8 @@ Horizontal5 Upscale-style boundary
 Horizontal6 Luxury 最后因为样本差距过大没有出结果，但是从系数上推测，确实是luxury的负面效应更强
 
 Horizontal7 Travelers' choice
+
+比星级更好
 
 * 交互项为正不显著
 * 分组组间差异通过，choice那个不确定性更小，当然效应小
@@ -220,23 +234,16 @@ Price1 ln_tp_price_mid
 * Yes：`sim_mean = -.2696573`, `p = 0.006`
 * 同一个Zip下同一个ym，在其他条件控制的前提下，高价酒店期望更高也更需要降低不确定性
 
-Price ln_tp_price_mid
-
-* 交互项为正不显著
-* 分组Zip ym，组间差异通过
-* No：`sim_mean = -.0615404`, `p = 0.535`
-* Yes：`sim_mean = -.2696573`, `p = 0.006`
-* 同一个Zip下同一个ym，在其他条件控制的前提下，高价酒店期望更高也更需要降低不确定性
-
 ### Review探索
 
 E1 recent_sd
+
+和sim_mean构建共线
 
 * 交互项为正不显著
 * 分组Zip ym，组间差异通过
 * 低SD：`sim_mean = -.2966674 `, `p = 0.003`
 * 高SD：`sim_mean = -.1367903`, `p = 0.228`
-* 同一个Zip下同一个ym，在其他条件控制的前提下，高价酒店期望更高也更需要降低不确定性
 
 E2 sd_acc
 
@@ -244,13 +251,12 @@ E2 sd_acc
 * 分组Zip ym，组间差异通过
 * 低SD：`sim_mean = -.0687084 `, `p = 0.494`
 * 高SD：`sim_mean = -.1367903`, `p = 0.029`
-* 同一个Zip下同一个ym，在其他条件控制的前提下，高价酒店期望更高也更需要降低不确定性
 
 E3 sent_net_pos_bing
 
 * **Bing 文本情感的净正向指标**，越高正面文本明显多于负面文本，评论语气更净正向
 * 交互项不显著
-* 组间差异在0.1水平显著
+* 组间差异在0.05水平显著
 * 低：`sim_mean =  -.2444491 `, `p = 0.009`
 * 高：`sim_mean = -.0669176`, `p = 0.480`
 
@@ -279,10 +285,10 @@ G1 lag_mr_any
 * 上月是否有回复
 * 交互项不显著
 * 组间无差异
-* 低：`sim_mean =  -.2593557 `, `p = 0.007`
-* 高：`sim_mean = -.1305891`, `p = 0.216`
+* No：`sim_mean =  -.2593557 `, `p = 0.007`
+* Yes：`sim_mean = -.1305891`, `p = 0.216`
 
-G2 leply rate
+G2 lag reply rate
 
 * 上月回复的比率
 * 交互项不显著
@@ -291,7 +297,7 @@ G2 leply rate
 * 高：`sim_mean = -.129462`, `p = 0.235`
 * 回复可以削弱simi的负面作用
 
-G3 leply count
+G3 lag reply count
 
 * 上月回复的数量
 * 交互项不显著
@@ -338,8 +344,8 @@ G8 lag_mr_avg_resp_days
 * 平均回复天数（回复速度）
 * 交互项不显著
 * Zip ym 组间差异显著
-* 低：`sim_mean =  -.2671112 `, `p = 0.009`
-* 高：`sim_mean = -.0666561`, `p = 0.522`
+* 慢：`sim_mean =  -.2671112 `, `p = 0.009`
+* 快：`sim_mean = -.0666561`, `p = 0.522`
 * 回复快速可以削弱simi的负面作用
 
 G9 Reply Tone: thanks wording
@@ -408,11 +414,11 @@ G15 Personalization
 
 G16 Manager-signed wording
 
-* 提到顾客名称，提到具体入住经历/具体问题
+* Best Name ...
 * 交互项不显著
 * Zip ym 组间差异显著
-* 低：`sim_mean = -.2922835`, `p = 0.022`
-* 高：`sim_mean = -.1714735`, `p = 0.283`
+* 低：`sim_mean = ` `p = 0.022`
+* 高：`sim_mean = `, `p = 0.283`
 
 ### Learning Effect
 
@@ -449,14 +455,6 @@ T2 service-targeting
 * 回复service issue内容的review可以缓解simi的负面作用
 
 T3 room-targeting
-
-* **上个月所有被回复的评论里，属于 service issue 的那部分占比**。lag_mr_rep_service_share
-* 交互项不显著
-* 低：`sim_mean = -.2278172`, `p = 0.036`
-* 高：`sim_mean = -.0696026`, `p = 0.518`
-* 回复room issue内容的review可以缓解simi的负面作用
-
-T4 room-targeting
 
 * **上个月所有被回复的评论里，属于 service issue 的那部分占比**。lag_mr_rep_service_share
 * 交互项不显著

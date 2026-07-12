@@ -1,7 +1,0 @@
-chain: baseline
-role: historical_baseline_replication
-status: scaffold_only
-current_release: null
-inputs: []
-scripts: []
-outputs: []

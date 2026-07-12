@@ -1,0 +1,29 @@
+-------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/fix_calenda
+> r_month_visible_mr_ym_260711.log
+  log type:  text
+ opened on:  11 Jul 2026, 18:48:22
+
+. use "`p'/outputs/core_simi_260501/data/calendar_month_pool_visible_mr_gt100_p
+> anel_260711.dta", clear
+
+. capture drop ym
+
+. gen ym = monthly(event_ym, "YM")
+
+. format ym %tm
+
+. save "`p'/outputs/core_simi_260501/data/calendar_month_pool_visible_mr_gt100_
+> panel_260711.dta", replace
+file
+    /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/dat
+    > a/calendar_month_pool_visible_mr_gt100_panel_260711.dta saved
+
+. log close
+      name:  <unnamed>
+       log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/fix_calenda
+> r_month_visible_mr_ym_260711.log
+  log type:  text
+ closed on:  11 Jul 2026, 18:48:22
+-------------------------------------------------------------------------------
