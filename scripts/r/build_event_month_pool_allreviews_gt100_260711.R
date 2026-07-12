@@ -101,7 +101,12 @@ panel[,final_review_count:=as.numeric(revtot_final)];panel[,sample_final_reviews
 for(v in grep("^pmr_activity_(n|chars|words)$",names(panel),value=TRUE))set(panel,which(is.na(panel[[v]])),v,0)
 for(v in grep("^pmr_activity_(thanks|invite|apology|recovery|contact|positive|problem|personal|mgr|complaint|service|room|cleanliness|value)$",names(panel),value=TRUE))panel[,(paste0(v,"_zf")):=fifelse(is.na(get(v)),0,get(v))]
 panel[,pmr_activity_any:=as.integer(pmr_activity_n>0)]
+* Preserve the established Route A/B variable interface directly in the DTA.
+* sim_mean now carries the rebuilt pooled ARS; the original name is retained
+* so the Route A/B replication files require no in-do variable mapping.
+panel[, `:=`(sim_mean=ars_pool_ev, ln_RevPAR_clean=lnRevenue_current, ln_lag_RevPAR_clean=lnRevenue_lag_month, cs_sample_focus100=1L)]
 drop<-unique(c(grep("(^|_)sim_mean|ars_cross_ev|ev_cross_pairs|next_event_ars_cross_ev",names(panel),value=TRUE),"ev_within_current","ev_within_previous"));panel[,(intersect(drop,names(panel))):=NULL]
+panel[, sim_mean := ars_pool_ev]
 stopifnot(!anyDuplicated(panel,by=c("HotelID","event_ym")),all(panel$final_review_count>100))
 cat("Final rows:",nrow(panel),"; hotels:",uniqueN(panel$HotelID),"; pooled ARS:",sum(!is.na(panel$ars_pool_ev)),"; Revenue+pool:",sum(!is.na(panel$Revenue_current)&!is.na(panel$ars_pool_ev)),"; dates:",min(panel$event_ym),max(panel$event_ym),"\n")
 write_dta(panel,out,version=14);cat("Wrote:",out,"\nCompleted:",format(Sys.time()),"\n")
