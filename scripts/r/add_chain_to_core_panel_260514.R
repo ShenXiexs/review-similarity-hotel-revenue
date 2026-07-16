@@ -50,19 +50,22 @@ panel_aug <- panel %>%
   left_join(chain_ref, by = "HotelID_chr") %>%
   mutate(
     chain_matched = as.integer(!is.na(chain_raw)),
-    chain = if_else(is.na(chain_raw), 0L, as.integer(chain_raw)),
-    independent = 1L - chain,
-    chain_small = if_else(is.na(chain_raw), 0L, as.integer(chain_raw)),
-    chain3_small = if_else(is.na(chain3_raw), 0L, as.integer(chain3_raw))
+    chain = if_else(is.na(chain_raw), NA_integer_, as.integer(chain_raw)),
+    independent = if_else(is.na(chain), NA_integer_, 1L - chain),
+    chain_small = if_else(is.na(chain_raw), NA_integer_, as.integer(chain_raw)),
+    chain3_small = if_else(
+      is.na(chain_raw), NA_integer_,
+      if_else(is.na(chain3_raw), 0L, as.integer(chain3_raw))
+    )
   ) %>%
   select(-HotelID_chr)
 
 attr(panel_aug$chain_raw, "label") <- "Raw chain indicator from chain/chainwjw.csv; missing if unmatched"
 attr(panel_aug$chain_matched, "label") <- "1 if HotelID matched chain/chainwjw.csv"
-attr(panel_aug$chain, "label") <- "Chain hotel indicator; unmatched hotels coded as 0 independent"
-attr(panel_aug$independent, "label") <- "Independent hotel indicator; equals 1 - chain"
-attr(panel_aug$chain_small, "label") <- "Alternative chain treatment; unmatched hotels coded as 0 control"
-attr(panel_aug$chain3_small, "label") <- "Alternative chain3 treatment; unmatched hotels coded as 0 control"
+attr(panel_aug$chain, "label") <- "Chain hotel indicator; missing if unmatched"
+attr(panel_aug$independent, "label") <- "Independent hotel indicator; equals 1 - chain, missing if unmatched"
+attr(panel_aug$chain_small, "label") <- "Alternative chain treatment; missing if unmatched"
+attr(panel_aug$chain3_small, "label") <- "Alternative chain3 treatment; missing if unmatched"
 
 audit <- bind_rows(
   panel_aug %>%
