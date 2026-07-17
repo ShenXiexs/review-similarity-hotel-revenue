@@ -11,6 +11,13 @@
 *   It is retained only to reconstruct the original Table 6/7
 *   rating-last-five subgroup; it is not a control variable.
 *
+* Correction requested on 2026-07-17:
+*   Replace lag_avg_rating_month with the matching recent-rating measure.
+*   Table 10 matches recent_rating_5/10/15/20/30 to its review scope;
+*   all other tables retain recent_rating_10, their 10-review base measure.
+*   The enriched panel is used because the original core panel does not
+*   contain the recent-rating variables.
+*
 * Persistent outputs:
 *   1) this do-file
 *   2) one final RTF only
@@ -26,11 +33,11 @@ mata: mata set matafavor speed
 
 local project  "/Users/samxie/Research/ReviewSimi_Sales/Code"
 local data_dir "`project'/outputs/core_simi_260501/data"
-local data_main "`data_dir'/core_simi_panel_260501.dta"
+local data_main "`data_dir'/core_simi_panel_260501_with_mr_text_sentiment_260526.dta"
 local data_alt  "`data_dir'/core_simi_panel_260501_with_altars.dta"
 local data_scope "`data_dir'/core_simi_panel_260501_with_scope_ars.dta"
 local data_chain "`data_dir'/core_simi_panel_260501_with_mr_text_sentiment_260526.dta"
-local rtf "`project'/outputs/paper/reviewsimi_revenue_0521_rerun_no_ratinglast5_260715.rtf"
+local rtf "`project'/outputs/paper/rtf/reviewsimi_revenue_0521_rerun_recent_rating10_260717.rtf"
 
 foreach f in "`data_main'" "`data_alt'" "`data_scope'" "`data_chain'" {
     capture confirm file `f'
@@ -56,8 +63,8 @@ args bdiff_reps
 if "`bdiff_reps'" == "" local bdiff_reps 500
 local seed 202505
 
-local controls "ln_recent_volumn recent_sd ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean"
-local controls_wlag "ln_recent_volumn recent_sd ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ln_lag_RevPAR_clean_w"
+local controls "ln_recent_volumn recent_sd recent_rating_10 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean"
+local controls_wlag "ln_recent_volumn recent_sd recent_rating_10 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean_w"
 
 ************************************************************
 * 1. Main panel and historically used winsorized outcomes
@@ -79,6 +86,16 @@ xtset hotel_id_num ym
 
 keep if cs_sample_focus100 == 1
 
+* Table 9 uses the alternative-ARS panel, which does not retain
+* recent_rating_10.  Save an exact HotelID x month lookup from the enriched
+* core panel and merge it later; the two panels have complete key overlap.
+tempfile recent_rating10_lookup
+preserve
+    keep HotelID year_month recent_rating_10
+    isid HotelID year_month
+    save `recent_rating10_lookup', replace
+restore
+
 capture drop ln_RevPAR_clean_w ln_lag_RevPAR_clean_w
 gen double ln_RevPAR_clean_w = ln_RevPAR_clean
 winsor2 ln_RevPAR_clean_w if cs_sample_focus50 == 1, cut(2.5 97.5) replace
@@ -92,18 +109,18 @@ gen double ln_lag_RevPAR_clean_w199 = ln_lag_RevPAR_clean
 winsor2 ln_lag_RevPAR_clean_w199, cut(1 99) replace
 
 label variable ln_RevPAR_clean "ln(RevPAR)"
-label variable sim_mean "ARS"
-label variable ln_recent_volumn "ln(Recent volume)"
+label variable sim_mean "ARS i,t"
+label variable ln_recent_volumn "Recent volume i,t"
 label variable recent_volumn "Recent volume"
-label variable recent_sd "Recent SD"
-label variable ln_lag_volumn_acc "ln(Review volume), t-1"
+label variable recent_sd "Recent SD i,t"
+label variable recent_rating_10 "Recent rating i,t-1 (10-review window)"
+label variable ln_lag_volumn_acc "Review volume i,t-1"
 label variable lag_volumn_acc "Review volume, t-1"
 label variable lag_recent_volumn "Recent volume, t-1"
-label variable lag_avg_rating_acc "Rating acc., t-1"
-label variable lag_sd_acc "Rating SD acc., t-1"
-label variable lag_avg_rating_month "Rating month, t-1"
-label variable ln_avg_com_RevPAR "ln(Competitor RevPAR)"
-label variable ln_lag_RevPAR_clean "ln(RevPAR), t-1"
+label variable lag_avg_rating_acc "Rating acc. i,t-1"
+label variable lag_sd_acc "Rating SD acc. i,t-1"
+label variable ln_avg_com_RevPAR "Competitor RevPAR i,t"
+label variable ln_lag_RevPAR_clean "RevPAR i,t-1"
 label variable star_class "Star class"
 
 ************************************************************
@@ -113,7 +130,7 @@ label variable star_class "Star class"
 
 local descvars ln_RevPAR_clean sim_mean ln_recent_volumn recent_volumn recent_sd ///
     ln_lag_volumn_acc lag_volumn_acc lag_recent_volumn lag_avg_rating_acc ///
-    lag_sd_acc lag_avg_rating_month ln_avg_com_RevPAR ///
+    lag_sd_acc recent_rating_10 ln_avg_com_RevPAR ///
     ln_lag_RevPAR_clean star_class
 
 estpost summarize `descvars', detail
@@ -327,6 +344,7 @@ gen int ym = monthly(year_month, "YM")
 format ym %tm
 xtset hotel_id_num ym
 keep if cs_sample_focus100 == 1
+label variable recent_rating_10 "Recent rating i,t-1 (10-review window)"
 gen double ln_RevPAR_clean_w = ln_RevPAR_clean
 winsor2 ln_RevPAR_clean_w if cs_sample_focus50 == 1, cut(2.5 97.5) replace
 
@@ -431,6 +449,10 @@ gen int ym = monthly(year_month, "YM")
 format ym %tm
 xtset hotel_id_num ym
 keep if cs_sample_focus100 == 1
+merge 1:1 HotelID year_month using `recent_rating10_lookup'
+assert _merge == 3
+drop _merge
+label variable recent_rating_10 "Recent rating i,t-1 (10-review window)"
 
 reghdfe ln_RevPAR_clean lag_sim_mean `controls', ///
     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
@@ -465,33 +487,39 @@ gen int ym = monthly(year_month, "YM")
 format ym %tm
 xtset hotel_id_num ym
 keep if cs_sample_focus100 == 1
+foreach s in 5 10 15 20 30 {
+    label variable sim_mean_`s' "ARS i,t (`s'-review window)"
+    label variable ln_recent_volumn_`s' "Recent volume i,t (`s'-review window)"
+    label variable recent_sd_`s' "Recent SD i,t (`s'-review window)"
+    label variable recent_rating_`s' "Recent rating i,t-1 (`s'-review window)"
+}
 
 reghdfe ln_RevPAR_clean sim_mean_5 ln_recent_volumn_5 recent_sd_5 ///
-    ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ///
+    ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc recent_rating_5 ///
     ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 estimates store t10_s5
 
 reghdfe ln_RevPAR_clean sim_mean ln_recent_volumn recent_sd ///
-    ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ///
+    ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc recent_rating_10 ///
     ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 estimates store t10_s10
 
 reghdfe ln_RevPAR_clean sim_mean_15 ln_recent_volumn_15 recent_sd_15 ///
-    ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ///
+    ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc recent_rating_15 ///
     ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 estimates store t10_s15
 
 reghdfe ln_RevPAR_clean sim_mean_20 ln_recent_volumn_20 recent_sd_20 ///
-    ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ///
+    ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc recent_rating_20 ///
     ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 estimates store t10_s20
 
 reghdfe ln_RevPAR_clean sim_mean_30 ln_recent_volumn_30 recent_sd_30 ///
-    ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ///
+    ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc recent_rating_30 ///
     ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 estimates store t10_s30
@@ -502,12 +530,38 @@ esttab t10_s5 t10_s10 t10_s15 t10_s20 t10_s30 using "`rtf'", append rtf ///
         ln_recent_volumn_5 ln_recent_volumn ln_recent_volumn_15 ///
         ln_recent_volumn_20 ln_recent_volumn_30 ///
         recent_sd_5 recent_sd recent_sd_15 recent_sd_20 recent_sd_30 ///
-        ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc lag_avg_rating_month ///
+        recent_rating_5 recent_rating_10 recent_rating_15 recent_rating_20 recent_rating_30 ///
+        ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
         ln_avg_com_RevPAR ln_lag_RevPAR_clean) ///
     cells(b(star fmt(3)) se(par fmt(3))) ///
     star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
     stats(N r2_a, labels("Observations" "Adjusted R-squared") fmt(%12.0fc %9.3f)) ///
     mtitles("5" "10" "15" "20" "30") ///
+    varlabels(sim_mean_5 "ARS i,t (5-review window)" ///
+        sim_mean "ARS i,t (10-review window)" ///
+        sim_mean_15 "ARS i,t (15-review window)" ///
+        sim_mean_20 "ARS i,t (20-review window)" ///
+        sim_mean_30 "ARS i,t (30-review window)" ///
+        ln_recent_volumn_5 "Recent volume i,t (5-review window)" ///
+        ln_recent_volumn "Recent volume i,t (10-review window)" ///
+        ln_recent_volumn_15 "Recent volume i,t (15-review window)" ///
+        ln_recent_volumn_20 "Recent volume i,t (20-review window)" ///
+        ln_recent_volumn_30 "Recent volume i,t (30-review window)" ///
+        recent_sd_5 "Recent SD i,t (5-review window)" ///
+        recent_sd "Recent SD i,t (10-review window)" ///
+        recent_sd_15 "Recent SD i,t (15-review window)" ///
+        recent_sd_20 "Recent SD i,t (20-review window)" ///
+        recent_sd_30 "Recent SD i,t (30-review window)" ///
+        recent_rating_5 "Recent rating i,t-1 (5-review window)" ///
+        recent_rating_10 "Recent rating i,t-1 (10-review window)" ///
+        recent_rating_15 "Recent rating i,t-1 (15-review window)" ///
+        recent_rating_20 "Recent rating i,t-1 (20-review window)" ///
+        recent_rating_30 "Recent rating i,t-1 (30-review window)" ///
+        ln_lag_volumn_acc "Review volume i,t-1" ///
+        lag_avg_rating_acc "Rating acc. i,t-1" ///
+        lag_sd_acc "Rating SD acc. i,t-1" ///
+        ln_avg_com_RevPAR "Competitor RevPAR i,t" ///
+        ln_lag_RevPAR_clean "RevPAR i,t-1") ///
     label nogap compress ///
     title("Table 10. Alternative review scopes; rating_last_5 removed")
 
