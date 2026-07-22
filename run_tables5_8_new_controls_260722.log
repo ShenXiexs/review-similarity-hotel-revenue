@@ -1,0 +1,1203 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: Single-user 2-core  perpetual
+Serial number: 501806366047
+  Licensed to: Sam Xie
+               samxie
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 5,000; see help set_maxvar.
+
+
+Running /Applications/Stata/profile.do ...
+command window is unrecognized
+r(199);
+
+. do scripts/stata/run_tables5_8_new_controls_260722.do 
+
+. ************************************************************
+. * Tables 5--8 for reviewsimi-revenue-0722v1.docx
+. * No data construction: reads two prepared analysis panels only.
+. * Table 5 excludes the separately maintained Sys-GMM specification.
+. ************************************************************
+. version 17.0
+
+. clear all
+
+. set more off
+
+. set linesize 255
+
+. capture log close _all
+
+. 
+. local project "/Users/samxie/Research/ReviewSimi_Sales/Code"
+
+. local data_main "`project'/outputs/core_simi_260501/data/routeAB_heterogeneity_final_260715.dta"
+
+. local data_scope "`project'/outputs/core_simi_260501/data/core_simi_panel_260501_with_scope_ars_35_50_260715.dta"
+
+. local logfile "`project'/stata-log/run_tables5_8_new_controls_260722.log"
+
+. 
+. capture confirm file "`data_main'"
+
+. if _rc exit 601
+
+. capture confirm file "`data_scope'"
+
+. if _rc exit 601
+
+. capture which reghdfe
+
+. if _rc exit 199
+
+. capture which esttab
+
+. if _rc exit 199
+
+. 
+. log using "`logfile'", text replace
+(file /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_tables5_8_new_controls_260722.log not found)
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_tables5_8_new_controls_260722.log
+  log type:  text
+ opened on:  22 Jul 2026, 13:26:53
+
+. 
+. ************************************************************
+. * Tables 5--7: final Route A/B prepared panel.
+. ************************************************************
+. use "`data_main'", clear
+
+. keep if cs_sample_focus100 == 1
+(0 observations deleted)
+
+. capture confirm variable hotel_id_num
+
+. if _rc {
+.     capture confirm numeric variable HotelID
+.     if _rc encode HotelID, gen(hotel_id_num)
+.     else gen long hotel_id_num = HotelID
+. }
+
+. capture confirm variable ym
+
+. if _rc gen int ym = monthly(year_month, "YM")
+
+. format ym %tm
+
+. xtset hotel_id_num ym
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+. 
+. ************************************************************
+. * Table 5. FE and OLS; Sys-GMM deliberately excluded.
+. ************************************************************
+. reghdfe ln_RevPAR_clean sim_mean ///
+>     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+>     ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+>     ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
+>     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 2 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     33,546
+Absorbing 2 HDFE groups                           F(  10,    557) =      80.40
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8568
+                                                  Adj R-squared   =     0.8537
+                                                  Within R-sq.    =     0.2512
+Number of clusters (hotel_id_num) =        558    Root MSE        =     0.2655
+
+                                 (Std. err. adjusted for 558 clusters in hotel_id_num)
+--------------------------------------------------------------------------------------
+                     |               Robust
+     ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+            sim_mean |  -.1802589   .0679161    -2.65   0.008    -.3136619   -.0468558
+        recent_sd_10 |  -.0154018     .00811    -1.90   0.058    -.0313317    .0005281
+ ln_recent_volumn_10 |   .0866087   .0101137     8.56   0.000     .0667431    .1064742
+lag_avg_rating_month |   .0070592   .0022112     3.19   0.001      .002716    .0114025
+       rating_last_5 |   .0012139   .0025583     0.47   0.635    -.0038112    .0062389
+   ln_lag_volumn_acc |   .0339516   .0083727     4.06   0.000     .0175056    .0503976
+  lag_avg_rating_acc |   .0201067   .0308752     0.65   0.515    -.0405394    .0807527
+          lag_sd_acc |  -.0073695   .0377285    -0.20   0.845    -.0814771    .0667381
+   ln_avg_com_RevPAR |   .1303443    .013695     9.52   0.000     .1034441    .1572446
+ ln_lag_RevPAR_clean |   .3978797   .0287142    13.86   0.000     .3414784     .454281
+               _cons |    1.55553   .1730597     8.99   0.000       1.2156    1.895459
+--------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       558         558           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store t5_fe
+
+. 
+. reg ln_RevPAR_clean sim_mean ///
+>     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+>     ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+>     ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
+>     vce(cluster hotel_id_num)
+
+Linear regression                               Number of obs     =     33,548
+                                                F(10, 559)        =    1021.78
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.7437
+                                                Root MSE          =     .35149
+
+                                 (Std. err. adjusted for 560 clusters in hotel_id_num)
+--------------------------------------------------------------------------------------
+                     |               Robust
+     ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+            sim_mean |  -.2257583   .1062976    -2.12   0.034    -.4345499   -.0169667
+        recent_sd_10 |  -.0147673   .0087003    -1.70   0.090    -.0318566    .0023221
+ ln_recent_volumn_10 |   .1047445   .0145717     7.19   0.000     .0761226    .1333664
+lag_avg_rating_month |   .0103101   .0029143     3.54   0.000     .0045859    .0160344
+       rating_last_5 |   .0000719   .0034859     0.02   0.984    -.0067752     .006919
+   ln_lag_volumn_acc |  -.0050793   .0034793    -1.46   0.145    -.0119134    .0017549
+  lag_avg_rating_acc |   .0666652    .013916     4.79   0.000     .0393312    .0939992
+          lag_sd_acc |  -.0321616   .0327968    -0.98   0.327    -.0965816    .0322585
+   ln_avg_com_RevPAR |   .0944481   .0110022     8.58   0.000     .0728375    .1160588
+ ln_lag_RevPAR_clean |   .7800232   .0245361    31.79   0.000     .7318289    .8282175
+               _cons |   .0938514   .0984594     0.95   0.341    -.0995442    .2872469
+--------------------------------------------------------------------------------------
+
+. estimates store t5_ols
+
+. 
+. esttab t5_fe t5_ols, ///
+>     order(sim_mean recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+>     ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean) ///
+>     cells(b(star fmt(3)) se(par fmt(3))) ///
+>     star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
+>     stats(N r2_a, labels("Observations" "Adjusted R-squared") fmt(%12.0fc %9.3f)) ///
+>     mtitles("FE" "OLS") label nogap compress
+
+--------------------------------------------
+                       (1)           (2)    
+                        FE           OLS    
+                      b/se          b/se    
+--------------------------------------------
+ARS                 -0.180***     -0.226**  
+                   (0.068)       (0.106)    
+Recent rating SD    -0.015*       -0.015*   
+                   (0.008)       (0.009)    
+ln(Recent revi~)     0.087****     0.105****
+                   (0.010)       (0.015)    
+lag_avg_rating~h     0.007***      0.010****
+                   (0.002)       (0.003)    
+rating_last_5        0.001         0.000    
+                   (0.003)       (0.003)    
+ln(Accumulated~)     0.034****    -0.005    
+                   (0.008)       (0.003)    
+Accumulated ra~g     0.020         0.067****
+                   (0.031)       (0.014)    
+Accumulated ra~D    -0.007        -0.032    
+                   (0.038)       (0.033)    
+ln(Competitor ~)     0.130****     0.094****
+                   (0.014)       (0.011)    
+ln_lag_RevPAR_~n     0.398****     0.780****
+                   (0.029)       (0.025)    
+Constant             1.556****     0.094    
+                   (0.173)       (0.098)    
+--------------------------------------------
+Observations        33,546        33,548    
+Adjusted R-squ~d     0.854         0.744    
+--------------------------------------------
+
+. 
+. ************************************************************
+. * Table 6. COVID-19 models.
+. ************************************************************
+. capture drop covid2020 covid2020_2022
+
+. gen byte covid2020 = Year == 2020 if !missing(Year)
+
+. gen byte covid2020_2022 = inrange(Year, 2020, 2022) if !missing(Year)
+
+. 
+. reghdfe ln_RevPAR_clean sim_mean ///
+>     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+>     ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+>     ln_avg_com_RevPAR ln_lag_RevPAR_clean ///
+>     if covid2020_2022 == 0, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 6 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     25,295
+Absorbing 2 HDFE groups                           F(  10,    504) =      52.42
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8954
+                                                  Adj R-squared   =     0.8928
+                                                  Within R-sq.    =     0.2507
+Number of clusters (hotel_id_num) =        505    Root MSE        =     0.2098
+
+                                 (Std. err. adjusted for 505 clusters in hotel_id_num)
+--------------------------------------------------------------------------------------
+                     |               Robust
+     ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+            sim_mean |  -.1124716   .0583578    -1.93   0.055    -.2271261     .002183
+        recent_sd_10 |  -.0120306   .0070932    -1.70   0.090    -.0259665    .0019054
+ ln_recent_volumn_10 |   .0575681   .0090033     6.39   0.000     .0398795    .0752567
+lag_avg_rating_month |   .0050638   .0021091     2.40   0.017       .00092    .0092076
+       rating_last_5 |  -.0058318   .0020032    -2.91   0.004    -.0097676   -.0018961
+   ln_lag_volumn_acc |   .0290574   .0080276     3.62   0.000     .0132857    .0448291
+  lag_avg_rating_acc |    .041039   .0289222     1.42   0.157    -.0157839    .0978618
+          lag_sd_acc |    .016179   .0348151     0.46   0.642    -.0522216    .0845795
+   ln_avg_com_RevPAR |   .1370444   .0189192     7.24   0.000     .0998742    .1742146
+ ln_lag_RevPAR_clean |   .3795182   .0303446    12.51   0.000     .3199008    .4391357
+               _cons |     1.6533   .1890613     8.74   0.000     1.281854    2.024745
+--------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       505         505           0    *|
+           ym |       102           1         101     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store t6_pre2020
+
+. 
+. reghdfe ln_RevPAR_clean c.sim_mean##i.covid2020 ///
+>     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+>     ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+>     ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
+>     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 2 singleton observations)
+(MWFE estimator converged in 8 iterations)
+note: 1bn.covid2020 is probably collinear with the fixed effects (all partialled-out values are close to zero; tol = 1.0e-09)
+
+HDFE Linear regression                            Number of obs   =     33,546
+Absorbing 2 HDFE groups                           F(  11,    557) =      74.53
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8568
+                                                  Adj R-squared   =     0.8538
+                                                  Within R-sq.    =     0.2517
+Number of clusters (hotel_id_num) =        558    Root MSE        =     0.2655
+
+                                 (Std. err. adjusted for 558 clusters in hotel_id_num)
+--------------------------------------------------------------------------------------
+                     |               Robust
+     ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+            sim_mean |   -.226404   .0656486    -3.45   0.001    -.3553531    -.097455
+         1.covid2020 |          0  (omitted)
+                     |
+covid2020#c.sim_mean |
+                  1  |   .5487883   .2925977     1.88   0.061    -.0259415    1.123518
+                     |
+        recent_sd_10 |  -.0145494   .0081345    -1.79   0.074    -.0305274    .0014285
+ ln_recent_volumn_10 |   .0870381   .0100664     8.65   0.000     .0672653    .1068108
+lag_avg_rating_month |   .0069372   .0022013     3.15   0.002     .0026134    .0112611
+       rating_last_5 |   .0010342   .0025705     0.40   0.688    -.0040149    .0060833
+   ln_lag_volumn_acc |   .0342066   .0083849     4.08   0.000     .0177368    .0506764
+  lag_avg_rating_acc |    .018585   .0309256     0.60   0.548    -.0421601    .0793302
+          lag_sd_acc |  -.0087654   .0378093    -0.23   0.817    -.0830316    .0655009
+   ln_avg_com_RevPAR |   .1300597   .0136631     9.52   0.000     .1032222    .1568973
+ ln_lag_RevPAR_clean |   .3973804   .0286666    13.86   0.000     .3410725    .4536883
+               _cons |   1.565559   .1726764     9.07   0.000     1.226382    1.904735
+--------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       558         558           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store t6_2020
+
+. 
+. reghdfe ln_RevPAR_clean c.sim_mean##i.covid2020_2022 ///
+>     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+>     ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+>     ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
+>     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 2 singleton observations)
+(MWFE estimator converged in 7 iterations)
+note: 1bn.covid2020_2022 is probably collinear with the fixed effects (all partialled-out values are close to zero; tol = 1.0e-09)
+
+HDFE Linear regression                            Number of obs   =     33,546
+Absorbing 2 HDFE groups                           F(  11,    557) =      74.26
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8569
+                                                  Adj R-squared   =     0.8538
+                                                  Within R-sq.    =     0.2519
+Number of clusters (hotel_id_num) =        558    Root MSE        =     0.2654
+
+                                      (Std. err. adjusted for 558 clusters in hotel_id_num)
+-------------------------------------------------------------------------------------------
+                          |               Robust
+          ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+--------------------------+----------------------------------------------------------------
+                 sim_mean |   -.307352   .0724722    -4.24   0.000    -.4497042   -.1649998
+         1.covid2020_2022 |          0  (omitted)
+                          |
+covid2020_2022#c.sim_mean |
+                       1  |   .4296924   .1600948     2.68   0.007     .1152291    .7441558
+                          |
+             recent_sd_10 |  -.0134002   .0081234    -1.65   0.100    -.0293565     .002556
+      ln_recent_volumn_10 |   .0863467   .0100856     8.56   0.000     .0665362    .1061572
+     lag_avg_rating_month |   .0068156   .0022044     3.09   0.002     .0024856    .0111455
+            rating_last_5 |   .0009138   .0025499     0.36   0.720    -.0040949    .0059224
+        ln_lag_volumn_acc |   .0339671   .0083758     4.06   0.000     .0175151    .0504191
+       lag_avg_rating_acc |   .0162834   .0308914     0.53   0.598    -.0443944    .0769612
+               lag_sd_acc |  -.0098061   .0378079    -0.26   0.795    -.0840696    .0644573
+        ln_avg_com_RevPAR |   .1295617   .0136428     9.50   0.000     .1027641    .1563593
+      ln_lag_RevPAR_clean |   .3964902   .0285818    13.87   0.000     .3403489    .4526315
+                    _cons |   1.589599   .1721971     9.23   0.000     1.251364    1.927834
+-------------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       558         558           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store t6_pandemic
+
+. 
+. reghdfe d_ln_RevPAR c.sim_mean##i.covid2020_2022 ///
+>     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+>     ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+>     ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
+>     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 2 singleton observations)
+(MWFE estimator converged in 7 iterations)
+note: 1bn.covid2020_2022 is probably collinear with the fixed effects (all partialled-out values are close to zero; tol = 1.0e-09)
+
+HDFE Linear regression                            Number of obs   =     33,460
+Absorbing 2 HDFE groups                           F(  11,    557) =      65.97
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.4873
+                                                  Adj R-squared   =     0.4763
+                                                  Within R-sq.    =     0.3287
+Number of clusters (hotel_id_num) =        558    Root MSE        =     0.2866
+
+                                      (Std. err. adjusted for 558 clusters in hotel_id_num)
+-------------------------------------------------------------------------------------------
+                          |               Robust
+              d_ln_RevPAR | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+--------------------------+----------------------------------------------------------------
+                 sim_mean |  -.2728763   .0751972    -3.63   0.000     -.420581   -.1251716
+         1.covid2020_2022 |          0  (omitted)
+                          |
+covid2020_2022#c.sim_mean |
+                       1  |   .5484086   .1694139     3.24   0.001     .2156404    .8811768
+                          |
+             recent_sd_10 |  -.0119063   .0086622    -1.37   0.170    -.0289209    .0051084
+      ln_recent_volumn_10 |   .0880809   .0104586     8.42   0.000     .0675379     .108624
+     lag_avg_rating_month |   .0062161   .0022694     2.74   0.006     .0017584    .0106738
+            rating_last_5 |   -.001918   .0026817    -0.72   0.475    -.0071856    .0033495
+        ln_lag_volumn_acc |   .0356438    .008689     4.10   0.000     .0185766     .052711
+       lag_avg_rating_acc |   .0279517   .0289806     0.96   0.335    -.0289729    .0848762
+               lag_sd_acc |  -.0071286   .0407759    -0.17   0.861     -.087222    .0729648
+        ln_avg_com_RevPAR |   .1335196   .0141017     9.47   0.000     .1058206    .1612186
+      ln_lag_RevPAR_clean |  -.6341139   .0290299   -21.84   0.000    -.6911353   -.5770925
+                    _cons |   1.636281   .1718626     9.52   0.000     1.298703    1.973859
+-------------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       558         558           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store t6_growth
+
+. 
+. esttab t6_pre2020 t6_2020 t6_pandemic t6_growth, ///
+>     order(sim_mean 1.covid2020#c.sim_mean 1.covid2020_2022#c.sim_mean ///
+>     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+>     ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean) ///
+>     cells(b(star fmt(3)) se(par fmt(3))) ///
+>     star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
+>     stats(N r2_a, labels("Observations" "Adjusted R-squared") fmt(%12.0fc %9.3f)) ///
+>     mtitles("Before 2020" "2020 shock" "2020--2022 shock" "2020--2022 growth") label nogap compress
+
+------------------------------------------------------------------------
+                       (1)           (2)           (3)           (4)    
+                 Befo~2020     2020 sh~k     2020--2~k     2020--2~h    
+                      b/se          b/se          b/se          b/se    
+------------------------------------------------------------------------
+ARS                 -0.112*       -0.226****    -0.307****    -0.273****
+                   (0.058)       (0.066)       (0.072)       (0.075)    
+covid2020=1 # ~S                   0.549*                               
+                                 (0.293)                                
+covid2020_2022~S                                 0.430***      0.548*** 
+                                               (0.160)       (0.169)    
+Recent rating SD    -0.012*       -0.015*       -0.013*       -0.012    
+                   (0.007)       (0.008)       (0.008)       (0.009)    
+ln(Recent revi~)     0.058****     0.087****     0.086****     0.088****
+                   (0.009)       (0.010)       (0.010)       (0.010)    
+lag_avg_rating~h     0.005**       0.007***      0.007***      0.006*** 
+                   (0.002)       (0.002)       (0.002)       (0.002)    
+rating_last_5       -0.006***      0.001         0.001        -0.002    
+                   (0.002)       (0.003)       (0.003)       (0.003)    
+ln(Accumulated~)     0.029****     0.034****     0.034****     0.036****
+                   (0.008)       (0.008)       (0.008)       (0.009)    
+Accumulated ra~g     0.041         0.019         0.016         0.028    
+                   (0.029)       (0.031)       (0.031)       (0.029)    
+Accumulated ra~D     0.016        -0.009        -0.010        -0.007    
+                   (0.035)       (0.038)       (0.038)       (0.041)    
+ln(Competitor ~)     0.137****     0.130****     0.130****     0.134****
+                   (0.019)       (0.014)       (0.014)       (0.014)    
+ln_lag_RevPAR_~n     0.380****     0.397****     0.396****    -0.634****
+                   (0.030)       (0.029)       (0.029)       (0.029)    
+covid2020=0                        0.000                                
+                                     (.)                                
+covid2020=1                        0.000                                
+                                     (.)                                
+covid2020=0 # ~S                   0.000                                
+                                     (.)                                
+covid2020_2022=0                                 0.000         0.000    
+                                                   (.)           (.)    
+covid2020_2022=1                                 0.000         0.000    
+                                                   (.)           (.)    
+covid2020_2022~S                                 0.000         0.000    
+                                                   (.)           (.)    
+Constant             1.653****     1.566****     1.590****     1.636****
+                   (0.189)       (0.173)       (0.172)       (0.172)    
+------------------------------------------------------------------------
+Observations        25,295        33,546        33,546        33,460    
+Adjusted R-squ~d     0.893         0.854         0.854         0.476    
+------------------------------------------------------------------------
+
+. 
+. ************************************************************
+. * Table 7. Alternative ARS measures.
+. ************************************************************
+. reghdfe ln_RevPAR_clean lag_sim_mean ///
+>     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+>     ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+>     ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
+>     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 2 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     33,546
+Absorbing 2 HDFE groups                           F(  10,    557) =      78.86
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8567
+                                                  Adj R-squared   =     0.8537
+                                                  Within R-sq.    =     0.2511
+Number of clusters (hotel_id_num) =        558    Root MSE        =     0.2656
+
+                                 (Std. err. adjusted for 558 clusters in hotel_id_num)
+--------------------------------------------------------------------------------------
+                     |               Robust
+     ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+        lag_sim_mean |  -.1136554   .0622678    -1.83   0.068    -.2359638    .0086531
+        recent_sd_10 |   -.010947   .0075462    -1.45   0.147    -.0257694    .0038755
+ ln_recent_volumn_10 |   .0846938    .010081     8.40   0.000     .0648924    .1044952
+lag_avg_rating_month |   .0070461   .0022151     3.18   0.002     .0026951    .0113971
+       rating_last_5 |   .0006831    .002514     0.27   0.786    -.0042549    .0056211
+   ln_lag_volumn_acc |   .0337869   .0084063     4.02   0.000     .0172749    .0502989
+  lag_avg_rating_acc |   .0202522   .0309562     0.65   0.513    -.0405529    .0810573
+          lag_sd_acc |  -.0113347   .0378088    -0.30   0.764       -.0856    .0629306
+   ln_avg_com_RevPAR |   .1303288   .0137024     9.51   0.000     .1034141    .1572435
+ ln_lag_RevPAR_clean |   .3980178   .0287131    13.86   0.000     .3416186     .454417
+               _cons |    1.54245   .1729767     8.92   0.000     1.202683    1.882216
+--------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       558         558           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store t7_lag
+
+. 
+. reghdfe ln_RevPAR_clean ars_roll_10 ///
+>     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+>     ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+>     ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
+>     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 2 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     33,546
+Absorbing 2 HDFE groups                           F(  10,    557) =      80.56
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8567
+                                                  Adj R-squared   =     0.8537
+                                                  Within R-sq.    =     0.2511
+Number of clusters (hotel_id_num) =        558    Root MSE        =     0.2655
+
+                                 (Std. err. adjusted for 558 clusters in hotel_id_num)
+--------------------------------------------------------------------------------------
+                     |               Robust
+     ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+         ars_roll_10 |  -.1348823   .0562098    -2.40   0.017    -.2452915   -.0244732
+        recent_sd_10 |  -.0132658   .0079385    -1.67   0.095    -.0288589    .0023273
+ ln_recent_volumn_10 |   .0858308   .0100763     8.52   0.000     .0660385    .1056231
+lag_avg_rating_month |   .0070925   .0022133     3.20   0.001      .002745    .0114401
+       rating_last_5 |   .0009137   .0025332     0.36   0.718     -.004062    .0058895
+   ln_lag_volumn_acc |   .0337182   .0083611     4.03   0.000     .0172952    .0501413
+  lag_avg_rating_acc |   .0199125   .0309083     0.64   0.520    -.0407986    .0806235
+          lag_sd_acc |  -.0086459   .0377583    -0.23   0.819     -.082812    .0655201
+   ln_avg_com_RevPAR |   .1303021   .0136997     9.51   0.000     .1033927    .1572115
+ ln_lag_RevPAR_clean |   .3978978   .0287163    13.86   0.000     .3414922    .4543033
+               _cons |   1.546656   .1732359     8.93   0.000      1.20638    1.886931
+--------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       558         558           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store t7_roll
+
+. 
+. reghdfe ln_RevPAR_clean ars_jsd_sim ///
+>     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+>     ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+>     ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
+>     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 2 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     33,546
+Absorbing 2 HDFE groups                           F(  10,    557) =      80.37
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8568
+                                                  Adj R-squared   =     0.8537
+                                                  Within R-sq.    =     0.2513
+Number of clusters (hotel_id_num) =        558    Root MSE        =     0.2655
+
+                                 (Std. err. adjusted for 558 clusters in hotel_id_num)
+--------------------------------------------------------------------------------------
+                     |               Robust
+     ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+         ars_jsd_sim |  -.0784342   .0283287    -2.77   0.006    -.1340783   -.0227902
+        recent_sd_10 |  -.0115092   .0078258    -1.47   0.142    -.0268808    .0038624
+ ln_recent_volumn_10 |   .0850326   .0100706     8.44   0.000     .0652516    .1048137
+lag_avg_rating_month |   .0074498   .0022032     3.38   0.001     .0031223    .0117774
+       rating_last_5 |    .001619   .0025724     0.63   0.529    -.0034339    .0066719
+   ln_lag_volumn_acc |   .0343551   .0084005     4.09   0.000     .0178545    .0508557
+  lag_avg_rating_acc |   .0218785   .0310763     0.70   0.482    -.0391625    .0829195
+          lag_sd_acc |  -.0082329   .0377746    -0.22   0.828     -.082431    .0659653
+   ln_avg_com_RevPAR |   .1304913   .0136938     9.53   0.000     .1035934    .1573892
+ ln_lag_RevPAR_clean |   .3978099    .028724    13.85   0.000     .3413893    .4542305
+               _cons |   1.417378   .1777586     7.97   0.000     1.068218    1.766537
+--------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       558         558           0    *|
+           ym |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store t7_jsd
+
+. 
+. esttab t7_lag t7_roll t7_jsd, ///
+>     order(lag_sim_mean ars_roll_10 ars_jsd_sim recent_sd_10 ln_recent_volumn_10 ///
+>     lag_avg_rating_month rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc ///
+>     lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean) ///
+>     cells(b(star fmt(3)) se(par fmt(3))) ///
+>     star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
+>     stats(N r2_a, labels("Observations" "Adjusted R-squared") fmt(%12.0fc %9.3f)) ///
+>     mtitles("ARS lag" "ARS roll" "ARS JSD") label nogap compress
+
+----------------------------------------------------------
+                       (1)           (2)           (3)    
+                   ARS lag      ARS roll       ARS JSD    
+                      b/se          b/se          b/se    
+----------------------------------------------------------
+lag_sim_mean        -0.114*                               
+                   (0.062)                                
+ars_roll_10                       -0.135**                
+                                 (0.056)                  
+ars_jsd_sim                                     -0.078*** 
+                                               (0.028)    
+Recent rating SD    -0.011        -0.013*       -0.012    
+                   (0.008)       (0.008)       (0.008)    
+ln(Recent revi~)     0.085****     0.086****     0.085****
+                   (0.010)       (0.010)       (0.010)    
+lag_avg_rating~h     0.007***      0.007***      0.007****
+                   (0.002)       (0.002)       (0.002)    
+rating_last_5        0.001         0.001         0.002    
+                   (0.003)       (0.003)       (0.003)    
+ln(Accumulated~)     0.034****     0.034****     0.034****
+                   (0.008)       (0.008)       (0.008)    
+Accumulated ra~g     0.020         0.020         0.022    
+                   (0.031)       (0.031)       (0.031)    
+Accumulated ra~D    -0.011        -0.009        -0.008    
+                   (0.038)       (0.038)       (0.038)    
+ln(Competitor ~)     0.130****     0.130****     0.130****
+                   (0.014)       (0.014)       (0.014)    
+ln_lag_RevPAR_~n     0.398****     0.398****     0.398****
+                   (0.029)       (0.029)       (0.029)    
+Constant             1.542****     1.547****     1.417****
+                   (0.173)       (0.173)       (0.178)    
+----------------------------------------------------------
+Observations        33,546        33,546        33,546    
+Adjusted R-squ~d     0.854         0.854         0.854    
+----------------------------------------------------------
+
+. 
+. ************************************************************
+. * Table 8. 5--50-review ARS windows.  Only the ARS window changes;
+. * all new-control variables remain the scope-10 baseline variables.
+. ************************************************************
+. use "`data_scope'", clear
+
+. keep if cs_sample_focus100 == 1
+(5,406 observations deleted)
+
+. capture confirm variable hotel_id_num
+
+. if _rc {
+.     capture confirm numeric variable HotelID
+.     if _rc encode HotelID, gen(hotel_id_num)
+.     else gen long hotel_id_num = HotelID
+. }
+
+. capture confirm variable ym
+
+. if _rc gen int ym = monthly(year_month, "YM")
+
+. format ym %tm
+
+. xtset hotel_id_num ym
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym_date, 3512m5 to 3867m6, but with gaps
+         Delta: 1 month
+
+. 
+. reghdfe ln_RevPAR_clean sim_mean_5 ///
+>     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+>     ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+>     ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
+>     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 2 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     33,546
+Absorbing 2 HDFE groups                           F(  10,    557) =      82.48
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8568
+                                                  Adj R-squared   =     0.8537
+                                                  Within R-sq.    =     0.2512
+Number of clusters (hotel_id_num) =        558    Root MSE        =     0.2655
+
+                                 (Std. err. adjusted for 558 clusters in hotel_id_num)
+--------------------------------------------------------------------------------------
+                     |               Robust
+     ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+          sim_mean_5 |  -.1294286   .0470207    -2.75   0.006    -.2217881   -.0370691
+        recent_sd_10 |  -.0124177   .0079348    -1.56   0.118    -.0280034     .003168
+ ln_recent_volumn_10 |   .0858307   .0099886     8.59   0.000     .0662108    .1054507
+lag_avg_rating_month |   .0071751    .002223     3.23   0.001     .0028085    .0115416
+       rating_last_5 |   .0014287   .0025708     0.56   0.579    -.0036209    .0064782
+   ln_lag_volumn_acc |   .0335799   .0083394     4.03   0.000     .0171994    .0499605
+  lag_avg_rating_acc |   .0190315   .0308324     0.62   0.537    -.0415304    .0795934
+          lag_sd_acc |  -.0082598   .0377346    -0.22   0.827    -.0823793    .0658596
+   ln_avg_com_RevPAR |   .1303679   .0137001     9.52   0.000     .1034577    .1572781
+ ln_lag_RevPAR_clean |   .3979815   .0287005    13.87   0.000     .3416071    .4543559
+               _cons |   1.544915   .1730285     8.93   0.000     1.205047    1.884783
+--------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       558         558           0    *|
+      ym_date |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store t8_scope5
+
+. 
+. reghdfe ln_RevPAR_clean sim_mean_10 ///
+>     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+>     ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+>     ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
+>     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 2 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     33,546
+Absorbing 2 HDFE groups                           F(  10,    557) =      80.40
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8568
+                                                  Adj R-squared   =     0.8537
+                                                  Within R-sq.    =     0.2512
+Number of clusters (hotel_id_num) =        558    Root MSE        =     0.2655
+
+                                 (Std. err. adjusted for 558 clusters in hotel_id_num)
+--------------------------------------------------------------------------------------
+                     |               Robust
+     ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+         sim_mean_10 |  -.1802589   .0679161    -2.65   0.008    -.3136619   -.0468558
+        recent_sd_10 |  -.0154018     .00811    -1.90   0.058    -.0313317    .0005281
+ ln_recent_volumn_10 |   .0866087   .0101137     8.56   0.000     .0667431    .1064742
+lag_avg_rating_month |   .0070592   .0022112     3.19   0.001      .002716    .0114025
+       rating_last_5 |   .0012139   .0025583     0.47   0.635    -.0038112    .0062389
+   ln_lag_volumn_acc |   .0339516   .0083727     4.06   0.000     .0175056    .0503976
+  lag_avg_rating_acc |   .0201067   .0308752     0.65   0.515    -.0405394    .0807527
+          lag_sd_acc |  -.0073695   .0377285    -0.20   0.845    -.0814771    .0667381
+   ln_avg_com_RevPAR |   .1303443    .013695     9.52   0.000     .1034441    .1572446
+ ln_lag_RevPAR_clean |   .3978797   .0287142    13.86   0.000     .3414784     .454281
+               _cons |    1.55553   .1730597     8.99   0.000       1.2156    1.895459
+--------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       558         558           0    *|
+      ym_date |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store t8_scope10
+
+. 
+. reghdfe ln_RevPAR_clean sim_mean_15 ///
+>     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+>     ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+>     ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
+>     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 2 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     33,546
+Absorbing 2 HDFE groups                           F(  10,    557) =      79.43
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8568
+                                                  Adj R-squared   =     0.8537
+                                                  Within R-sq.    =     0.2512
+Number of clusters (hotel_id_num) =        558    Root MSE        =     0.2655
+
+                                 (Std. err. adjusted for 558 clusters in hotel_id_num)
+--------------------------------------------------------------------------------------
+                     |               Robust
+     ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+         sim_mean_15 |  -.2097472   .0816632    -2.57   0.010    -.3701528   -.0493416
+        recent_sd_10 |  -.0146368   .0077497    -1.89   0.059     -.029859    .0005855
+ ln_recent_volumn_10 |     .08709   .0101698     8.56   0.000     .0671142    .1070658
+lag_avg_rating_month |    .007052   .0022174     3.18   0.002     .0026966    .0114074
+       rating_last_5 |   .0011941   .0025538     0.47   0.640    -.0038222    .0062105
+   ln_lag_volumn_acc |   .0342395   .0083964     4.08   0.000     .0177471    .0507319
+  lag_avg_rating_acc |   .0211021    .030912     0.68   0.495    -.0396163    .0818205
+          lag_sd_acc |  -.0089622   .0377174    -0.24   0.812     -.083048    .0651236
+   ln_avg_com_RevPAR |   .1303399   .0136885     9.52   0.000     .1034526    .1572273
+ ln_lag_RevPAR_clean |    .397736   .0287167    13.85   0.000     .3413296    .4541423
+               _cons |   1.558883   .1730356     9.01   0.000     1.219001    1.898765
+--------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       558         558           0    *|
+      ym_date |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store t8_scope15
+
+. 
+. reghdfe ln_RevPAR_clean sim_mean_20 ///
+>     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+>     ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+>     ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
+>     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 2 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     33,546
+Absorbing 2 HDFE groups                           F(  10,    557) =      79.78
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8568
+                                                  Adj R-squared   =     0.8537
+                                                  Within R-sq.    =     0.2514
+Number of clusters (hotel_id_num) =        558    Root MSE        =     0.2655
+
+                                 (Std. err. adjusted for 558 clusters in hotel_id_num)
+--------------------------------------------------------------------------------------
+                     |               Robust
+     ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+         sim_mean_20 |  -.2773207   .0933576    -2.97   0.003    -.4606967   -.0939447
+        recent_sd_10 |  -.0153656   .0076063    -2.02   0.044    -.0303061    -.000425
+ ln_recent_volumn_10 |   .0883621   .0101851     8.68   0.000     .0683562    .1083681
+lag_avg_rating_month |   .0070946   .0022187     3.20   0.001     .0027366    .0114526
+       rating_last_5 |   .0012377   .0025542     0.48   0.628    -.0037795    .0062548
+   ln_lag_volumn_acc |    .034747   .0084357     4.12   0.000     .0181773    .0513166
+  lag_avg_rating_acc |    .022363   .0309404     0.72   0.470    -.0384111    .0831371
+          lag_sd_acc |  -.0103439   .0377735    -0.27   0.784    -.0845399    .0638521
+   ln_avg_com_RevPAR |   .1303067   .0136812     9.52   0.000     .1034336    .1571798
+ ln_lag_RevPAR_clean |   .3975232   .0287253    13.84   0.000     .3411001    .4539464
+               _cons |   1.570407   .1732408     9.06   0.000     1.230122    1.910692
+--------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       558         558           0    *|
+      ym_date |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store t8_scope20
+
+. 
+. reghdfe ln_RevPAR_clean sim_mean_30 ///
+>     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+>     ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+>     ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
+>     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 2 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     33,546
+Absorbing 2 HDFE groups                           F(  10,    557) =      78.73
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8568
+                                                  Adj R-squared   =     0.8537
+                                                  Within R-sq.    =     0.2512
+Number of clusters (hotel_id_num) =        558    Root MSE        =     0.2655
+
+                                 (Std. err. adjusted for 558 clusters in hotel_id_num)
+--------------------------------------------------------------------------------------
+                     |               Robust
+     ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+         sim_mean_30 |  -.2425435   .1081265    -2.24   0.025    -.4549291   -.0301579
+        recent_sd_10 |  -.0122364   .0075455    -1.62   0.105    -.0270575    .0025847
+ ln_recent_volumn_10 |    .087315   .0101728     8.58   0.000     .0673332    .1072968
+lag_avg_rating_month |   .0069555   .0022203     3.13   0.002     .0025943    .0113167
+       rating_last_5 |   .0011576   .0025465     0.45   0.650    -.0038443    .0061596
+   ln_lag_volumn_acc |   .0346604   .0084666     4.09   0.000     .0180301    .0512908
+  lag_avg_rating_acc |     .02252   .0310421     0.73   0.468    -.0384539    .0834939
+          lag_sd_acc |  -.0124849   .0378493    -0.33   0.742    -.0868297    .0618599
+   ln_avg_com_RevPAR |   .1303216   .0136948     9.52   0.000     .1034218    .1572214
+ ln_lag_RevPAR_clean |   .3977052    .028684    13.87   0.000     .3413631    .4540473
+               _cons |   1.561693   .1724688     9.05   0.000     1.222924    1.900461
+--------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       558         558           0    *|
+      ym_date |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store t8_scope30
+
+. 
+. reghdfe ln_RevPAR_clean sim_mean_35 ///
+>     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+>     ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+>     ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
+>     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 2 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     33,546
+Absorbing 2 HDFE groups                           F(  10,    557) =      78.73
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8568
+                                                  Adj R-squared   =     0.8537
+                                                  Within R-sq.    =     0.2512
+Number of clusters (hotel_id_num) =        558    Root MSE        =     0.2655
+
+                                 (Std. err. adjusted for 558 clusters in hotel_id_num)
+--------------------------------------------------------------------------------------
+                     |               Robust
+     ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+         sim_mean_35 |  -.2503249   .1146152    -2.18   0.029    -.4754556   -.0251941
+        recent_sd_10 |  -.0117227   .0074996    -1.56   0.119    -.0264537    .0030083
+ ln_recent_volumn_10 |   .0873121   .0101537     8.60   0.000      .067368    .1072563
+lag_avg_rating_month |   .0069253   .0022251     3.11   0.002     .0025547    .0112959
+       rating_last_5 |   .0011558   .0025406     0.45   0.649    -.0038346    .0061462
+   ln_lag_volumn_acc |   .0347361   .0084539     4.11   0.000     .0181306    .0513416
+  lag_avg_rating_acc |   .0229093   .0310479     0.74   0.461    -.0380759    .0838946
+          lag_sd_acc |  -.0132285   .0378749    -0.35   0.727    -.0876236    .0611666
+   ln_avg_com_RevPAR |   .1302982   .0136966     9.51   0.000     .1033949    .1572015
+ ln_lag_RevPAR_clean |   .3977456   .0286636    13.88   0.000     .3414436    .4540476
+               _cons |   1.562278   .1722298     9.07   0.000     1.223979    1.900578
+--------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       558         558           0    *|
+      ym_date |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store t8_scope35
+
+. 
+. reghdfe ln_RevPAR_clean sim_mean_40 ///
+>     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+>     ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+>     ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
+>     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 2 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     33,546
+Absorbing 2 HDFE groups                           F(  10,    557) =      78.72
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8567
+                                                  Adj R-squared   =     0.8537
+                                                  Within R-sq.    =     0.2511
+Number of clusters (hotel_id_num) =        558    Root MSE        =     0.2656
+
+                                 (Std. err. adjusted for 558 clusters in hotel_id_num)
+--------------------------------------------------------------------------------------
+                     |               Robust
+     ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+         sim_mean_40 |   -.203453   .1201449    -1.69   0.091    -.4394456    .0325395
+        recent_sd_10 |  -.0103475    .007482    -1.38   0.167    -.0250439    .0043488
+ ln_recent_volumn_10 |   .0863465   .0101282     8.53   0.000     .0664523    .1062407
+lag_avg_rating_month |   .0068527   .0022281     3.08   0.002     .0024761    .0112292
+       rating_last_5 |   .0010985   .0025356     0.43   0.665     -.003882     .006079
+   ln_lag_volumn_acc |   .0344503   .0084481     4.08   0.000     .0178563    .0510444
+  lag_avg_rating_acc |   .0223387    .031053     0.72   0.472    -.0386566    .0833341
+          lag_sd_acc |  -.0133261   .0378935    -0.35   0.725    -.0877577    .0611056
+   ln_avg_com_RevPAR |   .1302414   .0136981     9.51   0.000     .1033352    .1571475
+ ln_lag_RevPAR_clean |   .3978915   .0286602    13.88   0.000     .3415963    .4541868
+               _cons |   1.553702   .1721857     9.02   0.000     1.215489    1.891914
+--------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       558         558           0    *|
+      ym_date |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store t8_scope40
+
+. 
+. reghdfe ln_RevPAR_clean sim_mean_45 ///
+>     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+>     ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+>     ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
+>     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 2 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     33,546
+Absorbing 2 HDFE groups                           F(  10,    557) =      78.64
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8567
+                                                  Adj R-squared   =     0.8537
+                                                  Within R-sq.    =     0.2511
+Number of clusters (hotel_id_num) =        558    Root MSE        =     0.2656
+
+                                 (Std. err. adjusted for 558 clusters in hotel_id_num)
+--------------------------------------------------------------------------------------
+                     |               Robust
+     ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+         sim_mean_45 |  -.1813861   .1270482    -1.43   0.154    -.4309383    .0681661
+        recent_sd_10 |  -.0096364   .0075177    -1.28   0.200    -.0244029    .0051301
+ ln_recent_volumn_10 |   .0858592   .0101773     8.44   0.000     .0658687    .1058498
+lag_avg_rating_month |    .006814   .0022243     3.06   0.002      .002445     .011183
+       rating_last_5 |   .0010664   .0025391     0.42   0.675     -.003921    .0060537
+   ln_lag_volumn_acc |    .034328   .0084762     4.05   0.000     .0176787    .0509773
+  lag_avg_rating_acc |   .0220979    .031054     0.71   0.477    -.0388994    .0830952
+          lag_sd_acc |  -.0133784     .03793    -0.35   0.724    -.0878819     .061125
+   ln_avg_com_RevPAR |   .1302106   .0136976     9.51   0.000     .1033053    .1571158
+ ln_lag_RevPAR_clean |   .3979766   .0286767    13.88   0.000     .3416489    .4543044
+               _cons |   1.549501   .1729243     8.96   0.000     1.209837    1.889164
+--------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       558         558           0    *|
+      ym_date |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store t8_scope45
+
+. 
+. reghdfe ln_RevPAR_clean sim_mean_50 ///
+>     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+>     ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+>     ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
+>     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+(dropped 2 singleton observations)
+(MWFE estimator converged in 7 iterations)
+
+HDFE Linear regression                            Number of obs   =     33,546
+Absorbing 2 HDFE groups                           F(  10,    557) =      78.64
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.8567
+                                                  Adj R-squared   =     0.8537
+                                                  Within R-sq.    =     0.2511
+Number of clusters (hotel_id_num) =        558    Root MSE        =     0.2656
+
+                                 (Std. err. adjusted for 558 clusters in hotel_id_num)
+--------------------------------------------------------------------------------------
+                     |               Robust
+     ln_RevPAR_clean | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+---------------------+----------------------------------------------------------------
+         sim_mean_50 |  -.1960757   .1311365    -1.50   0.135    -.4536583    .0615069
+        recent_sd_10 |  -.0096311   .0075402    -1.28   0.202    -.0244417    .0051795
+ ln_recent_volumn_10 |   .0860136   .0102018     8.43   0.000     .0659749    .1060522
+lag_avg_rating_month |   .0068066   .0022232     3.06   0.002     .0024398    .0111735
+       rating_last_5 |   .0010697   .0025379     0.42   0.674    -.0039153    .0060546
+   ln_lag_volumn_acc |   .0344612     .00848     4.06   0.000     .0178046    .0511178
+  lag_avg_rating_acc |   .0223585   .0310747     0.72   0.472    -.0386794    .0833964
+          lag_sd_acc |   -.013898   .0379619    -0.37   0.714     -.088464     .060668
+   ln_avg_com_RevPAR |   .1301803   .0136958     9.51   0.000     .1032785     .157082
+ ln_lag_RevPAR_clean |   .3979978    .028678    13.88   0.000     .3416674    .4543281
+               _cons |   1.552209   .1730153     8.97   0.000     1.212366    1.892051
+--------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+------------------------------------------------------+
+  Absorbed FE | Categories  - Redundant  = Num. Coefs |
+--------------+---------------------------------------|
+ hotel_id_num |       558         558           0    *|
+      ym_date |       135           1         134     |
+------------------------------------------------------+
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. estimates store t8_scope50
+
+. 
+. esttab t8_scope5 t8_scope10 t8_scope15 t8_scope20 t8_scope30 ///
+>     t8_scope35 t8_scope40 t8_scope45 t8_scope50, ///
+>     order(sim_mean_5 sim_mean_10 sim_mean_15 sim_mean_20 sim_mean_30 ///
+>     sim_mean_35 sim_mean_40 sim_mean_45 sim_mean_50 recent_sd_10 ///
+>     ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc ///
+>     lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean) ///
+>     cells(b(star fmt(3)) se(par fmt(3))) ///
+>     star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
+>     stats(N r2_a, labels("Observations" "Adjusted R-squared") fmt(%12.0fc %9.3f)) ///
+>     mtitles("5" "10" "15" "20" "30" "35" "40" "45" "50") label nogap compress
+
+----------------------------------------------------------------------------------------------------------------------------------------------
+                       (1)           (2)           (3)           (4)           (5)           (6)           (7)           (8)           (9)    
+                         5            10            15            20            30            35            40            45            50    
+                      b/se          b/se          b/se          b/se          b/se          b/se          b/se          b/se          b/se    
+----------------------------------------------------------------------------------------------------------------------------------------------
+sim_mean_5          -0.129***                                                                                                                 
+                   (0.047)                                                                                                                    
+sim_mean_10                       -0.180***                                                                                                   
+                                 (0.068)                                                                                                      
+sim_mean_15                                     -0.210**                                                                                      
+                                               (0.082)                                                                                        
+sim_mean_20                                                   -0.277***                                                                       
+                                                             (0.093)                                                                          
+sim_mean_30                                                                 -0.243**                                                          
+                                                                           (0.108)                                                            
+sim_mean_35                                                                               -0.250**                                            
+                                                                                         (0.115)                                              
+sim_mean_40                                                                                             -0.203*                               
+                                                                                                       (0.120)                                
+sim_mean_45                                                                                                           -0.181                  
+                                                                                                                     (0.127)                  
+sim_mean_50                                                                                                                         -0.196    
+                                                                                                                                   (0.131)    
+recent_sd_10        -0.012        -0.015*       -0.015*       -0.015**      -0.012        -0.012        -0.010        -0.010        -0.010    
+                   (0.008)       (0.008)       (0.008)       (0.008)       (0.008)       (0.007)       (0.007)       (0.008)       (0.008)    
+ln_recent_vol~10     0.086****     0.087****     0.087****     0.088****     0.087****     0.087****     0.086****     0.086****     0.086****
+                   (0.010)       (0.010)       (0.010)       (0.010)       (0.010)       (0.010)       (0.010)       (0.010)       (0.010)    
+lag_avg_rating~h     0.007***      0.007***      0.007***      0.007***      0.007***      0.007***      0.007***      0.007***      0.007*** 
+                   (0.002)       (0.002)       (0.002)       (0.002)       (0.002)       (0.002)       (0.002)       (0.002)       (0.002)    
+rating_last_5        0.001         0.001         0.001         0.001         0.001         0.001         0.001         0.001         0.001    
+                   (0.003)       (0.003)       (0.003)       (0.003)       (0.003)       (0.003)       (0.003)       (0.003)       (0.003)    
+ln_lag_volumn_~c     0.034****     0.034****     0.034****     0.035****     0.035****     0.035****     0.034****     0.034****     0.034****
+                   (0.008)       (0.008)       (0.008)       (0.008)       (0.008)       (0.008)       (0.008)       (0.008)       (0.008)    
+lag_avg_rating~c     0.019         0.020         0.021         0.022         0.023         0.023         0.022         0.022         0.022    
+                   (0.031)       (0.031)       (0.031)       (0.031)       (0.031)       (0.031)       (0.031)       (0.031)       (0.031)    
+lag_sd_acc          -0.008        -0.007        -0.009        -0.010        -0.012        -0.013        -0.013        -0.013        -0.014    
+                   (0.038)       (0.038)       (0.038)       (0.038)       (0.038)       (0.038)       (0.038)       (0.038)       (0.038)    
+ln_avg_com_Rev~R     0.130****     0.130****     0.130****     0.130****     0.130****     0.130****     0.130****     0.130****     0.130****
+                   (0.014)       (0.014)       (0.014)       (0.014)       (0.014)       (0.014)       (0.014)       (0.014)       (0.014)    
+ln_lag_RevPAR_~n     0.398****     0.398****     0.398****     0.398****     0.398****     0.398****     0.398****     0.398****     0.398****
+                   (0.029)       (0.029)       (0.029)       (0.029)       (0.029)       (0.029)       (0.029)       (0.029)       (0.029)    
+Constant             1.545****     1.556****     1.559****     1.570****     1.562****     1.562****     1.554****     1.550****     1.552****
+                   (0.173)       (0.173)       (0.173)       (0.173)       (0.172)       (0.172)       (0.172)       (0.173)       (0.173)    
+----------------------------------------------------------------------------------------------------------------------------------------------
+Observations        33,546        33,546        33,546        33,546        33,546        33,546        33,546        33,546        33,546    
+Adjusted R-squ~d     0.854         0.854         0.854         0.854         0.854         0.854         0.854         0.854         0.854    
+----------------------------------------------------------------------------------------------------------------------------------------------
+
+. 
+. log close
+      name:  <unnamed>
+       log:  /Users/samxie/Research/ReviewSimi_Sales/Code/stata-log/run_tables5_8_new_controls_260722.log
+  log type:  text
+ closed on:  22 Jul 2026, 13:26:56
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+. 
+end of do-file
