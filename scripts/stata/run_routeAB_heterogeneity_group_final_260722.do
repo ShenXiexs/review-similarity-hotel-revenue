@@ -4,35 +4,12 @@
 * Final deliverables only: one DTA and one RTF.
 ************************************************************
 
-version 17.0
-clear all
-set more off
-set linesize 255
-capture log close _all
-mata: mata set matafavor speed
-
-local project "/Users/samxie/Research/ReviewSimi_Sales/Code"
-local data_main "`project'/outputs/core_simi_260501/data/routeAB_heterogeneity_final_260715.dta"
-local data_final "`project'/outputs/core_simi_260501/data/routeAB_heterogeneity_final_260715.dta"
-local rtf_final "`project'/outputs/paper/routeAB_heterogeneity_group_interaction_final_260715.rtf"
-
-foreach f in "`data_main'" {
-    capture confirm file "`f'"
-    if _rc exit 601
-}
-foreach cmd in reghdfe winsor2 esttab bdiff {
-    capture which `cmd'
-    if _rc exit 199
-}
-
 ************************************************************
 * 1. Load the prepared Route-A/Route-B analysis panel.
 * The input DTA already contains profile fields, the final literal 1.0--5.0
 * star scale, the common complete-case flag, and Scope-10 MR variables.
 ************************************************************
 
-use "`data_main'", clear
-keep if cs_sample_focus100 == 1
 
 capture confirm variable hotel_id_num
 if _rc {
@@ -49,6 +26,7 @@ sort hotel_id_num ym
 
 * The prepared panel already has 1--99 winsorized fields.  Construct the
 * 1--95 and 5--95 variants only when later modules require them.
+******method1*********
 capture confirm variable ln_RevPAR_clean_w199
 if _rc winsor2 ln_RevPAR_clean, cuts(1 99) suffix(_w199)
 capture confirm variable ln_lag_RevPAR_clean_w199
@@ -63,7 +41,7 @@ capture confirm variable ln_lag_RevPAR_clean_w595
 if _rc winsor2 ln_lag_RevPAR_clean, cuts(5 95) suffix(_w595)
 
 
-
+******method2*********
 capture confirm variable ln_RevPAR_clean_w199
 if _rc winsor2 ln_RevPAR_clean, cuts(1 99) by(City ym) suffix(_w199)
 
@@ -96,7 +74,7 @@ label variable het_base_cc "Common complete-case sample"
 label variable sim_mean "ARS"
 label variable recent_sd_10 "Recent rating SD"
 label variable ln_recent_volumn_10 "ln(Recent review volume)"
-label variable lag_avg_rating_month rating_last_5 "Recent rating"
+label variable lag_avg_rating_month"Recent rating"
 label variable ln_lag_volumn_acc "ln(Accumulated review volume)"
 label variable lag_avg_rating_acc "Accumulated rating"
 label variable lag_sd_acc "Accumulated rating SD"
@@ -106,9 +84,6 @@ label variable star_class "Hotel star class (actual 1.0--5.0 scale)"
 label define het_lowhigh 0 "Low" 1 "High", replace
 
 estimates clear
-
-
-
 
 
 ************************************************************
@@ -122,8 +97,7 @@ gen byte het_high_acc_rating = .
 replace het_high_acc_rating = 0 if lag_avg_rating_acc < het_med_acc_rating & het_base_cc
 replace het_high_acc_rating = 1 if lag_avg_rating_acc >= het_med_acc_rating & het_base_cc
 
-
-
+	
 reghdfe ln_RevPAR_clean_w199 sim_mean ///
     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc ///
     lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 ///
@@ -168,8 +142,7 @@ bysort City ym: egen double het_med_mon_rating = median(lag_avg_rating_month) if
 gen byte het_high_mon_rating = .
 replace het_high_mon_rating = 0 if lag_avg_rating_month < het_med_mon_rating & het_base_cc
 replace het_high_mon_rating = 1 if lag_avg_rating_month >= het_med_mon_rating & het_base_cc
-
-
+	
 reghdfe ln_RevPAR_clean sim_mean ///
     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc ///
     lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 ///
@@ -216,6 +189,7 @@ gen byte het_high_acc_volume = .
 replace het_high_acc_volume = 0 if ln_lag_volumn_acc < het_med_acc_volume & het_base_cc
 replace het_high_acc_volume = 1 if ln_lag_volumn_acc > het_med_acc_volume & het_base_cc
 
+
 reghdfe ln_RevPAR_clean_w595 sim_mean ///
     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc ///
     lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean ///
@@ -260,6 +234,11 @@ gen byte het_high_re_volume = .
 replace het_high_re_volume = 0 if ln_recent_volumn_10 < het_med_re_volume
 replace het_high_re_volume = 1 if ln_recent_volumn_10 > het_med_re_volume
 
+
+reghdfe ln_RevPAR_clean_w595 c.sim_mean##c.ln_recent_volumn_10 ///
+    recent_sd_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc ///
+    lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean ///
+   , absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 
 reghdfe ln_RevPAR_clean_w595 sim_mean ///
     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc ///
@@ -558,7 +537,7 @@ bdiff, group(het_high_experience_style) ///
         ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
         ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
         absorb(hotel_id_num ym) cluster(hotel_id_num)) ///
-    reps(500) seed(260715) first
+    reps(500) seed(260722) first
 
 esttab low_experience_style high_experience_style ///
     using "heterogeneity_experience_style.rtf", replace rtf ///
@@ -571,9 +550,54 @@ esttab low_experience_style high_experience_style ///
     stats(N r2_a, labels("Observations" "Adjusted R-squared") fmt(%12.0fc %9.3f)) ///
     label nogap compress
 
-
 ************************************************************
-* 13. Travelers' Choice badge
+* 10-1. Platform rank status
+************************************************************
+
+capture drop het_med_rank_status
+capture drop het_high_rank_status
+
+bysort City ym: egen double het_med_rank_status = median(hotel_rank_pct) if het_base_cc
+gen het_high_rank_status = .
+replace het_high_rank_status = 0 if hotel_rank_pct < het_med_rank_status
+replace het_high_rank_status = 1 if hotel_rank_pct >= het_med_rank_status
+
+
+reghdfe ln_RevPAR_clean_w199 sim_mean ///
+    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc ///
+    lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean_w195 ///
+    if hotel_rank_pct < het_med_rank_status, ///
+    absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+estimates store low_rank_status
+
+reghdfe ln_RevPAR_clean_w199 sim_mean ///
+    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc ///
+    lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean_w195 ///
+    if hotel_rank_pct >= het_med_rank_status, ///
+    absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+estimates store high_rank_status
+
+bdiff, group(het_high_rank_status) ///
+    model(reghdfe ln_RevPAR_clean_w199 sim_mean ///
+        recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+        ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+        ln_avg_com_RevPAR ln_lag_RevPAR_clean_w195, ///
+        absorb(hotel_id_num ym) cluster(hotel_id_num)) ///
+    reps(500) seed(260715) first
+
+esttab low_rank_status high_rank_status using "heterogeneity_rank_status_0722.rtf", replace rtf ///
+    order(sim_mean ///
+        ln_recent_volumn_10 recent_sd_10 lag_avg_rating_month rating_last_5 ///
+        ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+        ln_avg_com_RevPAR ln_lag_RevPAR_clean_w195) ///
+    cells(b(star fmt(3)) se(par fmt(3))) ///
+    star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
+    stats(N r2_a, labels("Observations" "Adjusted R-squared") fmt(%12.0fc %9.3f)) ///
+    label nogap compress
+
+	
+************************************************************
+* 10-2. Travelers' Choice badge
 ************************************************************
 
 capture drop het_high_travelers_choice
@@ -589,14 +613,14 @@ replace het_high_travelers_choice = 0 if missing(travelers_choice)
 
 reghdfe ln_RevPAR_clean sim_mean ///
     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc ///
-    lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean ///
+    lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean_w195 ///
     if het_high_travelers_choice == 0, ///
     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 estimates store low_travelers_choice
 
 reghdfe ln_RevPAR_clean sim_mean ///
     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc ///
-    lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean ///
+    lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean_w195 ///
     if het_high_travelers_choice == 1, ///
     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 estimates store high_travelers_choice
@@ -605,15 +629,15 @@ bdiff, group(het_high_travelers_choice) ///
     model(reghdfe ln_RevPAR_clean sim_mean ///
         recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
         ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-        ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
+        ln_avg_com_RevPAR ln_lag_RevPAR_clean_w195, ///
         absorb(hotel_id_num ym) cluster(hotel_id_num)) ///
-    reps(500) seed(260715) first
+    reps(500) seed(260722) first
 
-esttab low_travelers_choice high_travelers_choice using "heterogeneity_travelers_choice.rtf", replace rtf ///
+esttab low_travelers_choice high_travelers_choice using "heterogeneity_travelers_choice_0722.rtf", replace rtf ///
     order(sim_mean ///
         ln_recent_volumn_10 recent_sd_10 lag_avg_rating_month rating_last_5 ///
         ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-        ln_avg_com_RevPAR ln_lag_RevPAR_clean) ///
+        ln_avg_com_RevPAR ln_lag_RevPAR_clean_w195) ///
     cells(b(star fmt(3)) se(par fmt(3))) ///
     star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
     stats(N r2_a, labels("Observations" "Adjusted R-squared") fmt(%12.0fc %9.3f)) ///
@@ -621,14 +645,14 @@ esttab low_travelers_choice high_travelers_choice using "heterogeneity_travelers
 
 
 ************************************************************
-* 14. Scope-10 net-positive Bing sentiment
+* 11. Scope-10 net-positive Bing sentiment
 ************************************************************
 
 capture drop het_med_sent_net_pos_bing_10
 capture drop het_high_sent_net_pos_bing_10
 
 bysort City ym: egen double het_med_sent_net_pos_bing_10 = ///
-    median(sent_net_pos_bing_10) if het_base_cc & sent_any_text_10 == 1
+    median(sent_net_pos_bing_10) if sent_any_text_10 == 1
 gen het_high_sent_net_pos_bing_10 = .
 replace het_high_sent_net_pos_bing_10 = 0 ///
     if sent_net_pos_bing_10 < het_med_sent_net_pos_bing_10 & !missing(het_med_sent_net_pos_bing_10)
@@ -645,7 +669,7 @@ estimates store low_sent_net_pos_bing_10
 reghdfe ln_RevPAR_clean_w199 sim_mean ///
     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc ///
     lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean ///
-    if sent_net_pos_bing_10 >= het_med_sent_net_pos_bing_10, ///
+    if sent_net_pos_bing_10 > het_med_sent_net_pos_bing_10, ///
     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 estimates store high_sent_net_pos_bing_10
 
@@ -661,7 +685,7 @@ esttab low_sent_net_pos_bing_10 high_sent_net_pos_bing_10 using "heterogeneity_s
     order(sim_mean ///
         ln_recent_volumn_10 recent_sd_10 lag_avg_rating_month rating_last_5 ///
         ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-        ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595) ///
+        ln_avg_com_RevPAR ln_lag_RevPAR_clean) ///
     cells(b(star fmt(3)) se(par fmt(3))) ///
     star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
     stats(N r2_a, labels("Observations" "Adjusted R-squared") fmt(%12.0fc %9.3f)) ///
@@ -669,35 +693,44 @@ esttab low_sent_net_pos_bing_10 high_sent_net_pos_bing_10 using "heterogeneity_s
 
 
 ************************************************************
-* 15-1. Lagged management reply rate
+* 12. Management response rate
 ************************************************************
 
-capture drop med_lag_mr_rate
+capture drop med_t14_response_rate
 capture drop g_hi_rate
-bysort Zip ym: egen med_lag_mr_rate = median(lag_mr_rate)
-generate g_hi_rate = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_rate) & lag_mr_rate > med_lag_mr_rate
-replace g_hi_rate = 0 if cs_sample_focus100 == 1 & !missing(lag_mr_rate) & lag_mr_rate < med_lag_mr_rate
 
-reghdfe ln_RevPAR_clean_w199 sim_mean ///
-    ln_recent_volumn_10 recent_sd_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 ///
-    if cs_sample_focus100 == 1 & g_hi_rate == 0, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+egen double med_t14_response_rate = ///
+    median(t14_response_rate) if t14_common_cc == 1
+
+gen byte g_hi_rate = .
+replace g_hi_rate = 0 if t14_common_cc == 1 & ///
+    t14_response_rate < med_t14_response_rate
+replace g_hi_rate = 1 if t14_common_cc == 1 & ///
+    t14_response_rate >= med_t14_response_rate
+
+reghdfe ln_RevPAR_clean_w195 sim_mean ///
+    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+    ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w195 t14_response_rate ///
+    if t14_common_cc == 1 & t14_high_response_rate == 0, ///
+    absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store low_mr_rate
 
 reghdfe ln_RevPAR_clean_w199 sim_mean ///
-    ln_recent_volumn_10 recent_sd_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+    ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
     ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 ///
-    if cs_sample_focus100 == 1 & g_hi_rate == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+    if t14_common_cc == 1 & t14_high_response_rate == 1, ///
+    absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store high_mr_rate
 
-
-bdiff, group(g_hi_rate) ///
+bdiff, group(t14_high_response_rate) ///
     model(reghdfe ln_RevPAR_clean_w199 sim_mean ///
         recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
         ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
         ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595, ///
         absorb(hotel_id_num ym) cluster(hotel_id_num)) ///
-    reps(500) seed(260715) first
+    reps(500) seed(260718) first
 
 esttab low_mr_rate high_mr_rate using "heterogeneity_mr_rate.rtf", replace rtf ///
     order(sim_mean ///
@@ -710,86 +743,38 @@ esttab low_mr_rate high_mr_rate using "heterogeneity_mr_rate.rtf", replace rtf /
     label nogap compress
 
 ************************************************************
-* 15-2. Lagged Scope-10 management reply rate
-* Conditional on at least one visible Scope-10 reply.
+* 13. Average management response length: group construction
 ************************************************************
 
-capture drop het_med_scope10_mr_rate
-capture drop het_high_scope10_mr_rate
-
-bysort Zip ym: egen double het_med_scope10_mr_rate = ///
-    median(lag_scope10_mr_rate) ///
-    if het_base_cc & lag_scope10_mr_reply_n > 0
-
-gen het_high_scope10_mr_rate = .
-replace het_high_scope10_mr_rate = 0 ///
-    if het_base_cc & lag_scope10_mr_reply_n > 0 & ///
-    lag_scope10_mr_rate < het_med_scope10_mr_rate
-replace het_high_scope10_mr_rate = 1 ///
-    if het_base_cc & lag_scope10_mr_reply_n > 0 & ///
-    lag_scope10_mr_rate > het_med_scope10_mr_rate
-
-reghdfe ln_RevPAR_clean_w199 sim_mean ///
-    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc ///
-    lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean ///
-    if het_high_scope10_mr_rate == 0, ///
-    absorb(hotel_id_num ym) vce(cluster hotel_id_num)
-estimates store low_scope10_mr_rate
-
-reghdfe ln_RevPAR_clean_w199 sim_mean ///
-    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc ///
-    lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 ///
-    if het_high_scope10_mr_rate == 1, ///
-    absorb(hotel_id_num ym) vce(cluster hotel_id_num)
-estimates store high_scope10_mr_rate
-
-bdiff, group(het_high_scope10_mr_rate) ///
-    model(reghdfe ln_RevPAR_clean_w199 sim_mean ///
-        recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
-        ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-        ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595, ///
-        absorb(hotel_id_num ym) cluster(hotel_id_num)) ///
-    reps(500) seed(260715) first
-
-esttab low_scope10_mr_rate high_scope10_mr_rate ///
-    using "heterogeneity_scope10_mr_rate.rtf", replace rtf ///
-    order(sim_mean ///
-        ln_recent_volumn_10 recent_sd_10 lag_avg_rating_month rating_last_5 ///
-        ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-        ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595) ///
-    cells(b(star fmt(3)) se(par fmt(3))) ///
-    star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
-    stats(N r2_a, labels("Observations" "Adjusted R-squared") ///
-        fmt(%12.0fc %9.3f)) ///
-    label nogap compress
-
-************************************************************
-* 16-1. Average management response length
-************************************************************
-capture drop ln_lag_mr_words
-capture drop ln_lag_mr_avg_words
-gen double ln_lag_mr_words = ln(lag_mr_text_words + 1) if !missing(lag_mr_text_words)
-gen double ln_lag_mr_avg_words = ln(lag_mr_avg_text_words + 1) if !missing(lag_mr_avg_text_words)
-
-capture drop med_ln_lag_mr_words
+capture drop med_t14_response_length
 capture drop g_hi_words
-bysort Zip ym: egen med_ln_lag_mr_words = median(ln_lag_mr_words)
-generate g_hi_words = 1 if cs_sample_focus100 == 1 & !missing(ln_lag_mr_words) & ln_lag_mr_words > med_ln_lag_mr_words
-replace g_hi_words = 0 if cs_sample_focus100 == 1 & !missing(ln_lag_mr_words) & ln_lag_mr_words < med_ln_lag_mr_words
+
+egen double med_t14_response_length = ///
+    median(t14_response_length) if t14_common_cc == 1
+
+gen byte g_hi_words = .
+replace g_hi_words = 0 if t14_common_cc == 1 & ///
+    t14_response_length < med_t14_response_length
+replace g_hi_words = 1 if t14_common_cc == 1 & ///
+    t14_response_length >= med_t14_response_length
 
 reghdfe ln_RevPAR_clean_w199 sim_mean ///
-    ln_recent_volumn_10 recent_sd_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 ///
-    if cs_sample_focus100 == 1 & g_hi_words == 0, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+    ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 t14_response_rate ///
+    if t14_common_cc == 1 & t14_high_response_length == 0, ///
+    absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store low_mr_avg_words
 
 reghdfe ln_RevPAR_clean_w199 sim_mean ///
-    ln_recent_volumn_10 recent_sd_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 ///
-    if cs_sample_focus100 == 1 & g_hi_words == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+    ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 t14_response_rate ///
+    if t14_common_cc == 1 & t14_high_response_length == 1, ///
+    absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store high_mr_avg_words
 
-bdiff, group(g_hi_words) ///
+bdiff, group(t14_high_response_length) ///
     model(reghdfe ln_RevPAR_clean_w199 sim_mean ///
         recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
         ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
@@ -806,88 +791,46 @@ esttab low_mr_avg_words high_mr_avg_words using "heterogeneity_mr_avg_words.rtf"
     star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
     stats(N r2_a, labels("Observations" "Adjusted R-squared") fmt(%12.0fc %9.3f)) ///
     label nogap compress
+	
+	
 
 ************************************************************
-* 16-2. Lagged Scope-10 average management response length
-* Conditional on a visible Scope-10 reply with nonempty text.
+* 14. Quick management response share
 ************************************************************
 
-capture drop het_med_scope10_mr_avg_words
-capture drop het_high_scope10_mr_avg_words
+capture drop med_t14_response_speed
+capture drop g_hi_quick30
 
-bysort Zip ym: egen double het_med_scope10_mr_avg_words = ///
-    median(lag_scope10_mr_avg_text_words) ///
-    if het_base_cc & lag_scope10_mr_text_reply_n > 0
+egen double med_t14_response_speed = ///
+    median(t14_response_speed) if t14_common_cc == 1
 
-gen het_high_scope10_mr_avg_words = .
-replace het_high_scope10_mr_avg_words = 0 ///
-    if het_base_cc & lag_scope10_mr_text_reply_n > 0 & ///
-    lag_scope10_mr_avg_text_words < het_med_scope10_mr_avg_words
-replace het_high_scope10_mr_avg_words = 1 ///
-    if het_base_cc & lag_scope10_mr_text_reply_n > 0 & ///
-    lag_scope10_mr_avg_text_words > het_med_scope10_mr_avg_words
+gen byte g_hi_quick30 = .
+replace g_hi_quick30 = 0 if t14_common_cc == 1 & ///
+    t14_response_speed < med_t14_response_speed
+replace g_hi_quick30 = 1 if t14_common_cc == 1 & ///
+    t14_response_speed >= med_t14_response_speed
 
 reghdfe ln_RevPAR_clean_w199 sim_mean ///
-    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc ///
-    lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 ///
-    if het_high_scope10_mr_avg_words == 0, ///
+    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+    ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 ///
+    if t14_common_cc == 1 & t14_high_response_speed == 0, ///
     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
-estimates store low_scope10_mr_avg_words
+est store quick30_low
 
 reghdfe ln_RevPAR_clean_w199 sim_mean ///
-    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc ///
-    lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 ///
-    if het_high_scope10_mr_avg_words == 1, ///
+    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+    ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 ///
+    if t14_common_cc == 1 & t14_high_response_speed == 1, ///
     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
-estimates store high_scope10_mr_avg_words
+est store quick30_high
 
-bdiff, group(het_high_scope10_mr_avg_words) ///
+bdiff, group(t14_high_response_speed) ///
     model(reghdfe ln_RevPAR_clean_w199 sim_mean ///
         recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
         ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
         ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595, ///
-        absorb(hotel_id_num ym) cluster(hotel_id_num)) ///
-    reps(500) seed(260715) first
-
-esttab low_scope10_mr_avg_words high_scope10_mr_avg_words ///
-    using "heterogeneity_scope10_mr_avg_words.rtf", replace rtf ///
-    order(sim_mean ///
-        ln_recent_volumn_10 recent_sd_10 lag_avg_rating_month rating_last_5 ///
-        ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-        ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595) ///
-    cells(b(star fmt(3)) se(par fmt(3))) ///
-    star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
-    stats(N r2_a, labels("Observations" "Adjusted R-squared") ///
-        fmt(%12.0fc %9.3f)) ///
-    label nogap compress
-
-************************************************************
-* 17. Quick management response share
-************************************************************
-
-capture drop med_lag_mr_quick30_share
-capture drop g_hi_quick30
-bysort Zip ym: egen med_lag_mr_quick30_share = median(lag_mr_quick30_share)
-generate g_hi_quick30 = 1 if cs_sample_focus100 == 1 & !missing(lag_mr_quick30_share) & lag_mr_quick30_share > med_lag_mr_quick30_share
-replace g_hi_quick30 = 0 if cs_sample_focus100 == 1 & !missing(lag_mr_quick30_share) & lag_mr_quick30_share < med_lag_mr_quick30_share
-
-reghdfe ln_RevPAR_clean_w195 sim_mean ///
-    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 ///
-    if cs_sample_focus100 == 1 & g_hi_quick30 == 0, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
-est store quick30_low
-
-reghdfe ln_RevPAR_clean_w195 sim_mean ///
-    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199 ///
-    if cs_sample_focus100 == 1 & g_hi_quick30 == 1, absorb(hotel_id_num ym) vce(cluster hotel_id_num)
-est store quick30_high
-
-bdiff, group(g_hi_quick30) ///
-    model(reghdfe ln_RevPAR_clean_w195 sim_mean ///
-        recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
-        ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-        ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199, ///
         absorb(hotel_id_num ym) cluster(hotel_id_num)) ///
     reps(500) seed(260718) first
 
@@ -895,62 +838,250 @@ esttab quick30_low quick30_high using "heterogeneity_mr_quick30.rtf", replace rt
     order(sim_mean ///
         ln_recent_volumn_10 recent_sd_10 lag_avg_rating_month rating_last_5 ///
         ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-        ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199) ///
+        ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595) ///
     cells(b(star fmt(3)) se(par fmt(3))) ///
     star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
     stats(N r2_a, labels("Observations" "Adjusted R-squared") fmt(%12.0fc %9.3f)) ///
     label nogap compress
 
 ************************************************************
-* 17-2. Lagged Scope-10 quick management response share
-* Conditional on a visible Scope-10 reply with valid response timing.
+* 15-1. ZIP full-market HHI
 ************************************************************
 
-capture drop het_med_scope10_mr_quick30
-capture drop het_high_scope10_mr_quick30
+* gen double hhi_zip_full_pct = hhi_zip_full / 100
+label variable hhi_zip_full_pct "HHI (percentage points)"
 
-bysort Zip ym: egen double het_med_scope10_mr_quick30 = ///
-    median(lag_scope10_mr_quick30_share) ///
-    if het_base_cc & lag_scope10_mr_timing_n > 0
+capture drop med_hhi_zip_full
+capture drop g_hi_hhi_zip_full
 
-gen het_high_scope10_mr_quick30 = .
-replace het_high_scope10_mr_quick30 = 0 ///
-    if het_base_cc & lag_scope10_mr_timing_n > 0 & ///
-    lag_scope10_mr_quick30_share < het_med_scope10_mr_quick30
-replace het_high_scope10_mr_quick30 = 1 ///
-    if het_base_cc & lag_scope10_mr_timing_n > 0 & ///
-    lag_scope10_mr_quick30_share > het_med_scope10_mr_quick30
+egen double med_hhi_zip_full = median(hhi_zip_full_pct)
 
-reghdfe ln_RevPAR_clean_w199 sim_mean ///
-    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc ///
-    lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean ///
-    if het_high_scope10_mr_quick30 == 0, ///
+gen byte g_hi_hhi_zip_full = .
+replace g_hi_hhi_zip_full = 0 if !missing(hhi_zip_full) & hhi_zip_full_pct < med_hhi_zip_full
+replace g_hi_hhi_zip_full = 1 if !missing(hhi_zip_full) & hhi_zip_full_pct >= med_hhi_zip_full
+
+reghdfe ln_RevPAR_clean sim_mean ///
+    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+    ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 ///
+    if g_hi_hhi_zip_full == 0, ///
     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
-estimates store low_scope10_mr_quick30
+est store hhi_zip_full_low
 
-reghdfe ln_RevPAR_clean_w199 sim_mean ///
-    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc ///
-    lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean ///
-    if het_high_scope10_mr_quick30 == 1, ///
+reghdfe ln_RevPAR_clean sim_mean ///
+    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+    ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 ///
+    if g_hi_hhi_zip_full == 1, ///
     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
-estimates store high_scope10_mr_quick30
+est store hhi_zip_full_high
 
-bdiff, group(het_high_scope10_mr_quick30) ///
-    model(reghdfe ln_RevPAR_clean_w199 sim_mean ///
+bdiff, group(g_hi_hhi_zip_full) ///
+    model(reghdfe ln_RevPAR_clean sim_mean ///
         recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
         ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
         ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595, ///
         absorb(hotel_id_num ym) cluster(hotel_id_num)) ///
-    reps(500) seed(260715) first
+    reps(500) seed(260720) first
 
-esttab low_scope10_mr_quick30 high_scope10_mr_quick30 ///
-    using "heterogeneity_scope10_mr_quick30.rtf", replace rtf ///
+esttab hhi_zip_full_low hhi_zip_full_high using "heterogeneity_hhi_zip_full_0722.rtf", replace rtf ///
     order(sim_mean ///
         ln_recent_volumn_10 recent_sd_10 lag_avg_rating_month rating_last_5 ///
         ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
         ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595) ///
     cells(b(star fmt(3)) se(par fmt(3))) ///
     star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
-    stats(N r2_a, labels("Observations" "Adjusted R-squared") ///
-        fmt(%12.0fc %9.3f)) ///
+    stats(N r2_a, labels("Observations" "Adjusted R-squared") fmt(%12.0fc %9.3f)) ///
+    label nogap compress
+	
+
+************************************************************
+* 15-2. ZIP full-market HHI with HHI
+************************************************************
+
+* gen double hhi_zip_full_pct = hhi_zip_full / 100
+label variable hhi_zip_full_pct "HHI (percentage points)"
+
+capture drop med_hhi_zip_full
+capture drop g_hi_hhi_zip_full
+
+egen double med_hhi_zip_full = median(hhi_zip_full_pct)
+
+gen byte g_hi_hhi_zip_full = .
+replace g_hi_hhi_zip_full = 0 if !missing(hhi_zip_full) & hhi_zip_full_pct < med_hhi_zip_full
+replace g_hi_hhi_zip_full = 1 if !missing(hhi_zip_full) & hhi_zip_full_pct >= med_hhi_zip_full
+
+reghdfe ln_RevPAR_clean sim_mean hhi_zip_full_pct ///
+    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+    ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 ///
+    if g_hi_hhi_zip_full == 0, ///
+    absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store hhi_zip_full_low
+
+reghdfe ln_RevPAR_clean sim_mean hhi_zip_full_pct ///
+    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+    ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 hhi_zip_full ///
+    if g_hi_hhi_zip_full == 1, ///
+    absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store hhi_zip_full_high
+
+bdiff, group(g_hi_hhi_zip_full) ///
+    model(reghdfe ln_RevPAR_clean sim_mean ///
+        recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+        ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+        ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595, ///
+        absorb(hotel_id_num ym) cluster(hotel_id_num)) ///
+    reps(500) seed(260722) first
+
+esttab hhi_zip_full_low hhi_zip_full_high using "heterogeneity_hhi_zip_withhhi_0722.rtf", replace rtf ///
+    order(sim_mean hhi_zip_full_pct ///
+        ln_recent_volumn_10 recent_sd_10 lag_avg_rating_month rating_last_5 ///
+        ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+        ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595) ///
+    cells(b(star fmt(3)) se(par fmt(3))) ///
+    star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
+    stats(N r2_a, labels("Observations" "Adjusted R-squared") fmt(%12.0fc %9.3f)) ///
+    label nogap compress
+
+************************************************************
+* 15-3. Zip full-market HHI Inter
+************************************************************	
+
+reghdfe ln_RevPAR_clean c.sim_mean##c.hhi_zip_full_pct ///
+    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+    ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595, ///
+    absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store hhi_zip_full_Inter
+
+esttab hhi_zip_full_Inter using "heterogeneity_hhi_zip_inter_0722.rtf", replace rtf ///
+    order(sim_mean hhi_zip_full_pct c.sim_mean#c.hhi_zip_full_pct ///
+        ln_recent_volumn_10 recent_sd_10 lag_avg_rating_month rating_last_5 ///
+        ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+        ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595) ///
+    cells(b(star fmt(3)) se(par fmt(3))) ///
+    star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
+    stats(N r2_a, labels("Observations" "Adjusted R-squared") fmt(%12.0fc %9.3f)) ///
+    label nogap compress
+
+************************************************************
+* 16-1. City full-market HHI
+************************************************************
+
+capture drop med_hhi_city_full
+capture drop g_hi_hhi_city_full
+
+egen double med_hhi_city_full = median(hhi_city_full)
+
+gen byte g_hi_hhi_city_full = .
+replace g_hi_hhi_city_full = 0 if !missing(hhi_city_full) & hhi_city_full < med_hhi_city_full
+replace g_hi_hhi_city_full = 1 if !missing(hhi_city_full) & hhi_city_full >= med_hhi_city_full
+
+reghdfe ln_RevPAR_clean sim_mean ///
+    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+    ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 ///
+    if g_hi_hhi_city_full == 0, ///
+    absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store hhi_city_full_low
+
+reghdfe ln_RevPAR_clean sim_mean ///
+    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+    ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 ///
+    if g_hi_hhi_city_full == 1, ///
+    absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store hhi_city_full_high
+
+bdiff, group(g_hi_hhi_city_full) ///
+    model(reghdfe ln_RevPAR_clean sim_mean ///
+        recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+        ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+        ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595, ///
+        absorb(hotel_id_num ym) cluster(hotel_id_num)) ///
+    reps(500) seed(260722) first
+
+esttab hhi_city_full_low hhi_city_full_high using "heterogeneity_hhi_city_full_0722.rtf", replace rtf ///
+    order(sim_mean ///
+        ln_recent_volumn_10 recent_sd_10 lag_avg_rating_month rating_last_5 ///
+        ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+        ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595) ///
+    cells(b(star fmt(3)) se(par fmt(3))) ///
+    star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
+    stats(N r2_a, labels("Observations" "Adjusted R-squared") fmt(%12.0fc %9.3f)) ///
+    label nogap compress
+
+	
+************************************************************
+* 16-2. City full-market HHI with HHI
+************************************************************
+
+gen double hhi_city_full_pct = hhi_city_full / 100
+label variable hhi_city_full_pct "HHI (percentage points)"
+
+capture drop med_hhi_city_full
+capture drop g_hi_hhi_city_full
+
+egen double med_hhi_city_full = median(hhi_city_full_pct)
+
+gen byte g_hi_hhi_city_full = .
+replace g_hi_hhi_city_full = 0 if !missing(hhi_city_full_pct) & hhi_city_full_pct < med_hhi_city_full
+replace g_hi_hhi_city_full = 1 if !missing(hhi_city_full_pct) & hhi_city_full_pct >= med_hhi_city_full
+
+reghdfe ln_RevPAR_clean sim_mean hhi_city_full_pct ///
+    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+    ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 ///
+    if g_hi_hhi_city_full == 0, ///
+    absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store hhi_city_full_low
+
+reghdfe ln_RevPAR_clean sim_mean hhi_city_full_pct ///
+    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+    ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 ///
+    if g_hi_hhi_city_full == 1, ///
+    absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store hhi_city_full_high
+
+bdiff, group(g_hi_hhi_city_full) ///
+    model(reghdfe ln_RevPAR_clean sim_mean hhi_city_full_pct ///
+        recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+        ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+        ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595, ///
+        absorb(hotel_id_num ym) cluster(hotel_id_num)) ///
+    reps(500) seed(260722) first
+
+esttab hhi_city_full_low hhi_city_full_high using "heterogeneity_hhi_city_full_0722.rtf", replace rtf ///
+    order(sim_mean hhi_city_full_pct ///
+        ln_recent_volumn_10 recent_sd_10 lag_avg_rating_month rating_last_5 ///
+        ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+        ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595) ///
+    cells(b(star fmt(3)) se(par fmt(3))) ///
+    star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
+    stats(N r2_a, labels("Observations" "Adjusted R-squared") fmt(%12.0fc %9.3f)) ///
+    label nogap compress
+	
+	
+************************************************************
+* 16-3. City full-market HHI Inter
+************************************************************	
+
+reghdfe ln_RevPAR_clean c.sim_mean##c.hhi_city_full_pct ///
+    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+    ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595, ///
+    absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+est store hhi_city_full_Inter
+
+esttab hhi_city_full_Inter using "heterogeneity_hhi_city_inter_0722.rtf", replace rtf ///
+    order(sim_mean hhi_city_full_pct c.sim_mean#c.hhi_city_full_pct ///
+        ln_recent_volumn_10 recent_sd_10 lag_avg_rating_month rating_last_5 ///
+        ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+        ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595) ///
+    cells(b(star fmt(3)) se(par fmt(3))) ///
+    star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
+    stats(N r2_a, labels("Observations" "Adjusted R-squared") fmt(%12.0fc %9.3f)) ///
     label nogap compress

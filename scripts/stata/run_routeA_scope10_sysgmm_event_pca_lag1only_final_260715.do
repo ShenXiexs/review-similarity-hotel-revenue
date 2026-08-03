@@ -143,6 +143,8 @@ foreach v in ///
     recent_sd_10 ///
     ln_recent_volumn_10 ///
     recent_rating_10 ///
+	lag_avg_rating_month ///
+	rating_last_5 ///
     ln_lag_volumn_acc ///
     lag_avg_rating_acc ///
     lag_sd_acc ///
@@ -165,7 +167,8 @@ noisily xtabond2 ///
     sys_sim_mean ///
     sys_recent_sd_10 ///
     sys_ln_recent_volumn_10 ///
-    sys_recent_rating_10 ///
+    sys_lag_avg_rating_month ///
+	sys_rating_last_5 ///
     sys_ln_lag_volumn_acc ///
     sys_lag_avg_rating_acc ///
     sys_lag_sd_acc ///
@@ -177,8 +180,8 @@ noisily xtabond2 ///
         sys_sim_mean ///
         sys_recent_sd_10 ///
         sys_ln_recent_volumn_10 ///
-        sys_recent_rating_10 ///
-        sys_ln_lag_volumn_acc ///
+        sys_rating_last_5 ///
+		sys_lag_avg_rating_month ///
         sys_lag_avg_rating_acc ///
         sys_lag_sd_acc ///
         sys_ln_avg_com_RevPAR) ///
@@ -242,7 +245,8 @@ if 1 {
             sys_sim_mean ///
             sys_recent_sd_10 ///
             sys_ln_recent_volumn_10 ///
-            sys_recent_rating_10 ///
+            sys_rating_last_5 ///
+		    sys_lag_avg_rating_month ///
             sys_ln_lag_volumn_acc ///
             sys_lag_avg_rating_acc ///
             sys_lag_sd_acc ///
