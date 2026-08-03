@@ -1,8 +1,6 @@
 # Review Similarity–Revenue 论文重新定位与理论框架方案
 
-> 版本：2026-08-03  
-> 依据：`outputs/paper/reviewsimi-revenue-0723v1.docx`、`../Shen_Manuscript_Draft_1121.docx`，以及已核实的公开调查和学术文献。  
-> 目标读者：Hospitality 研究者，以及 IS 中关注 consumer decision support / decision analysis 的读者。
+> 2026-08-03
 
 ## 1. 核心判断
 
@@ -28,8 +26,8 @@
 
 ### 2.1 可用于 Introduction 的事实
 
-- Tripadvisor 与 Ipsos MORI 对 12 个市场的 23,292 名用户进行调查，81% 的受访者表示会在预订住宿前经常或总是阅读评论；78% 特别关注最新评论；55% 会跨多个页面阅读多条评论，平均在酒店或餐厅决策前阅读 9 条评论。这组事实直接支持本文的“recent review set”决策场景。[Tripadvisor & Ipsos MORI, 2019](https://ir.tripadvisor.com/news-releases/news-release-details/online-reviews-remain-trusted-source-information-when-booking)
-- 同一调查中，70% 的用户将描述性、helpful 的评论列为使用 Tripadvisor 的主要原因，62% 看重内容的广泛性；这说明消费者不仅需要评分共识，也需要具体且覆盖面广的文本信息。[Tripadvisor & Ipsos MORI, 2019](https://ir.tripadvisor.com/news-releases/news-release-details/online-reviews-remain-trusted-source-information-when-booking)
+- Tripadvisor 与 Ipsos MORI 对 12 个市场的 23,292 名用户进行调查，81% 的受访者表示会在预订住宿前经常或总是阅读评论；78% 特别关注最新评论；55% 会跨多个页面阅读多条评论，平均在酒店或餐厅决策前阅读 9 条评论。这组事实直接支持本文的“recent review set”决策场景。[Tripadvisor &amp; Ipsos MORI, 2019](https://ir.tripadvisor.com/news-releases/news-release-details/online-reviews-remain-trusted-source-information-when-booking)
+- 同一调查中，70% 的用户将描述性、helpful 的评论列为使用 Tripadvisor 的主要原因，62% 看重内容的广泛性；这说明消费者不仅需要评分共识，也需要具体且覆盖面广的文本信息。[Tripadvisor &amp; Ipsos MORI, 2019](https://ir.tripadvisor.com/news-releases/news-release-details/online-reviews-remain-trusted-source-information-when-booking)
 - Tripadvisor 对五个国家约 9,000 名消费者的调查显示，76% 的旅行者偏好住宿场景中的长文本评论；他们关注清洁、位置、价值、房间、服务和设施等不同属性。这可用于说明酒店是一种多属性体验产品，评论集合的属性覆盖具有决策价值。[Tripadvisor hotel shopper survey](https://www.tripadvisor.com/business/insights/hotels/resources/hotel-shoppers-look-for-reviews)
 - YouGov 2024 年覆盖 17 个市场的调查显示，42% 的消费者在选择住宿时更依赖其他消费者的评论，只有 5% 更依赖专业评论，33% 同等依赖两者。这可以作为 peer-generated information 在酒店选择中的现实地位证据。[YouGov, 2024](https://yougov.com/articles/49462-peers-over-pros-more-travellers-rely-on-consumer-feedback-than-critic-reviews-for-accommodation)
 - Tripadvisor 针对 95,608 名旅行者和 7,215 名酒店业经营者的早期调查将“及时、具体、包含个人独特经历和事实细节”列为有用评论的重要特征。这可以辅助引出“重复评论未必继续增加信息”的现实问题。[Tripadvisor helpful-review survey](https://www.tripadvisor.com/TripAdvisorInsights/w753)
@@ -50,14 +48,14 @@
 
 两篇论文应被写成同一研究议程中的互补层级：
 
-| 维度 | Journal of Retailing 论文 | 当前 Revenue 论文 |
-|---|---|---|
-| 分析单位 | focal review 及其相邻评论 | hotel-month 的近期可见评论集合 |
-| 核心问题 | 一条评论在局部序列中是否显得独特、helpful | 整个近期评论集合是否提供足够的非重复决策信息 |
-| 主要结果变量 | perceived helpfulness | 酒店 RevPAR / 经营绩效 |
-| 理论重点 | local redundancy、perceived uniqueness | consensus–coverage trade-off、review-set diagnosticity、经济后果 |
-| 识别与证据 | 大规模评论数据 + controlled experiments | 评论—收入匹配面板、FE、Sys-GMM、替代测量和情境边界 |
-| 管理问题 | 如何排序与呈现评论 | 评论集合结构是否具有可衡量的经营价值，以及何时更重要 |
+| 维度         | Journal of Retailing 论文                 | 当前 Revenue 论文                                                 |
+| ------------ | ----------------------------------------- | ----------------------------------------------------------------- |
+| 分析单位     | focal review 及其相邻评论                 | hotel-month 的近期可见评论集合                                    |
+| 核心问题     | 一条评论在局部序列中是否显得独特、helpful | 整个近期评论集合是否提供足够的非重复决策信息                      |
+| 主要结果变量 | perceived helpfulness                     | 酒店 RevPAR / 经营绩效                                            |
+| 理论重点     | local redundancy、perceived uniqueness    | consensus–coverage trade-off、review-set diagnosticity、经济后果 |
+| 识别与证据   | 大规模评论数据 + controlled experiments   | 评论—收入匹配面板、FE、Sys-GMM、替代测量和情境边界               |
+| 管理问题     | 如何排序与呈现评论                        | 评论集合结构是否具有可衡量的经营价值，以及何时更重要              |
 
 ### 必须遵守的写作边界
 
@@ -77,7 +75,7 @@
 - 局限：即使 volume 和 rating 完全相同，两组评论也可能在语义内容的重复程度和属性覆盖上存在巨大差异。
 - 本文对话方式：不是否定 aggregate signals，而是解释当这些信号已经提供“多少人评论、总体评价如何、评价是否一致”之后，文本集合还提供多少增量信息。
 
-可重点引用：[Babić Rosario et al., 2016](https://doi.org/10.1509/jmr.14.0380)；[Ding, Gao, & Liu, 2022](https://doi.org/10.1016/j.dss.2021.113649)。
+可重点引用：[Babić Rosario et al., 2016](https://doi.org/10.1509/jmr.14.0380)；[Ding, Gao, &amp; Liu, 2022](https://doi.org/10.1016/j.dss.2021.113649)。
 
 ### Stream 2：Individual review content 与信息价值
 
@@ -93,7 +91,7 @@
 
 这一 stream 已经出现两种相反观点，正是本文 tension 的来源。
 
-**观点 A：一致与相似可以有价值。** 当多条评论或 top reviews 与总体评论信号一致时，信息更容易被处理，也可能显得更可信。Jabr 与 Rahman 发现，top-review signal 得到其他评论重申时，其影响会增强。[Jabr & Rahman, 2022](https://doi.org/10.25300/MISQ/2022/16169)
+**观点 A：一致与相似可以有价值。** 当多条评论或 top reviews 与总体评论信号一致时，信息更容易被处理，也可能显得更可信。Jabr 与 Rahman 发现，top-review signal 得到其他评论重申时，其影响会增强。[Jabr &amp; Rahman, 2022](https://doi.org/10.25300/MISQ/2022/16169)
 
 **观点 B：差异与新颖可以有价值。** 团队 Journal of Retailing 论文发现，相邻内容越相似，单条评论越不 helpful，机制是 perceived uniqueness 下降。[Gao et al., 2026](https://doi.org/10.1016/j.jretai.2026.02.005)
 
@@ -226,128 +224,20 @@ COVID 不宜被写成普通 moderator hypothesis。它更适合作为对理论�
 - “发现三个新的 moderators”——新结果已经变化，而且大量分组差异只在 5%–10% 水平。
 - “证明消费者通过某心理机制做出选择”——当前论文没有直接的消费者过程测量。
 
-## 8. Introduction 的推荐五段结构
-
-### Paragraph 1：现实决策场景
-
-用 Tripadvisor/Ipsos 的 81%、78%、55% 和平均 9 条评论说明消费者在住宿选择中依赖一个近期评论集合。不要从 rating inflation 开篇；rating inflation 可以作为背景，但不足以产生当前论文的核心 tension。
-
-### Paragraph 2：现实 puzzle
-
-提出“更多评论是否真的等于更多信息”。相似评论可能形成可信共识，也可能只是重复相同属性与经历。对酒店这种多属性体验产品，两种解释都合理，因此净绩效后果并不显然。
-
-### Paragraph 3：文献 tension 与未解问题
-
-先承认 aggregate-signal、individual-content 和 cross-review-context 三条文献已经取得的进展，包括团队 Journal of Retailing 论文；随后把 gap 收窄为 review-set structure 的 firm-level economic consequence 与 context dependence。
-
-### Paragraph 4：研究设计与核心发现
-
-简洁介绍 TripAdvisor 评论、Texas 酒店收入、hotel-month panel、Doc2Vec、近期可见 review set、FE/Sys-GMM 和替代测量。结果只强调：稳定负主效应、existing-consensus 边界、alternative-signal 边界和局部 decision context。
-
-### Paragraph 5：三项贡献
-
-按“经济后果—理论 trade-off—hospitality decision context”的顺序写，避免列举所有异质性结果。
-
-## 9. Literature Review 与 Discussion 的重构
-
-### Literature Review
-
-建议由旧稿的“online reviews and product demand + 三个零散 moderator”改成：
-
-1. **Aggregate Review Signals and Hotel Performance**  
-   交代 rating、volume、variance、valence/sentiment 如何提供共识或质量信号。
-2. **From Review Content to Review-Set Structure**  
-   从 sentiment、informativeness、narrativity 过渡到 contextual/adjacent review research，并明确引用团队论文。
-3. **Consensus–Coverage Trade-off**  
-   同时推导共识收益和覆盖损失，说明酒店情境下为何预计净效应为负。
-4. **When Redundancy Costs More**  
-   只正式发展 existing consensus cues 和 alternative quality signals 两组边界；竞争、情绪、设施与 COVID 放入 extensions。
-
-### Discussion
-
-Discussion 不应逐表复述结果。建议按以下顺序：
-
-1. **Net effect**：在酒店近期评论集合中，coverage loss 平均超过 consensus benefit。
-2. **Why volume and agreement matter**：共识已由数量和评分一致性提供时，重复文本发生信息折旧。
-3. **Why weak-signal hotels matter**：低星级、独立、低排名酒店缺少替代信号，更依赖非重复文本。
-4. **Decision context**：ZIP 而非 City、设施复杂度、低情绪和 COVID 共同说明该效应取决于实际 choice environment。
-5. **Connection to sister paper**：从 perceived uniqueness/helpfulness 延伸到 review-set economic value，但明确当前研究没有直接再检验心理中介。
-
-## 10. 论文标题备选
-
-推荐优先级如下：
-
-1. **When More Reviews Say the Same Thing: Recent Review-Set Similarity and Hotel Performance**
-2. **Consensus or Redundancy? The Performance Consequences of Similarity Within Recent Review Sets**
-3. **Beyond Review Volume: How the Information Structure of Recent Reviews Shapes Hotel Performance**
-4. **The Economic Cost of Redundant Reviews: Evidence from Hotel Review Sets and Revenue**
-
-标题 1 最适合 Hospitality 与 Decision Support 双重读者：问题直观、构念明确，也不会与团队 Journal of Retailing 论文的 “Standing Out” 标题过度接近。
-
-## 11. 执行计划
-
-### Phase 1：锁定 construct 与跨论文边界
-
-- 统一使用 recent review-set similarity；定义 ARS 是其集合内平均相似度测量。
-- 制作两篇团队论文的数据、样本、测量、结果变量和贡献对照表。
-- 删除所有“first cross-review study”式 novelty 声明。
-
-### Phase 2：重建文献矩阵
-
-- 按 aggregate signals、individual content、cross-review context、hospitality performance 四组整理文献。
-- 每篇文献记录 construct、unit of analysis、outcome、mechanism、与本文关系。
-- 将支持 consensus 的论文和支持 novelty/coverage 的论文并列，而不是只寻找支持负效应的证据。
-
-### Phase 3：重写前端理论
-
-- 先重写 Introduction 五段和 Literature Review 四节。
-- 只保留 H1、existing-consensus boundary 和 alternative-signal boundary 三个主理论模块。
-- 将 competition、amenities、sentiment 和 COVID 降为 context extensions。
-
-### Phase 4：结果—理论对齐
-
-- 主结果表中优先呈现 FE、Sys-GMM、替代相似度和 5–20 review scopes。
-- 异质性结果分为 confirmatory、supportive 和 exploratory 三层，始终报告 exact p-values。
-- 累计 rating、City competition 和 Travelers’ Choice 的 null results 应主动报告，用于界定理论边界。
-- 删除或附录化 functional/experiential 结果。
-
-### Phase 5：重写 Discussion 与 contributions
-
-- 以 consensus–coverage trade-off 解释结果，不再并列 signaling、relationship capital、herding 和 dual-process 四套理论。
-- 明确当前数据支持的是绩效关联、稳健性和边界，不是心理 mediation。
-- 将团队 Journal of Retailing 论文作为微观过程基础，并清楚说明本文的宏观经济增量。
-
-### Phase 6：投稿前审计
-
-- 检查两篇团队论文是否存在样本、文字、图表或理论段落重叠。
-- 准备一段 cross-paper disclosure 和 cover-letter explanation。
-- 做 claim–evidence audit：所有理论陈述有文献，所有结果陈述与 0723 表格一致，所有公开调查注明样本和来源。
-
-## 12. 完成标准
-
-重写后的论文前端应达到以下状态：
-
-- 读者能在 Introduction 第二段看到明确的“共识还是冗余”冲突。
-- 读者不会把本文误认为 Journal of Retailing 论文的 revenue extension 或重复发表。
-- 所有主要异质性都能归入 existing consensus、alternative signals 或 decision context，而不是一串零散 moderators。
-- contributions 只包含当前研究真正识别的 review-set economic value、trade-off 和 hospitality decision context。
-- 公开调查只承担现实动机功能，学术文献承担理论推导功能，0723 结果承担经验检验功能。
-
-## 13. 优先参考文献与资料
+## 8. 优先参考文献与资料
 
 ### Academic literature
 
-- Babić Rosario, A., Sotgiu, F., De Valck, K., & Bijmolt, T. H. A. (2016). The effect of electronic word of mouth on sales: A meta-analytic review of platform, product, and metric factors. *Journal of Marketing Research, 53*(3), 297–318. <https://doi.org/10.1509/jmr.14.0380>
-- Ding, X., Gao, B., & Liu, S. (2022). Understanding the interplay between online reviews and growth of independent and branded hotels. *Decision Support Systems, 152*, 113649. <https://doi.org/10.1016/j.dss.2021.113649>
-- Gao, B., Wang, J., Liu, S., & Cui, N. (2026). Standing out from adjacent reviews: How content similarity affects review helpfulness. *Journal of Retailing*. <https://doi.org/10.1016/j.jretai.2026.02.005>
-- Jabr, W., & Rahman, M. S. (2022). Online reviews and information overload: The role of selective, parsimonious, and concordant top reviews. *MIS Quarterly, 46*(3), 1517–1550. <https://doi.org/10.25300/MISQ/2022/16169>
-- Mukhopadhyay, S., Kumar, V., Sharma, A., & Chung, T. S. (2022). Impact of review narrativity on sales in a competitive environment. *Production and Operations Management, 31*(6), 2538–2556. <https://doi.org/10.1111/poms.13698>
-- Wang, S., Karmakar, S., Wang, F., & Pei, Y. (2025). Content dissimilarity and online review helpfulness: Contextual insights. *Journal of Business Research, 187*, 115068. <https://doi.org/10.1016/j.jbusres.2024.115068>
+- Babić Rosario, A., Sotgiu, F., De Valck, K., & Bijmolt, T. H. A. (2016). The effect of electronic word of mouth on sales: A meta-analytic review of platform, product, and metric factors. *Journal of Marketing Research, 53*(3), 297–318. [https://doi.org/10.1509/jmr.14.0380](https://doi.org/10.1509/jmr.14.0380)
+- Ding, X., Gao, B., & Liu, S. (2022). Understanding the interplay between online reviews and growth of independent and branded hotels. *Decision Support Systems, 152*, 113649. [https://doi.org/10.1016/j.dss.2021.113649](https://doi.org/10.1016/j.dss.2021.113649)
+- Gao, B., Wang, J., Liu, S., & Cui, N. (2026). Standing out from adjacent reviews: How content similarity affects review helpfulness. *Journal of Retailing*. [https://doi.org/10.1016/j.jretai.2026.02.005](https://doi.org/10.1016/j.jretai.2026.02.005)
+- Jabr, W., & Rahman, M. S. (2022). Online reviews and information overload: The role of selective, parsimonious, and concordant top reviews. *MIS Quarterly, 46*(3), 1517–1550. [https://doi.org/10.25300/MISQ/2022/16169](https://doi.org/10.25300/MISQ/2022/16169)
+- Mukhopadhyay, S., Kumar, V., Sharma, A., & Chung, T. S. (2022). Impact of review narrativity on sales in a competitive environment. *Production and Operations Management, 31*(6), 2538–2556. [https://doi.org/10.1111/poms.13698](https://doi.org/10.1111/poms.13698)
+- Wang, S., Karmakar, S., Wang, F., & Pei, Y. (2025). Content dissimilarity and online review helpfulness: Contextual insights. *Journal of Business Research, 187*, 115068. [https://doi.org/10.1016/j.jbusres.2024.115068](https://doi.org/10.1016/j.jbusres.2024.115068)
 
 ### Public survey and industry evidence
 
-- Tripadvisor & Ipsos MORI (2019), *The Power of Reviews*: <https://ir.tripadvisor.com/news-releases/news-release-details/online-reviews-remain-trusted-source-information-when-booking>
-- Tripadvisor, *What Hotel Shoppers Look for in Reviews*: <https://www.tripadvisor.com/business/insights/hotels/resources/hotel-shoppers-look-for-reviews>
-- Tripadvisor, *Research: What Makes a Helpful Review*: <https://www.tripadvisor.com/TripAdvisorInsights/w753>
-- YouGov (2024), *Peers over Pros*: <https://yougov.com/articles/49462-peers-over-pros-more-travellers-rely-on-consumer-feedback-than-critic-reviews-for-accommodation>
-
+- Tripadvisor & Ipsos MORI (2019), *The Power of Reviews*: [https://ir.tripadvisor.com/news-releases/news-release-details/online-reviews-remain-trusted-source-information-when-booking](https://ir.tripadvisor.com/news-releases/news-release-details/online-reviews-remain-trusted-source-information-when-booking)
+- Tripadvisor, *What Hotel Shoppers Look for in Reviews*: [https://www.tripadvisor.com/business/insights/hotels/resources/hotel-shoppers-look-for-reviews](https://www.tripadvisor.com/business/insights/hotels/resources/hotel-shoppers-look-for-reviews)
+- Tripadvisor, *Research: What Makes a Helpful Review*: [https://www.tripadvisor.com/TripAdvisorInsights/w753](https://www.tripadvisor.com/TripAdvisorInsights/w753)
+- YouGov (2024), *Peers over Pros*: [https://yougov.com/articles/49462-peers-over-pros-more-travellers-rely-on-consumer-feedback-than-critic-reviews-for-accommodation](https://yougov.com/articles/49462-peers-over-pros-more-travellers-rely-on-consumer-feedback-than-critic-reviews-for-accommodation)
