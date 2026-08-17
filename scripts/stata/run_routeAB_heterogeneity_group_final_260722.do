@@ -164,8 +164,14 @@ bdiff, group(het_high_mon_rating) ///
 	ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595, ///
         absorb(hotel_id_num ym) cluster(hotel_id_num)) ///
     reps(500) seed(260721) first
-*** 没有通过！但是比之前的好些
 
+bdiff, group(het_high_mon_rating) ///
+    model(reghdfe ln_RevPAR_clean sim_mean ///
+    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5  ///
+	ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+	ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595, ///
+        absorb(hotel_id_num ym) cluster(hotel_id_num)) ///
+    reps(100) seed(1) first
 
 esttab low_mon_rating high_mon_rating using "heterogeneity_mon_rating_0722.rtf", replace rtf ///
     order(sim_mean ///
@@ -340,14 +346,14 @@ reghdfe ln_RevPAR_clean sim_mean ///
     if het_high_star == 1, ///
     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 estimates store high_star
-
+	
 bdiff, group(het_high_star) ///
     model(reghdfe ln_RevPAR_clean sim_mean ///
     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc ///
     lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean_w195, ///
         absorb(hotel_id_num ym) cluster(hotel_id_num)) ///
-    reps(500) seed(260715) first
-
+    reps(500) seed(42) first	
+	
 esttab low_star high_star using "heterogeneity_star_0722.rtf", replace rtf ///
     order(sim_mean ///
         ln_recent_volumn_10 recent_sd_10 lag_avg_rating_month rating_last_5 ///
@@ -387,6 +393,20 @@ bdiff, group(chain) ///
         absorb(hotel_id_num ym) cluster(hotel_id_num)) ///
     reps(500) seed(260722) first
 	
+bdiff, group(chain) ///
+    model(reghdfe ln_RevPAR_clean_w595 sim_mean ///
+    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc ///
+    lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
+        absorb(hotel_id_num ym) cluster(hotel_id_num)) ///
+    reps(500) seed(1) first
+
+bdiff, group(chain) ///
+    model(reghdfe ln_RevPAR_clean_w595 sim_mean ///
+    recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc ///
+    lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
+        absorb(hotel_id_num ym) cluster(hotel_id_num)) ///
+    reps(200) seed(1) first
+	
 esttab result_chain result_indep using "heterogeneity_chain_0722.rtf", replace rtf ///
     order(sim_mean ///
     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc ///
@@ -405,7 +425,7 @@ esttab result_chain result_indep using "heterogeneity_chain_0722.rtf", replace r
 capture drop het_med_rank_status
 capture drop het_high_rank_status
 
-bysort City ym: egen double het_med_rank_status = median(hotel_rank_pct) if het_base_cc
+egen double het_med_rank_status = median(hotel_rank_pct) if het_base_cc
 gen het_high_rank_status = .
 replace het_high_rank_status = 0 if hotel_rank_pct < het_med_rank_status
 replace het_high_rank_status = 1 if hotel_rank_pct >= het_med_rank_status
@@ -483,6 +503,15 @@ bdiff, group(het_high_amenity_count) ///
         absorb(hotel_id_num ym) cluster(hotel_id_num)) ///
     reps(500) seed(260722) first
 
+bdiff, group(het_high_amenity_count) ///
+    model(reghdfe ln_RevPAR_clean_w595 sim_mean ///
+        recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+        ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+        ln_avg_com_RevPAR ln_lag_RevPAR_clean, ///
+        absorb(hotel_id_num ym) cluster(hotel_id_num)) ///
+    reps(300) seed(2) first	
+
+	
 esttab low_amenity_count high_amenity_count using "heterogeneity_amenity_count_0722.rtf", replace rtf ///
     order(sim_mean ///
         ln_recent_volumn_10 recent_sd_10 lag_avg_rating_month rating_last_5 ///
@@ -848,7 +877,7 @@ esttab quick30_low quick30_high using "heterogeneity_mr_quick30.rtf", replace rt
 * 15-1. ZIP full-market HHI
 ************************************************************
 
-* gen double hhi_zip_full_pct = hhi_zip_full / 100
+gen double hhi_zip_full_pct = hhi_zip_full / 100
 label variable hhi_zip_full_pct "HHI (percentage points)"
 
 capture drop med_hhi_zip_full
@@ -883,6 +912,14 @@ bdiff, group(g_hi_hhi_zip_full) ///
         ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595, ///
         absorb(hotel_id_num ym) cluster(hotel_id_num)) ///
     reps(500) seed(260720) first
+	
+bdiff, group(g_hi_hhi_zip_full) ///
+    model(reghdfe ln_RevPAR_clean sim_mean ///
+        recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+        ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+        ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595, ///
+        absorb(hotel_id_num ym) cluster(hotel_id_num)) ///
+    reps(300) seed(42) first
 
 esttab hhi_zip_full_low hhi_zip_full_high using "heterogeneity_hhi_zip_full_0722.rtf", replace rtf ///
     order(sim_mean ///
@@ -922,7 +959,7 @@ est store hhi_zip_full_low
 reghdfe ln_RevPAR_clean sim_mean hhi_zip_full_pct ///
     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
     ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
-    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 hhi_zip_full ///
+    ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595 ///
     if g_hi_hhi_zip_full == 1, ///
     absorb(hotel_id_num ym) vce(cluster hotel_id_num)
 est store hhi_zip_full_high
@@ -935,6 +972,14 @@ bdiff, group(g_hi_hhi_zip_full) ///
         absorb(hotel_id_num ym) cluster(hotel_id_num)) ///
     reps(500) seed(260722) first
 
+bdiff, group(g_hi_hhi_zip_full) ///
+    model(reghdfe ln_RevPAR_clean sim_mean ///
+        recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+        ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+        ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595, ///
+        absorb(hotel_id_num ym) cluster(hotel_id_num)) ///
+    reps(300) seed(42) first	
+	
 esttab hhi_zip_full_low hhi_zip_full_high using "heterogeneity_hhi_zip_withhhi_0722.rtf", replace rtf ///
     order(sim_mean hhi_zip_full_pct ///
         ln_recent_volumn_10 recent_sd_10 lag_avg_rating_month rating_last_5 ///

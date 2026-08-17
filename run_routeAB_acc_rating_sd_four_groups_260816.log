@@ -1,0 +1,653 @@
+
+  ___  ____  ____  ____  ____ ©
+ /__    /   ____/   /   ____/      17.0
+___/   /   /___/   /   /___/       MP—Parallel Edition
+
+ Statistics and Data Science       Copyright 1985-2021 StataCorp LLC
+                                   StataCorp
+                                   4905 Lakeway Drive
+                                   College Station, Texas 77845 USA
+                                   800-STATA-PC        https://www.stata.com
+                                   979-696-4600        stata@stata.com
+
+Stata license: Single-user 2-core  perpetual
+Serial number: 501806366047
+  Licensed to: Sam Xie
+               samxie
+
+Notes:
+      1. Stata is running in batch mode.
+      2. Unicode is supported; see help unicode_advice.
+      3. More than 2 billion observations are allowed; see help obs_advice.
+      4. Maximum number of variables is set to 5,000; see help set_maxvar.
+
+
+Running /Applications/Stata/profile.do ...
+command window is unrecognized
+r(199);
+
+. do scripts/stata/run_routeAB_acc_rating_sd_four_groups_260816.do 
+
+. ************************************************************
+. * Route A/B: accumulated-rating x accumulated-rating-SD
+. * four-group heterogeneity analysis.
+. *
+. * Input: routeAB_heterogeneity_final_260715.dta
+. * Groups: CityID x month medians on the common complete-case sample.
+. * Models: hotel FE + month FE; SE clustered by hotel.
+. * Robustness: 3 x 3 combinations of winsorized current and lagged RevPAR.
+. ************************************************************
+. 
+. version 17.0
+
+. clear all
+
+. set more off
+
+. set linesize 255
+
+. 
+. local project "/Users/samxie/Research/ReviewSimi_Sales/Code"
+
+. local input   "`project'/outputs/core_simi_260501/data/routeAB_heterogeneity_final_260715.dta"
+
+. local outdir  "`project'/outputs/core_simi_260501/research/results"
+
+. 
+. capture mkdir "`project'/outputs/core_simi_260501/research"
+
+. capture mkdir "`outdir'"
+
+. 
+. capture log close _all
+
+. log using "`outdir'/routeAB_acc_rating_sd_four_groups_260816.log", replace text name(fourgroups)
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+      name:  fourgroups
+       log:  /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/research/results/routeAB_acc_rating_sd_four_groups_260816.log
+  log type:  text
+ opened on:  16 Aug 2026, 14:27:40
+
+. 
+. use "`input'", clear
+
+. 
+. capture confirm variable hotel_id_num
+
+. if _rc {
+.     capture confirm numeric variable HotelID
+.     if _rc encode HotelID, gen(hotel_id_num)
+.     else gen long hotel_id_num = HotelID
+. }
+
+. 
+. capture confirm variable ym
+
+. if _rc gen int ym = monthly(year_month, "YM")
+
+. format ym %tm
+
+. xtset hotel_id_num ym
+
+Panel variable: hotel_id_num (unbalanced)
+ Time variable: ym, 2011m1 to 2022m9, but with gaps
+         Delta: 1 month
+
+. sort hotel_id_num ym
+
+. 
+. ************************************************************
+. * 1. Construct the requested global winsorized variants.
+. ************************************************************
+. 
+. capture confirm variable ln_RevPAR_clean_w199
+
+. if _rc winsor2 ln_RevPAR_clean, cuts(1 99) suffix(_w199)
+
+. capture confirm variable ln_lag_RevPAR_clean_w199
+
+. if _rc winsor2 ln_lag_RevPAR_clean, cuts(1 99) suffix(_w199)
+
+. 
+. capture confirm variable ln_RevPAR_clean_w195
+
+. if _rc winsor2 ln_RevPAR_clean, cuts(1 95) suffix(_w195)
+
+. capture confirm variable ln_lag_RevPAR_clean_w195
+
+. if _rc winsor2 ln_lag_RevPAR_clean, cuts(1 95) suffix(_w195)
+
+. 
+. capture confirm variable ln_RevPAR_clean_w595
+
+. if _rc winsor2 ln_RevPAR_clean, cuts(5 95) suffix(_w595)
+
+. capture confirm variable ln_lag_RevPAR_clean_w595
+
+. if _rc winsor2 ln_lag_RevPAR_clean, cuts(5 95) suffix(_w595)
+
+. 
+. label variable ln_RevPAR_clean_w199 "ln(RevPAR), winsorized 1-99"
+
+. label variable ln_lag_RevPAR_clean_w199 "Lagged ln(RevPAR), winsorized 1-99"
+
+. label variable ln_RevPAR_clean_w195 "ln(RevPAR), winsorized 1-95"
+
+. label variable ln_lag_RevPAR_clean_w195 "Lagged ln(RevPAR), winsorized 1-95"
+
+. label variable ln_RevPAR_clean_w595 "ln(RevPAR), winsorized 5-95"
+
+. label variable ln_lag_RevPAR_clean_w595 "Lagged ln(RevPAR), winsorized 5-95"
+
+. 
+. ************************************************************
+. * 2. Rebuild the common sample and CityID x ym median groups.
+. * Low is strictly below the median; high includes median ties.
+. ************************************************************
+. 
+. capture drop het_missing_four het_base_cc_four
+
+. egen byte het_missing_four = rowmiss(ln_RevPAR_clean_w199 sim_mean ///
+>     recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+>     ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+>     ln_avg_com_RevPAR ln_lag_RevPAR_clean_w199)
+
+. gen byte het_base_cc_four = (het_missing_four == 0)
+
+. label variable het_base_cc_four "Four-group common complete-case sample"
+
+. 
+. capture drop het_med_acc_rating_four het_med_acc_sd_four
+
+. capture drop het_high_acc_rating_four het_high_acc_sd_four
+
+. capture drop het_acc_rating_sd_g4
+
+. 
+. bysort CityID ym: egen double het_med_acc_rating_four = ///
+>     median(lag_avg_rating_acc) if het_base_cc_four == 1
+(1,243 missing values generated)
+
+. bysort CityID ym: egen double het_med_acc_sd_four = ///
+>     median(lag_sd_acc) if het_base_cc_four == 1
+(1,243 missing values generated)
+
+. 
+. gen byte het_high_acc_rating_four = .
+(34,791 missing values generated)
+
+. replace het_high_acc_rating_four = 0 if het_base_cc_four == 1 & ///
+>     lag_avg_rating_acc < het_med_acc_rating_four
+(16,766 real changes made)
+
+. replace het_high_acc_rating_four = 1 if het_base_cc_four == 1 & ///
+>     lag_avg_rating_acc >= het_med_acc_rating_four
+(16,782 real changes made)
+
+. 
+. gen byte het_high_acc_sd_four = .
+(34,791 missing values generated)
+
+. replace het_high_acc_sd_four = 0 if het_base_cc_four == 1 & ///
+>     lag_sd_acc < het_med_acc_sd_four
+(16,774 real changes made)
+
+. replace het_high_acc_sd_four = 1 if het_base_cc_four == 1 & ///
+>     lag_sd_acc >= het_med_acc_sd_four
+(16,774 real changes made)
+
+. 
+. gen byte het_acc_rating_sd_g4 = .
+(34,791 missing values generated)
+
+. replace het_acc_rating_sd_g4 = 1 if het_high_acc_rating_four == 0 & het_high_acc_sd_four == 0
+(2,761 real changes made)
+
+. replace het_acc_rating_sd_g4 = 2 if het_high_acc_rating_four == 0 & het_high_acc_sd_four == 1
+(14,005 real changes made)
+
+. replace het_acc_rating_sd_g4 = 3 if het_high_acc_rating_four == 1 & het_high_acc_sd_four == 0
+(14,013 real changes made)
+
+. replace het_acc_rating_sd_g4 = 4 if het_high_acc_rating_four == 1 & het_high_acc_sd_four == 1
+(2,769 real changes made)
+
+. 
+. label define acc_rating_sd_g4 ///
+>     1 "Low accumulated rating / Low accumulated SD" ///
+>     2 "Low accumulated rating / High accumulated SD" ///
+>     3 "High accumulated rating / Low accumulated SD" ///
+>     4 "High accumulated rating / High accumulated SD", replace
+
+. label values het_acc_rating_sd_g4 acc_rating_sd_g4
+
+. label variable het_acc_rating_sd_g4 "Accumulated rating x accumulated rating SD (four groups)"
+
+. 
+. label variable sim_mean "ARS"
+
+. label variable recent_sd_10 "Recent rating SD"
+
+. label variable ln_recent_volumn_10 "ln(Recent review volume)"
+
+. label variable lag_avg_rating_month "Recent rating"
+
+. label variable rating_last_5 "Rating of last 5 reviews"
+
+. label variable ln_lag_volumn_acc "ln(Accumulated review volume)"
+
+. label variable lag_avg_rating_acc "Accumulated rating"
+
+. label variable lag_sd_acc "Accumulated rating SD"
+
+. label variable ln_avg_com_RevPAR "ln(Competitor RevPAR)"
+
+. 
+. tab het_acc_rating_sd_g4 if het_base_cc_four == 1, missing
+
+Accumulated rating x accumulated rating |
+                       SD (four groups) |      Freq.     Percent        Cum.
+----------------------------------------+-----------------------------------
+Low accumulated rating / Low accumulate |      2,761        8.23        8.23
+Low accumulated rating / High accumulat |     14,005       41.75       49.98
+High accumulated rating / Low accumulat |     14,013       41.77       91.75
+High accumulated rating / High accumula |      2,769        8.25      100.00
+----------------------------------------+-----------------------------------
+                                  Total |     33,548      100.00
+
+. 
+. * Export group sample sizes and distinct hotel counts.
+. preserve
+
+. keep if het_base_cc_four == 1 & !missing(het_acc_rating_sd_g4)
+(1,243 observations deleted)
+
+. bysort het_acc_rating_sd_g4 hotel_id_num: gen byte hotel_tag_four = (_n == 1)
+
+. collapse (count) observations=hotel_id_num (sum) hotels=hotel_tag_four, by(het_acc_rating_sd_g4)
+
+. decode het_acc_rating_sd_g4, gen(group_label)
+
+. order het_acc_rating_sd_g4 group_label observations hotels
+
+. export delimited using "`outdir'/routeAB_acc_rating_sd_four_group_counts_260816.csv", replace nolabel
+file /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/research/results/routeAB_acc_rating_sd_four_group_counts_260816.csv saved
+
+. restore
+
+. 
+. * Save a derived analysis panel; the 260715 source file is not overwritten.
+. compress
+  (0 bytes saved)
+
+. save "`outdir'/routeAB_acc_rating_sd_four_groups_panel_260816.dta", replace
+file /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/research/results/routeAB_acc_rating_sd_four_groups_panel_260816.dta saved
+
+. 
+. ************************************************************
+. * 3. Separate four-group regressions for all 3 x 3 variants.
+. ************************************************************
+. 
+. local controls "recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ln_avg_com_RevPAR"
+
+. local cuts "199 195 595"
+
+. 
+. estimates clear
+
+. tempname regpost
+
+. postfile `regpost' str3 outcome_cut str3 lag_cut byte group ///
+>     double b_sim se_sim p_sim N N_clust r2_a ///
+>     using "`outdir'/routeAB_acc_rating_sd_four_groups_results_260816.dta", replace
+
+. 
+. foreach ycut of local cuts {
+  2.     foreach lcut of local cuts {
+  3.         local depvar "ln_RevPAR_clean_w`ycut'"
+  4.         local lagvar "ln_lag_RevPAR_clean_w`lcut'"
+  5. 
+.         forvalues g = 1/4 {
+  6.             quietly reghdfe `depvar' sim_mean `controls' `lagvar' ///
+>                 if het_base_cc_four == 1 & het_acc_rating_sd_g4 == `g', ///
+>                 absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+  7. 
+.             estimates store m_`ycut'_`lcut'_g`g'
+  8. 
+.             scalar b_four  = _b[sim_mean]
+  9.             scalar se_four = _se[sim_mean]
+ 10.             scalar p_four  = 2 * ttail(e(df_r), abs(b_four / se_four))
+ 11.             scalar n_four  = e(N)
+ 12.             capture scalar nc_four = e(N_clust)
+ 13.             if _rc scalar nc_four = .
+ 14.             scalar r2a_four = e(r2_a)
+ 15. 
+.             post `regpost' ("`ycut'") ("`lcut'") (`g') ///
+>                 (b_four) (se_four) (p_four) (n_four) (nc_four) (r2a_four)
+ 16.         }
+ 17.     }
+ 18. }
+
+. postclose `regpost'
+
+. 
+. preserve
+
+. use "`outdir'/routeAB_acc_rating_sd_four_groups_results_260816.dta", clear
+
+. label define acc_rating_sd_g4 ///
+>     1 "Low accumulated rating / Low accumulated SD" ///
+>     2 "Low accumulated rating / High accumulated SD" ///
+>     3 "High accumulated rating / Low accumulated SD" ///
+>     4 "High accumulated rating / High accumulated SD", replace
+
+. label values group acc_rating_sd_g4
+
+. decode group, gen(group_label)
+
+. order outcome_cut lag_cut group group_label b_sim se_sim p_sim N N_clust r2_a
+
+. sort outcome_cut lag_cut group
+
+. save "`outdir'/routeAB_acc_rating_sd_four_groups_results_260816.dta", replace
+file /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/research/results/routeAB_acc_rating_sd_four_groups_results_260816.dta saved
+
+. export delimited using "`outdir'/routeAB_acc_rating_sd_four_groups_results_260816.csv", replace nolabel
+file /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/research/results/routeAB_acc_rating_sd_four_groups_results_260816.csv saved
+
+. restore
+
+. 
+. ************************************************************
+. * 4. RTF tables.
+. ************************************************************
+. 
+. * User-requested reference specification: outcome w199, lagged outcome w595.
+. esttab m_199_595_g1 m_199_595_g2 m_199_595_g3 m_199_595_g4 ///
+>     using "`outdir'/routeAB_acc_rating_sd_four_groups_main_w199_lagw595_260816.rtf", ///
+>     replace rtf ///
+>     mtitles("Low rating / Low SD" "Low rating / High SD" ///
+>         "High rating / Low SD" "High rating / High SD") ///
+>     order(sim_mean `controls' ln_lag_RevPAR_clean_w595) ///
+>     cells(b(star fmt(3)) se(par fmt(3))) ///
+>     star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
+>     stats(N N_clust r2_a, ///
+>         labels("Observations" "Hotel clusters" "Adjusted R-squared") ///
+>         fmt(%12.0fc %12.0fc %9.3f)) ///
+>     title("Accumulated Rating x Accumulated Rating SD: Four Groups") ///
+>     label nogap compress
+(output written to /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/research/results/routeAB_acc_rating_sd_four_groups_main_w199_lagw595_260816.rtf)
+
+. 
+. * Compact matched-cut robustness table; report only the ARS coefficient.
+. esttab m_199_199_g1 m_199_199_g2 m_199_199_g3 m_199_199_g4 ///
+>        m_195_195_g1 m_195_195_g2 m_195_195_g3 m_195_195_g4 ///
+>        m_595_595_g1 m_595_595_g2 m_595_595_g3 m_595_595_g4 ///
+>     using "`outdir'/routeAB_acc_rating_sd_four_groups_matched_winsor_260816.rtf", ///
+>     replace rtf keep(sim_mean) ///
+>     mtitles("199 LL" "199 LH" "199 HL" "199 HH" ///
+>         "195 LL" "195 LH" "195 HL" "195 HH" ///
+>         "595 LL" "595 LH" "595 HL" "595 HH") ///
+>     cells(b(star fmt(3)) se(par fmt(3))) ///
+>     star(* 0.10 ** 0.05 *** 0.01 **** 0.001) ///
+>     stats(N N_clust r2_a, ///
+>         labels("Observations" "Hotel clusters" "Adjusted R-squared") ///
+>         fmt(%12.0fc %12.0fc %9.3f)) ///
+>     title("ARS Coefficients Across Matched Winsorization Specifications") ///
+>     label nogap compress
+(output written to /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/research/results/routeAB_acc_rating_sd_four_groups_matched_winsor_260816.rtf)
+
+. 
+. ************************************************************
+. * 5. Pooled interaction tests of the four economically relevant
+. *    pairwise differences in ARS slopes, for all 3 x 3 variants.
+. *    These complement separate regressions and do not depend on bdiff.
+. ************************************************************
+. 
+. tempname diffpost
+
+. postfile `diffpost' str3 outcome_cut str3 lag_cut str34 contrast ///
+>     double b_diff se_diff p_diff N N_clust ///
+>     using "`outdir'/routeAB_acc_rating_sd_four_groups_differences_260816.dta", replace
+
+. 
+. foreach ycut of local cuts {
+  2.     foreach lcut of local cuts {
+  3.         local depvar "ln_RevPAR_clean_w`ycut'"
+  4.         local lagvar "ln_lag_RevPAR_clean_w`lcut'"
+  5. 
+.         quietly reghdfe `depvar' c.sim_mean##ib1.het_acc_rating_sd_g4 ///
+>             `controls' `lagvar' if het_base_cc_four == 1, ///
+>             absorb(hotel_id_num ym) vce(cluster hotel_id_num)
+  6. 
+.         scalar pooled_n = e(N)
+  7.         capture scalar pooled_nc = e(N_clust)
+  8.         if _rc scalar pooled_nc = .
+  9. 
+.         * High SD minus low SD among low-rating observations: G2 - G1.
+.         quietly lincom 2.het_acc_rating_sd_g4#c.sim_mean
+ 10.         post `diffpost' ("`ycut'") ("`lcut'") ("SD effect | low rating: G2-G1") ///
+>             (r(estimate)) (r(se)) (r(p)) (pooled_n) (pooled_nc)
+ 11. 
+.         * High SD minus low SD among high-rating observations: G4 - G3.
+.         quietly lincom 4.het_acc_rating_sd_g4#c.sim_mean - ///
+>             3.het_acc_rating_sd_g4#c.sim_mean
+ 12.         post `diffpost' ("`ycut'") ("`lcut'") ("SD effect | high rating: G4-G3") ///
+>             (r(estimate)) (r(se)) (r(p)) (pooled_n) (pooled_nc)
+ 13. 
+.         * High rating minus low rating among low-SD observations: G3 - G1.
+.         quietly lincom 3.het_acc_rating_sd_g4#c.sim_mean
+ 14.         post `diffpost' ("`ycut'") ("`lcut'") ("Rating effect | low SD: G3-G1") ///
+>             (r(estimate)) (r(se)) (r(p)) (pooled_n) (pooled_nc)
+ 15. 
+.         * High rating minus low rating among high-SD observations: G4 - G2.
+.         quietly lincom 4.het_acc_rating_sd_g4#c.sim_mean - ///
+>             2.het_acc_rating_sd_g4#c.sim_mean
+ 16.         post `diffpost' ("`ycut'") ("`lcut'") ("Rating effect | high SD: G4-G2") ///
+>             (r(estimate)) (r(se)) (r(p)) (pooled_n) (pooled_nc)
+ 17.     }
+ 18. }
+
+. postclose `diffpost'
+
+. 
+. preserve
+
+. use "`outdir'/routeAB_acc_rating_sd_four_groups_differences_260816.dta", clear
+
+. sort outcome_cut lag_cut contrast
+
+. save "`outdir'/routeAB_acc_rating_sd_four_groups_differences_260816.dta", replace
+file /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/research/results/routeAB_acc_rating_sd_four_groups_differences_260816.dta saved
+
+. export delimited using "`outdir'/routeAB_acc_rating_sd_four_groups_differences_260816.csv", replace
+file /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/research/results/routeAB_acc_rating_sd_four_groups_differences_260816.csv saved
+
+. restore
+
+. 
+. ************************************************************
+. * 6. Attempt bdiff for the four key pairwise comparisons in
+. *    the user's reference specification (w199 outcome / w595 lag).
+. *    Output is retained in the text log because bdiff is an add-on.
+. ************************************************************
+. 
+. capture which bdiff
+
+. if !_rc {
+.     capture program drop run_bdiff_four_pair
+.     program define run_bdiff_four_pair, rclass
+  1.         syntax, LOW(integer) HIGH(integer) SEED(integer)
+  2.         preserve
+  3.         keep if inlist(het_acc_rating_sd_g4, `low', `high') & het_base_cc_four == 1
+  4.         gen byte bdiff_four_group = (het_acc_rating_sd_g4 == `high')
+  5.         noisily bdiff, group(bdiff_four_group) ///
+>             model(reghdfe ln_RevPAR_clean_w199 sim_mean ///
+>                 recent_sd_10 ln_recent_volumn_10 lag_avg_rating_month rating_last_5 ///
+>                 ln_lag_volumn_acc lag_avg_rating_acc lag_sd_acc ///
+>                 ln_avg_com_RevPAR ln_lag_RevPAR_clean_w595, ///
+>                 absorb(hotel_id_num ym) cluster(hotel_id_num)) ///
+>             reps(100) seed(`seed') first
+  6.         local pair_bdiff = r(bdiff)
+  7.         local pair_p = r(p)
+  8.         restore
+  9.         return scalar bdiff = `pair_bdiff'
+ 10.         return scalar p = `pair_p'
+ 11.     end
+. 
+.     tempname bdiffpost
+.     postfile `bdiffpost' str34 contrast double b0_minus_b1 p_permutation ///
+>         using "`outdir'/routeAB_acc_rating_sd_four_groups_bdiff_260816.dta", replace
+(file /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/research/results/routeAB_acc_rating_sd_four_groups_bdiff_260816.dta not found)
+. 
+.     di as text "BDIFF: G2 versus G1 (SD difference within low rating)"
+BDIFF: G2 versus G1 (SD difference within low rating)
+.     capture noisily run_bdiff_four_pair, low(1) high(2) seed(2608161)
+(18,025 observations deleted)
+
+Begin Time: 16 Aug 2026 14:27:45
+....................................................................................................
+
+
+-Permutaion (100 times)- Test of Group (bdiff_four_group 0 v.s 1) coeficients difference
+
+   Variables |      b0-b1    Freq     p-value
+-------------+-------------------------------
+    sim_mean |      0.152      23       0.230
+recent_sd_10 |     -0.013      77       0.230
+ln_recent~10 |     -0.032      82       0.180
+lag_avg_ra~h |     -0.001      62       0.380
+rating_las~5 |     -0.005      77       0.230
+ln_lag_vol~c |      0.014      27       0.270
+lag_avg_ra~c |      0.177       0       0.000
+  lag_sd_acc |      0.039      24       0.240
+ln_avg_com~R |     -0.092     100       0.000
+ln_lag_R~595 |     -0.139     100       0.000
+       _cons |      0.408       9       0.090
+---------------------------------------------
+Ho: b0(sim_mean) = b1(sim_mean)
+  Observed difference =  0.152
+    Empirical p-value =  0.230
+
+ Over Time:16 Aug 2026 14:27:59   Time used: 13.143s
+.     if !_rc post `bdiffpost' ("SD effect | low rating: G1-G2") (r(bdiff)) (r(p))
+.     di as text "BDIFF: G4 versus G3 (SD difference within high rating)"
+BDIFF: G4 versus G3 (SD difference within high rating)
+.     capture noisily run_bdiff_four_pair, low(3) high(4) seed(2608162)
+(18,009 observations deleted)
+
+Begin Time: 16 Aug 2026 14:27:59
+....................................................................................................
+
+
+-Permutaion (100 times)- Test of Group (bdiff_four_group 0 v.s 1) coeficients difference
+
+   Variables |      b0-b1    Freq     p-value
+-------------+-------------------------------
+    sim_mean |     -0.282      98       0.020
+recent_sd_10 |     -0.052      99       0.010
+ln_recent~10 |     -0.041      98       0.020
+lag_avg_ra~h |     -0.019     100       0.000
+rating_las~5 |      0.003      32       0.320
+ln_lag_vol~c |      0.044       1       0.010
+lag_avg_ra~c |      0.174       3       0.030
+  lag_sd_acc |      0.312       0       0.000
+ln_avg_com~R |     -0.033      94       0.060
+ln_lag_R~595 |      0.030      25       0.250
+       _cons |     -0.988      96       0.040
+---------------------------------------------
+Ho: b0(sim_mean) = b1(sim_mean)
+  Observed difference = -0.282
+    Empirical p-value =  0.020
+
+ Over Time:16 Aug 2026 14:28:11   Time used: 12.656s
+.     if !_rc post `bdiffpost' ("SD effect | high rating: G3-G4") (r(bdiff)) (r(p))
+.     di as text "BDIFF: G3 versus G1 (rating difference within low SD)"
+BDIFF: G3 versus G1 (rating difference within low SD)
+.     capture noisily run_bdiff_four_pair, low(1) high(3) seed(2608163)
+(18,017 observations deleted)
+
+Begin Time: 16 Aug 2026 14:28:11
+....................................................................................................
+
+
+-Permutaion (100 times)- Test of Group (bdiff_four_group 0 v.s 1) coeficients difference
+
+   Variables |      b0-b1    Freq     p-value
+-------------+-------------------------------
+    sim_mean |      0.102      32       0.320
+recent_sd_10 |      0.019      22       0.220
+ln_recent~10 |      0.001      55       0.450
+lag_avg_ra~h |      0.006      19       0.190
+rating_las~5 |     -0.001      62       0.380
+ln_lag_vol~c |      0.021      21       0.210
+lag_avg_ra~c |      0.161       3       0.030
+  lag_sd_acc |      0.174       3       0.030
+ln_avg_com~R |     -0.045      99       0.010
+ln_lag_R~595 |     -0.101     100       0.000
+       _cons |     -0.393      82       0.180
+---------------------------------------------
+Ho: b0(sim_mean) = b1(sim_mean)
+  Observed difference =  0.102
+    Empirical p-value =  0.320
+
+ Over Time:16 Aug 2026 14:28:24   Time used: 12.941s
+.     if !_rc post `bdiffpost' ("Rating effect | low SD: G1-G3") (r(bdiff)) (r(p))
+.     di as text "BDIFF: G4 versus G2 (rating difference within high SD)"
+BDIFF: G4 versus G2 (rating difference within high SD)
+.     capture noisily run_bdiff_four_pair, low(2) high(4) seed(2608164)
+(18,017 observations deleted)
+
+Begin Time: 16 Aug 2026 14:28:24
+....................................................................................................
+
+
+-Permutaion (100 times)- Test of Group (bdiff_four_group 0 v.s 1) coeficients difference
+
+   Variables |      b0-b1    Freq     p-value
+-------------+-------------------------------
+    sim_mean |     -0.332      95       0.050
+recent_sd_10 |     -0.020      75       0.250
+ln_recent~10 |     -0.008      64       0.360
+lag_avg_ra~h |     -0.013     100       0.000
+rating_las~5 |      0.006      14       0.140
+ln_lag_vol~c |      0.050       4       0.040
+lag_avg_ra~c |      0.158       0       0.000
+  lag_sd_acc |      0.446       0       0.000
+ln_avg_com~R |      0.013      30       0.300
+ln_lag_R~595 |      0.067       1       0.010
+       _cons |     -1.789     100       0.000
+---------------------------------------------
+Ho: b0(sim_mean) = b1(sim_mean)
+  Observed difference = -0.332
+    Empirical p-value =  0.050
+
+ Over Time:16 Aug 2026 14:28:37   Time used: 12.779s
+.     if !_rc post `bdiffpost' ("Rating effect | high SD: G2-G4") (r(bdiff)) (r(p))
+. 
+.     postclose `bdiffpost'
+.     preserve
+.     use "`outdir'/routeAB_acc_rating_sd_four_groups_bdiff_260816.dta", clear
+.     export delimited using "`outdir'/routeAB_acc_rating_sd_four_groups_bdiff_260816.csv", replace
+(file /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/research/results/routeAB_acc_rating_sd_four_groups_bdiff_260816.csv not found)
+file /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/research/results/routeAB_acc_rating_sd_four_groups_bdiff_260816.csv saved
+.     restore
+. }
+
+. else {
+.     di as error "bdiff is not installed; pooled interaction difference tests were completed instead."
+. }
+
+. 
+. di as result "Four-group analysis completed."
+Four-group analysis completed.
+
+. log close fourgroups
+      name:  fourgroups
+       log:  /Users/samxie/Research/ReviewSimi_Sales/Code/outputs/core_simi_260501/research/results/routeAB_acc_rating_sd_four_groups_260816.log
+  log type:  text
+ closed on:  16 Aug 2026, 14:28:37
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+. 
+end of do-file
