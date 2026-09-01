@@ -1,6 +1,5 @@
 # Generated outputs should not be uploaded.
-outputs/
-outputs/paper/
+outputs/*
 
 # Local raw/full datasets should stay off GitHub.
-full-data/
+full-data/*
